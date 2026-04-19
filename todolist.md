@@ -35,9 +35,9 @@ Phase 2: 극한의 시각화 엔진 (The Visuals)
 - [x] Blender-style Node Editor: React Flow를 사용하여 하드웨어 아키텍처를 시각화하되, 수천 개의 노드에서도 렉이 없는 뷰포트 컬링 최적화 적용.
 
 Phase 3: 확장형 AI 생태계 (The Brains)
-- [ ] Dual AI Pipeline: 기본은 클라우드 API(Gemini/Claude)를 사용하되, 보안 환경을 위한 로컬 엔진 지원.
-- [ ] Extension Manager: VS Installer 스타일의 UI를 구현하여, 유저가 필요할 때만 로컬 LLM 엔진(llama.cpp 기반) 및 가속 모델을 선택적으로 다운로드 및 활성화.
-- [ ] Context Compression: 수백만 라인의 시뮬레이션 로그를 AI가 읽기 쉬운 요약본으로 압축하여 토큰 효율 극대화.
+- [x] Dual AI Pipeline: 기본은 클라우드 API(Gemini/Claude)를 사용하되, 보안 환경을 위한 로컬 엔진 지원.
+- [x] Extension Manager: VS Installer 스타일의 UI를 구현하여, 유저가 필요할 때만 로컬 LLM 엔진(llama.cpp 기반) 및 가속 모델을 선택적으로 다운로드 및 활성화.
+- [x] Context Compression: 수백만 라인의 시뮬레이션 로그를 AI가 읽기 쉬운 요약본으로 압축하여 토큰 효율 극대화.
 
 Phase 4: 엔터프라이즈 리포팅 (The Output)
 - [ ] Snapshot 엔진: 32K 고해상도로 현재 분석 화면을 캡처하여 메모리에 유지.

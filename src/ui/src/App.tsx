@@ -3,12 +3,13 @@ import { invoke } from "@tauri-apps/api/core";
 import { CanvasView } from "./CanvasView";
 import { PerfChart } from "./PerfChart";
 import { NodeEditor } from "./NodeEditor";
+import { ExtensionManager } from "./ExtensionManager";
 import { Flex, Text, Button, TextField } from "@radix-ui/themes";
-import { Cpu, LayoutDashboard, BrainCircuit, Activity } from "lucide-react";
+import { Cpu, LayoutDashboard, BrainCircuit, Activity, Settings2 } from "lucide-react";
 
 function App() {
   const [header, setHeader] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<"canvas" | "nodes">("canvas");
+  const [activeTab, setActiveTab] = useState<"canvas" | "nodes" | "extensions">("canvas");
 
   useEffect(() => {
     async function loadTrace() {
@@ -43,7 +44,7 @@ function App() {
         <div className="w-12 border-r border-gray-800/50 bg-gray-900/50 flex flex-col items-center py-4 gap-6">
           <button className="p-2 rounded-md hover:bg-gray-800 text-blue-400 transition-colors"><LayoutDashboard size={20} /></button>
           <button className="p-2 rounded-md hover:bg-gray-800 text-gray-500 hover:text-gray-300 transition-colors"><Activity size={20} /></button>
-          <button className="p-2 rounded-md hover:bg-gray-800 text-gray-500 hover:text-gray-300 transition-colors"><BrainCircuit size={20} /></button>
+          <button className="p-2 rounded-md hover:bg-gray-800 text-gray-500 hover:text-gray-300 transition-colors" onClick={() => setActiveTab("extensions")}><Settings2 size={20} /></button>
         </div>
 
         {/* Layout */}
@@ -63,10 +64,18 @@ function App() {
               >
                 Data Flow Graph
               </button>
+              <button 
+                onClick={() => setActiveTab("extensions")}
+                className={`hover:text-gray-200 transition-colors ${activeTab === "extensions" ? "text-blue-400 border-b-2 border-blue-400 h-full" : ""}`}
+              >
+                Extension Manager
+              </button>
             </div>
             
             <div className="flex-1 relative bg-gradient-to-br from-gray-950 to-gray-900">
-              {activeTab === "canvas" ? <CanvasView /> : <NodeEditor />}
+              {activeTab === "canvas" && <CanvasView />}
+              {activeTab === "nodes" && <NodeEditor />}
+              {activeTab === "extensions" && <ExtensionManager />}
               
               {/* Overlay Info (Only for Canvas) */}
               {activeTab === "canvas" && (
