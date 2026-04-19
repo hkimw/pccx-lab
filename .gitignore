@@ -12,8 +12,28 @@ docs/ko/_build/
 
 # Python
 .venv/
+venv/
 __pycache__/
 *.pyc
 
+# CMake / C++ build output
+build/
+cmake-build-*/
+
+# Qt installation (fetched by aqtinstall)
+qt6/
+aqtinstall.log
+
+# Editor / IDE local state
+.vscode/
+.idea/
+imgui.ini
+
+# Local tooling scratch (not committed)
+.claude/
+.claudesignore
+pccx-lab-bootstrap-task.md
+
 # OS
 .DS_Store
+Thumbs.db
