@@ -84,6 +84,7 @@ function ResizeHandle({ direction = "horizontal" }: { direction?: "horizontal" |
 
 function AppInner() {
   const theme = useTheme();
+  const { lang, t } = useI18n();
   const isDark = theme.mode === "dark";
   const [header, setHeader]       = useState<any>(null);
   const [license, setLicense]     = useState("");
@@ -143,20 +144,24 @@ function AppInner() {
 
         <div className="p-2 shrink-0" style={{ borderTop: `1px solid ${border}` }}>
           <Flex gap="1">
-            <TextField.Root placeholder="질문 입력…" className="flex-1" size="1"
+            <TextField.Root placeholder={t("placeholder.ask")} className="flex-1" size="1"
               value={inputText} onChange={e => setInputText(e.target.value)}
               onKeyDown={handleKeyDown} />
             <Button size="1" color="purple" variant="solid"
               disabled={copilotBusy || !inputText.trim()} onClick={handleSend}>→</Button>
           </Flex>
-          <div style={{ fontSize: 9, color: theme.textMuted, marginTop: 3 }}>Enter 전송 · Shift+Enter 줄바꿈</div>
+          <div style={{ fontSize: 9, color: theme.textMuted, marginTop: 3 }}>
+            {lang === "ko" ? "Enter 전송 · Shift+Enter 줄바꿈" : "Enter to send · Shift+Enter for newline"}
+          </div>
         </div>
       </div>
   );
 
   // AI Chat
   const [messages, setMessages]   = useState<ChatMessage[]>([
-    { role: "system", content: "AI Copilot 대기 중. .pccx 트레이스를 로드하면 분석을 시작합니다." },
+    { role: "system", content: lang === "ko"
+        ? "AI Copilot 대기 중. .pccx 트레이스를 로드하면 분석을 시작합니다."
+        : "AI Copilot is idle. Load a .pccx trace to start analysing." },
   ]);
   const [inputText, setInputText] = useState("");
   const [apiKey, setApiKey] = useState(() => localStorage.getItem("pccx_openai_key") || "");
@@ -314,7 +319,7 @@ function AppInner() {
         <Group direction="horizontal" className="flex-1">
           {copilotVisible && copilotDock === "left" && (
             <>
-              <Panel defaultSize={30} minSize={20} maxSize={50} style={{ minWidth: 280 }}>
+              <Panel defaultSize={30} minSize={16} maxSize={70} style={{ minWidth: 240 }}>
                 {renderCopilot()}
               </Panel>
               <ResizeHandle />
@@ -407,7 +412,7 @@ function AppInner() {
           {copilotVisible && copilotDock === "right" && (
             <>
               <ResizeHandle />
-              <Panel defaultSize={30} minSize={20} maxSize={50} style={{ minWidth: 280 }}>
+              <Panel defaultSize={30} minSize={16} maxSize={70} style={{ minWidth: 240 }}>
                  {renderCopilot()}
               </Panel>
             </>

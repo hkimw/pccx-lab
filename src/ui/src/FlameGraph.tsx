@@ -19,8 +19,25 @@ export function FlameGraph() {
   const [loading, setLoading] = useState(true);
   const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string } | null>(null);
   const [aiAnalysis, setAiAnalysis] = useState<{ text: string; rec: string } | null>(null);
+  const [selected, setSelected]   = useState<Span | null>(null);
 
   const vp = useRef({ offset: 0, cpp: 1, dragging: false, lastX: 0 });
+
+  // A span is "kept in colour" when it is either the selected one, its
+  // parent (ancestor containing the selected range), or one of its
+  // descendants (contained inside the selected range). Every other span
+  // is rendered grey so the chosen execution path pops out.
+  function isHighlighted(span: Span, sel: Span | null): boolean {
+    if (!sel) return true;
+    if (span === sel) return true;
+    const spanEnd = span.start + span.duration;
+    const selEnd  = sel.start  + sel.duration;
+    // ancestor
+    if (span.depth < sel.depth && span.start <= sel.start && spanEnd >= selEnd) return true;
+    // descendant
+    if (span.depth > sel.depth && span.start >= sel.start && spanEnd <= selEnd) return true;
+    return false;
+  }
 
   useEffect(() => {
     // Models a Gemma 3N E4B single-token decode step on the pccx v002
@@ -191,47 +208,65 @@ export function FlameGraph() {
     ctx.fillStyle = theme.bgPanel;
     ctx.fillRect(0, 0, cw, ch);
 
-    const SPAN_H = 22;
     const paddingY = 20;
+    // Stretch span rows to fill the available height instead of wasting
+    // vertical space. Depth goes 0..3 for the Gemma decode scenario, so
+    // we size rows to `ch / (maxDepth + 1)` minus small gap.
+    const maxDepth = spans.reduce((m, s) => Math.max(m, s.depth), 0);
+    const rowGap   = 2;
+    const SPAN_H   = Math.max(22, Math.floor((ch - paddingY * 2 - rowGap * maxDepth) / (maxDepth + 1)));
 
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
 
+    // Desaturate palette for un-selected spans
+    const dim = theme.mode === "dark" ? "#3a3a3a" : "#d4d4d4";
+
     for (const span of spans) {
       const x1 = (span.start - offset) / cpp;
       const w = span.duration / cpp;
-      
+
       if (x1 + w < 0 || x1 > cw) continue; // Culling
 
-      const y = paddingY + span.depth * (SPAN_H + 2);
-      
+      const y = paddingY + span.depth * (SPAN_H + rowGap);
+
       const drawX = Math.max(0, x1);
       const drawW = Math.min(cw - drawX, w - (drawX - x1));
-      
+
       if (drawW <= 0) continue;
 
+      const active = isHighlighted(span, selected);
+
       // Box
-      ctx.fillStyle = span.color;
+      ctx.fillStyle = active ? span.color : dim;
+      ctx.globalAlpha = active ? 1 : 0.55;
       ctx.beginPath();
-      ctx.roundRect(x1, y, w, SPAN_H, 2);
+      ctx.roundRect(x1, y, w, SPAN_H, 3);
       ctx.fill();
-      
+      ctx.globalAlpha = 1;
+
       // Border
-      ctx.strokeStyle = theme.mode === "dark" ? "rgba(0,0,0,0.3)" : "rgba(255,255,255,0.5)";
-      ctx.lineWidth = 1;
+      if (selected && span === selected) {
+        ctx.strokeStyle = theme.accent;
+        ctx.lineWidth = 2;
+      } else {
+        ctx.strokeStyle = theme.mode === "dark" ? "rgba(0,0,0,0.3)" : "rgba(255,255,255,0.5)";
+        ctx.lineWidth = 1;
+      }
       ctx.stroke();
 
       // Text if wide enough
       if (drawW > 30) {
-        ctx.fillStyle = "#ffffff";
-        ctx.font = "10px Inter, sans-serif";
+        ctx.fillStyle = active ? "#ffffff"
+                                : (theme.mode === "dark" ? "#777777" : "#999999");
+        ctx.font = "11px Inter, sans-serif";
         ctx.save();
         ctx.beginPath(); ctx.rect(drawX, y, drawW, SPAN_H); ctx.clip();
-        ctx.fillText(span.name, Math.max(x1 + 4, 4), y + SPAN_H / 2);
+        ctx.fillText(span.name, Math.max(x1 + 6, 6), y + SPAN_H / 2);
         ctx.restore();
       }
     }
-  }, [spans, theme]);
+  }, [spans, theme, selected]);
 
   useEffect(() => { 
     draw(); 
@@ -280,14 +315,17 @@ export function FlameGraph() {
       return;
     }
 
-    const SPAN_H = 22;
     const paddingY = 20;
+    const rowGap   = 2;
+    const ch = canvasRef.current?.height ? canvasRef.current.height / (window.devicePixelRatio || 1) : rect.height;
+    const maxDepth = spans.reduce((m, s) => Math.max(m, s.depth), 0);
+    const SPAN_H = Math.max(22, Math.floor((ch - paddingY * 2 - rowGap * maxDepth) / (maxDepth + 1)));
     const hCyc = vp.current.offset + mx * vp.current.cpp;
-    
+
     // Find highest depth hit
     let hit: Span | null = null;
     for (const span of spans) {
-        const y = paddingY + span.depth * (SPAN_H + 2);
+        const y = paddingY + span.depth * (SPAN_H + rowGap);
         if (my >= y && my <= y + SPAN_H && hCyc >= span.start && hCyc <= span.start + span.duration) {
             if (!hit || span.depth > hit.depth) hit = span;
         }
@@ -354,8 +392,37 @@ export function FlameGraph() {
         ref={containerRef} 
         className="flex-1 relative overflow-hidden" 
         style={{ cursor: vp.current.dragging ? "grabbing" : "crosshair" }}
-        onMouseDown={e => { vp.current.dragging = true; vp.current.lastX = e.clientX; }}
-        onMouseUp={() => vp.current.dragging = false}
+        onMouseDown={e => {
+          vp.current.dragging = true;
+          vp.current.lastX    = e.clientX;
+          (e.currentTarget as HTMLElement).dataset.dragStartX = String(e.clientX);
+          (e.currentTarget as HTMLElement).dataset.dragStartY = String(e.clientY);
+        }}
+        onMouseUp={e => {
+          vp.current.dragging = false;
+          // Treat as click only when the pointer barely moved.
+          const sx = Number((e.currentTarget as HTMLElement).dataset.dragStartX ?? 0);
+          const sy = Number((e.currentTarget as HTMLElement).dataset.dragStartY ?? 0);
+          if (Math.abs(e.clientX - sx) < 4 && Math.abs(e.clientY - sy) < 4) {
+            const rect = canvasRef.current?.getBoundingClientRect();
+            if (!rect) return;
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+            const paddingY = 20, rowGap = 2;
+            const ch = rect.height;
+            const maxDepth = spans.reduce((m, s) => Math.max(m, s.depth), 0);
+            const SPAN_H = Math.max(22, Math.floor((ch - paddingY * 2 - rowGap * maxDepth) / (maxDepth + 1)));
+            const hCyc = vp.current.offset + mx * vp.current.cpp;
+            let hit: Span | null = null;
+            for (const span of spans) {
+              const y = paddingY + span.depth * (SPAN_H + rowGap);
+              if (my >= y && my <= y + SPAN_H && hCyc >= span.start && hCyc <= span.start + span.duration) {
+                if (!hit || span.depth > hit.depth) hit = span;
+              }
+            }
+            setSelected(sel => sel && hit && sel === hit ? null : hit);
+          }
+        }}
         onMouseLeave={() => vp.current.dragging = false}
         onMouseMove={onMouseMove}
       >

@@ -28,7 +28,7 @@ type BottomTab = "log" | "console" | "telemetry";
 export function BottomPanel() {
   const theme = useTheme();
   const { t }  = useI18n();
-  const [active, setActive] = useState<BottomTab>("log");
+  const [active, setActive] = useState<BottomTab>("telemetry");
 
   // ── Log state ─────────────────────────────────────────────────────────
   const [logs, setLogs] = useState<LogEntry[]>(() => {

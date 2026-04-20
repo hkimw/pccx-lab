@@ -69,7 +69,7 @@ export function VerificationSuite() {
         <ShieldCheck size={18} className="mr-2" style={{ color: theme.accent }} />
         <span style={{ fontWeight: 600, fontSize: 13, marginRight: 24 }}>Verification Suite</span>
         
-        <div className="flex bg-black/20 rounded p-1 gap-1" style={{ border: `1px solid ${theme.border}` }}>
+        <div className="flex rounded p-1 gap-1" style={{ border: `1px solid ${theme.border}`, background: theme.bg }}>
           {[
             { id: "isa",   label: "ISA Dashboard", icon: <TerminalSquare size={14} /> },
             { id: "api",   label: "API Integrity", icon: <Activity size={14} />       },
@@ -125,9 +125,9 @@ export function VerificationSuite() {
                   </thead>
                   <tbody>
                     {DUMMY_ISA_RESULTS.map((row, i) => (
-                      <tr key={i} style={{ borderBottom: `1px solid ${theme.borderDim}` }} className="hover:bg-white/5">
+                      <tr key={i} style={{ borderBottom: `1px solid ${theme.borderDim}` }} >
                         <td className="p-2 font-mono" style={{ color: theme.accent }}>{row.inst}</td>
-                        <td className="p-2 font-mono text-gray-500">{row.opcode}</td>
+                        <td className="p-2 font-mono" style={{ color: theme.textMuted }}>{row.opcode}</td>
                         <td className="p-2">{row.decode}</td>
                         <td className="p-2 text-right">{row.expectedCyc}</td>
                         <td className="p-2 text-right font-bold" style={{ color: row.expectedCyc !== row.actualCyc ? theme.error : theme.text }}>{row.actualCyc}</td>
@@ -148,7 +148,7 @@ export function VerificationSuite() {
              <div className="flex flex-col h-full items-center justify-center text-center opacity-70">
                <Activity size={48} className="mb-4 text-emerald-500" />
                <h3 className="text-lg font-bold">API Ping-Pong Stress Tester</h3>
-               <p className="text-sm max-w-md mt-2 text-gray-400">
+               <p className="text-sm max-w-md mt-2 text-inherit">
                  Validates Tauri IPC and standard Rust NPU definitions. Streams 50,000 synthetic trace events to the UI bridge and measures parsing loss.
                </p>
              </div>
@@ -158,7 +158,7 @@ export function VerificationSuite() {
              <div className="flex flex-col h-full items-center justify-center text-center opacity-70">
                <Bug size={48} className="mb-4 text-rose-500" />
                <h3 className="text-lg font-bold">UVM Coverage Visualizer</h3>
-               <p className="text-sm max-w-md mt-2 text-gray-400">
+               <p className="text-sm max-w-md mt-2 text-inherit">
                  Imports Synopsys `vdb` and Cadence `ucm` line coverages. Shows heatmaps of AXI transaction loss and edge-case hits.
                </p>
              </div>
@@ -188,10 +188,10 @@ export function VerificationSuite() {
         <div className="w-[300px] border-l flex flex-col" style={{ borderColor: theme.border, background: theme.bgPanel }}>
            <div className="p-3 border-b text-xs font-bold flex justify-between" style={{ borderColor: theme.border }}>
              <span>Regression Logs</span>
-             <button onClick={() => setLog([])} className="text-gray-500 hover:text-white">Clear</button>
+             <button onClick={() => setLog([])} style={{ color: theme.textMuted }}>Clear</button>
            </div>
            <div className="flex-1 p-3 overflow-y-auto font-mono text-[10px] flex flex-col gap-1">
-              {log.length === 0 && <span className="text-gray-600">No active runs.</span>}
+              {log.length === 0 && <span style={{ color: theme.textFaint }}>No active runs.</span>}
               {log.map((l, i) => (
                  <div key={i} style={{ color: l.includes("FAIL") || l.includes("Violat") ? theme.error : theme.textDim }}>
                    {l}
