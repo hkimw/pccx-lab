@@ -50,3 +50,37 @@ Phase 9: 미래 최적화 및 외부 확장 (완료)
 - [x] WebGPU Compute Shader 개념 도입 및 시각적 파이프라인(CanvasView) 통합 분석.
 - [x] .pccx → .vcd (GTKWave/Verdi) 내보내기 로직(다이얼로그 메시지) 구현 완료.
 - [x] 퍼포먼스 Roofline 모델 라이브 렌더링 (`Roofline.tsx` 및 ECharts 연동).
+
+Phase 10: pccx-FPGA Verification Bridge (2026-04-20 완료)
+- [x] `hw/sim/run_verification.sh` glob 기반 러너 — testbench 추가 시 두 줄만
+      (`TB_DEPS` / `TB_CORE`) 업데이트하면 자동 픽업.
+- [x] `pccx-core/src/bin/from_xsim_log.rs` — xsim stdout (PASS/FAIL 라인)
+      을 `.pccx` 트레이스로 변환하는 브릿지 바이너리.
+- [x] Verification → Synth Status 서브탭의 4-card 대시보드:
+      `VerificationRunner`, `SynthStatusCard`, `RooflineCard`,
+      `BottleneckCard` — 모두 `trace-loaded` 이벤트 구독으로 자동 리프레시.
+- [x] Tauri IPC 17 개 — `run_verification`, `load_synth_report`,
+      `analyze_roofline`, `detect_bottlenecks`, `generate_markdown_report`,
+      `list_pccx_traces`, `list_uvm_strategies` 추가.
+- [x] pccx-FPGA RTL 검증 6 tb / 1930 cycles PASS 확정.
+
+Phase 11: Blender-grade Node Editor + Strengthened Reports (2026-04-20 진행 중)
+- [x] 노드 팔레트 카테고리화 (Input / Memory / Compute / Output) + 라이브 검색.
+- [x] Shift+A quick-add 메뉴 — 커서 위치 기준 플로팅 오버레이.
+- [x] pccx v002 전용 5 노드 추가: GEMV, CVO SFU, HP Buffer, URAM L2, fmap Cache.
+- [x] UVM 전략 카탈로그 5 종 + `list_uvm_strategies` IPC.
+- [x] Markdown 리포트 생성기 (`pccx_core::report::render_markdown`) + IPC.
+- [ ] Frame / Node group (Blender-grade nested grouping).
+- [ ] Typed socket 검증 — 연결 시도 시 부적합한 타입 차단 + 힌트.
+- [ ] SVG / PNG topology 내보내기.
+- [ ] PDF 리포트 렌더링 (현재 Markdown 전용).
+- [ ] Vivado post-implementation 리포트 (`timing_summary_post_impl.rpt`)
+      파싱 + `SynthStatusCard` 에 `impl` / `synth` 스위치.
+
+Phase 12: pccx-FPGA V002 Coverage Push (다음 세션 대상)
+- [ ] `vec_core_pkg` + `dtype_pkg` 선행 컴파일 + UNISIM 로드로 VEC_CORE
+      테스트벤치 (`GEMV_reduction`, `GEMV_accumulate`) 추가.
+- [ ] XPM 메모리 매크로 지원 — `fmap_cache.sv` 테스트벤치.
+- [ ] `tb_GEMM_fmap_staggered_delay` 재도전 — xsim 에서 관찰된 col≥1 의
+      "same-iter drive가 row_data 에 즉시 반영되는" 타이밍 패턴 재현.
+- [ ] NPU_Controller 통합 테스트 (`ctrl_npu_decoder` + `Global_Scheduler`).

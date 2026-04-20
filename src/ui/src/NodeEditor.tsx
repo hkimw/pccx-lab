@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, useRef } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import {
   ReactFlow,
   MiniMap,
@@ -227,11 +227,104 @@ function WriteBackNode(_: NodeProps) {
   );
 }
 
+// ─── pccx v002-specific nodes (Blender-style rich palette) ────────────────────
+
+function GemvNode(_: NodeProps) {
+  const s = useNodeStyle(); const c = "#22d3ee";
+  const [lanes, setLanes] = useState("4");
+  return (
+    <div style={{ ...s, borderColor: c + "55" }}>
+      <Header title="GEMV Engine" sub="v002 · 32-MAC × 5-stage × N lanes" color={c} />
+      <div style={{ padding: "4px 0" }}>
+        <Field label="Lanes"     value={lanes} type="select" options={["1","2","4","8"]} onChange={setLanes} />
+        <Field label="Per-lane"  value="32"    unit="MAC" />
+        <Field label="Stages"    value="5"     unit="cyc" />
+        <Field label="Throughput" value={`${Number(lanes) * 32}/cyc`} />
+      </div>
+      <Handle type="target" id="fmap"     position={Position.Left}   style={handleStyle(c,       "left")}   />
+      <Handle type="target" id="weight"   position={Position.Top}    style={handleStyle("#818cf8","top")}   />
+      <Handle type="source" id="partial"  position={Position.Right}  style={handleStyle(c,       "right")}  />
+      <Handle type="source" id="stall"    position={Position.Bottom} style={handleStyle("#f59e0b","bottom")}/>
+    </div>
+  );
+}
+
+function CvoNode(_: NodeProps) {
+  const s = useNodeStyle(); const c = "#e879f9";
+  return (
+    <div style={{ ...s, borderColor: c + "55" }}>
+      <Header title="CVO SFU" sub="v002 · single instance · CORDIC + LUT" color={c} />
+      <div style={{ padding: "4px 0" }}>
+        <Field label="Ops" value="exp" type="select"
+               options={["exp","sqrt","GELU","sin","cos","reduce_sum","scale","recip"]} />
+        <Field label="Throughput" value="1" unit="op/cyc" />
+        <Field label="Latency"    value="16" unit="cyc" />
+      </div>
+      <Handle type="target" id="in"  position={Position.Left}  style={handleStyle(c, "left")}  />
+      <Handle type="source" id="out" position={Position.Right} style={handleStyle(c, "right")} />
+    </div>
+  );
+}
+
+function HpBufferNode(_: NodeProps) {
+  const s = useNodeStyle(); const c = "#f87171";
+  return (
+    <div style={{ ...s, borderColor: c + "55" }}>
+      <Header title="HP Buffer" sub="v002 · 4 × HP AXI, weight pre-fetch FIFO" color={c} />
+      <div style={{ padding: "4px 0" }}>
+        <Field label="Ports" value="4" type="select" options={["1","2","4"]} />
+        <Field label="Width" value="128-bit" type="select" options={["64-bit","128-bit","256-bit"]} />
+        <Field label="Depth" value="512"     unit="entries" />
+      </div>
+      <Handle type="target" id="axi_in"    position={Position.Left}  style={handleStyle(c,        "left")}  />
+      <Handle type="source" id="upper_ch"  position={Position.Top}   style={handleStyle("#818cf8","top")}    />
+      <Handle type="source" id="lower_ch"  position={Position.Right} style={handleStyle("#22d3ee","right")}  />
+    </div>
+  );
+}
+
+function UramNode(_: NodeProps) {
+  const s = useNodeStyle(); const c = "#14b8a6";
+  return (
+    <div style={{ ...s, borderColor: c + "55" }}>
+      <Header title="URAM L2" sub="v002 · 64 URAMs · 1.75 MB · 2-cycle read" color={c} />
+      <div style={{ padding: "4px 0" }}>
+        <Field label="URAMs"   value="64" unit="blocks" />
+        <Field label="Size"    value="1.75" unit="MB" />
+        <Field label="Read Latency" value="2" unit="cyc" />
+        <Field label="Ports"   value="2" type="select" options={["1","2"]} />
+      </div>
+      <Handle type="target" id="wr"     position={Position.Left}  style={handleStyle(c, "left")}  />
+      <Handle type="source" id="rd_a"   position={Position.Right} style={handleStyle(c, "right")} />
+      <Handle type="source" id="rd_b"   position={Position.Bottom} style={handleStyle("#06b6d4","bottom")} />
+    </div>
+  );
+}
+
+function FmapCacheNode(_: NodeProps) {
+  const s = useNodeStyle(); const c = "#eab308";
+  return (
+    <div style={{ ...s, borderColor: c + "55" }}>
+      <Header title="fmap Cache" sub="v002 · 27 b × 2048 · 32-lane broadcast" color={c} />
+      <div style={{ padding: "4px 0" }}>
+        <Field label="Data width" value="27"   unit="bits" />
+        <Field label="Depth"      value="2048" unit="words" />
+        <Field label="Write lanes" value="16" />
+        <Field label="Broadcast"  value="32" unit="lanes" />
+      </div>
+      <Handle type="target" id="wr_bf16" position={Position.Left}  style={handleStyle(c, "left")}  />
+      <Handle type="source" id="bcast"   position={Position.Right} style={handleStyle("#f59e0b","right")} />
+    </div>
+  );
+}
+
 // ─── Registration ─────────────────────────────────────────────────────────────
 const nodeTypes: NodeTypes = {
   host: HostNode as any, dram: DramNode as any, axi: AxiNode as any,
   bram: BramNode as any, mac: MacNode as any, accum: AccumNode as any,
   postproc: PostProcNode as any, writeback: WriteBackNode as any,
+  gemv: GemvNode as any, cvo: CvoNode as any, hpbuf: HpBufferNode as any,
+  uram: UramNode as any, fmapcache: FmapCacheNode as any,
 };
 
 function buildGraph() {
@@ -272,51 +365,212 @@ import { ReactFlowProvider, useReactFlow } from '@xyflow/react';
 
 // ─── DnD Sidebar ──────────────────────────────────────────────────────────────
 
-function Sidebar() {
+interface PaletteEntry { id: string; label: string; color: string; hint?: string; }
+interface PaletteCategory { name: string; entries: PaletteEntry[]; }
+
+const PALETTE: PaletteCategory[] = [
+  { name: "Input", entries: [
+    { id: "host", label: "Host CPU",           color: "#94a3b8", hint: "AXI-Lite master" },
+  ]},
+  { name: "Memory", entries: [
+    { id: "dram",       label: "DRAM",         color: "#60a5fa", hint: "LPDDR5 / HBM2E"       },
+    { id: "axi",        label: "AXI Fabric",   color: "#818cf8", hint: "128 b interconnect"   },
+    { id: "bram",       label: "BRAM L1",      color: "#34d399", hint: "On-chip scratchpad"   },
+    { id: "uram",       label: "URAM L2",      color: "#14b8a6", hint: "v002 · 1.75 MB"       },
+    { id: "hpbuf",      label: "HP Buffer",    color: "#f87171", hint: "4× HP AXI, weight FIFO" },
+    { id: "fmapcache",  label: "fmap Cache",   color: "#eab308", hint: "27 b × 2048 · 32-lane"},
+  ]},
+  { name: "Compute", entries: [
+    { id: "mac",   label: "GEMM MAC Array", color: "#a78bfa", hint: "v002 · 32×32 W4A8"  },
+    { id: "gemv",  label: "GEMV Engine",    color: "#22d3ee", hint: "v002 · 4 lanes × 32 MAC" },
+    { id: "cvo",   label: "CVO SFU",        color: "#e879f9", hint: "v002 · single instance"  },
+    { id: "accum", label: "Accumulator",    color: "#f59e0b", hint: "Register file + adder"   },
+  ]},
+  { name: "Output", entries: [
+    { id: "postproc",  label: "Post-Proc",      color: "#fb923c", hint: "Activation / Norm / Quant" },
+    { id: "writeback", label: "Write-back DMA", color: "#f472b6", hint: "AXI egress"            },
+  ]},
+];
+
+function paletteSearch(q: string): PaletteCategory[] {
+  if (!q.trim()) return PALETTE;
+  const needle = q.trim().toLowerCase();
+  return PALETTE.map(cat => ({
+    name: cat.name,
+    entries: cat.entries.filter(e =>
+      e.label.toLowerCase().includes(needle) ||
+      e.id.includes(needle) ||
+      (e.hint ?? "").toLowerCase().includes(needle)
+    ),
+  })).filter(cat => cat.entries.length > 0);
+}
+
+function Sidebar({ onSpawn }: { onSpawn: (id: string) => void }) {
   const theme = useTheme();
-  
+  const [query, setQuery] = useState("");
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+
   const onDragStart = (event: React.DragEvent, nodeType: string) => {
     event.dataTransfer.setData("application/reactflow", nodeType);
     event.dataTransfer.effectAllowed = "move";
   };
 
-  const modules = [
-     { id: "host", label: "Host CPU", color: "#94a3b8" },
-     { id: "dram", label: "DRAM Controller", color: "#60a5fa" },
-     { id: "axi", label: "AXI Interconnect", color: "#818cf8" },
-     { id: "bram", label: "L2 BRAM Cache", color: "#34d399" },
-     { id: "mac", label: "MAC Array", color: "#a78bfa" },
-     { id: "accum", label: "Accumulator", color: "#f59e0b" },
-     { id: "postproc", label: "Post-Processing", color: "#fb923c" },
-     { id: "writeback", label: "DMA Write-Back", color: "#f472b6" }
-  ];
+  const visible = useMemo(() => paletteSearch(query), [query]);
+  const dark = theme.mode === "dark";
 
   return (
-    <div className="w-[220px] shrink-0 flex flex-col" style={{ background: theme.bgPanel, borderRight: `1px solid ${theme.border}` }}>
-      <div style={{ padding: "12px 16px", fontSize: 13, fontWeight: 600, borderBottom: `1px solid ${theme.border}`, color: theme.text }}>
-        Hardware Modules
+    <div className="w-[240px] shrink-0 flex flex-col" style={{ background: theme.bgPanel, borderRight: `1px solid ${theme.border}` }}>
+      <div style={{ padding: "10px 14px", fontSize: 13, fontWeight: 600, borderBottom: `1px solid ${theme.border}`, color: theme.text, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span>Node Palette</span>
+        <span style={{ fontSize: 9, color: theme.textMuted }}>Shift+A · drag-drop</span>
       </div>
-      <div style={{ fontSize: 10, color: theme.textMuted, padding: "8px 16px", borderBottom: `1px solid ${theme.border}` }}>
-        Drag nodes into the canvas to build a custom NPU dataflow topology.
+      <div style={{ padding: "8px 12px", borderBottom: `1px solid ${theme.border}` }}>
+        <input
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          placeholder="Search nodes…"
+          style={{
+            width: "100%", fontSize: 11, padding: "5px 8px",
+            background: dark ? "#2d2d2d" : "#ffffff",
+            border: `1px solid ${theme.border}`,
+            borderRadius: 4,
+            color: theme.text,
+          }}
+        />
       </div>
-      <div className="flex px-4 py-2 gap-2 border-b" style={{ borderColor: theme.border }}>
+      <div className="flex px-3 py-2 gap-2 border-b" style={{ borderColor: theme.border }}>
          <button onClick={() => alert("Topology cleared")} className="flex-1 py-1 rounded text-[10px] font-bold shadow" style={{ background: theme.bgSurface, color: theme.textDim, border: `1px solid ${theme.border}` }}>
             Clear Graph
          </button>
          <button onClick={() => alert("Exported pccx_topology.json")} className="flex-1 py-1 rounded text-[10px] font-bold shadow" style={{ background: theme.accent, color: "#fff" }}>
-            Export JSON
+            Export
          </button>
       </div>
-      <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
-         {modules.map(opt => (
-            <div key={opt.id} 
-                 onDragStart={(e) => onDragStart(e, opt.id)} 
-                 draggable
-                 style={{ padding: "8px 12px", background: theme.bgSurface, border: `1px solid ${theme.borderDim}`, borderRadius: 6, cursor: "grab", display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ width: 10, height: 10, borderRadius: "50%", background: opt.color, boxShadow: `0 0 8px ${opt.color}88` }} />
-                <span style={{ fontSize: 11, color: theme.text, fontWeight: 600 }}>{opt.label}</span>
+      <div className="flex-1 overflow-y-auto p-2">
+        {visible.length === 0 && (
+          <div style={{ fontSize: 11, color: theme.textMuted, padding: 12, textAlign: "center" }}>
+            No matching nodes.
+          </div>
+        )}
+        {visible.map(cat => (
+          <div key={cat.name} style={{ marginBottom: 6 }}>
+            <button
+              onClick={() => setCollapsed(c => ({ ...c, [cat.name]: !c[cat.name] }))}
+              style={{
+                width: "100%", textAlign: "left", padding: "4px 8px",
+                fontSize: 10, fontWeight: 700, textTransform: "uppercase",
+                color: theme.textMuted, background: "transparent",
+                border: "none", cursor: "pointer",
+                letterSpacing: 0.6,
+              }}
+            >
+              {collapsed[cat.name] ? "▸" : "▾"} {cat.name}
+              <span style={{ marginLeft: 6, fontWeight: 400, opacity: 0.6 }}>
+                ({cat.entries.length})
+              </span>
+            </button>
+            {!collapsed[cat.name] && cat.entries.map(opt => (
+              <div
+                key={opt.id}
+                onDragStart={(e) => onDragStart(e, opt.id)}
+                draggable
+                onDoubleClick={() => onSpawn(opt.id)}
+                title={opt.hint ? `${opt.hint} — double-click to add` : "double-click to add"}
+                style={{
+                  margin: "3px 4px",
+                  padding: "6px 10px", background: theme.bgSurface,
+                  border: `1px solid ${theme.borderDim}`, borderRadius: 5,
+                  cursor: "grab", display: "flex", alignItems: "center", gap: 8,
+                }}
+              >
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: opt.color, boxShadow: `0 0 6px ${opt.color}88` }} />
+                <div style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                  <span style={{ fontSize: 11, color: theme.text, fontWeight: 600 }}>{opt.label}</span>
+                  {opt.hint && (
+                    <span style={{ fontSize: 9, color: theme.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {opt.hint}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Shift+A quick-add menu (Blender-style) ───────────────────────────────────
+
+function QuickAddMenu(
+  { pos, onClose, onPick }: {
+    pos: { x: number; y: number } | null;
+    onClose: () => void;
+    onPick: (id: string) => void;
+  }
+) {
+  const theme = useTheme();
+  const [query, setQuery] = useState("");
+  useEffect(() => { setQuery(""); }, [pos]);
+  if (!pos) return null;
+  const results = paletteSearch(query);
+  const dark = theme.mode === "dark";
+  return (
+    <div
+      onMouseDown={e => e.stopPropagation()}
+      style={{
+        position: "absolute", left: pos.x, top: pos.y, zIndex: 1000,
+        width: 260, background: dark ? "#1e1e1e" : "#ffffff",
+        border: `1px solid ${theme.border}`, borderRadius: 6,
+        boxShadow: "0 8px 24px rgba(0,0,0,0.35)", padding: 6,
+      }}
+    >
+      <input
+        autoFocus
+        value={query}
+        onChange={e => setQuery(e.target.value)}
+        onKeyDown={e => { if (e.key === "Escape") onClose(); }}
+        placeholder="Add node…  (Esc to close)"
+        style={{
+          width: "100%", fontSize: 11, padding: "5px 8px", marginBottom: 4,
+          background: dark ? "#2d2d2d" : "#f4f4f4",
+          border: `1px solid ${theme.border}`, borderRadius: 4,
+          color: theme.text,
+        }}
+      />
+      <div style={{ maxHeight: 280, overflowY: "auto" }}>
+        {results.map(cat => (
+          <div key={cat.name} style={{ marginBottom: 4 }}>
+            <div style={{
+              padding: "3px 8px", fontSize: 9, fontWeight: 700, textTransform: "uppercase",
+              color: theme.textMuted, letterSpacing: 0.5,
+            }}>
+              {cat.name}
             </div>
-         ))}
+            {cat.entries.map(e => (
+              <div
+                key={e.id}
+                onClick={() => { onPick(e.id); onClose(); }}
+                style={{
+                  padding: "5px 10px", fontSize: 11, cursor: "pointer",
+                  color: theme.text, borderRadius: 3,
+                  display: "flex", alignItems: "center", gap: 8,
+                }}
+                onMouseEnter={ev => ((ev.currentTarget.style.background = theme.bgHover))}
+                onMouseLeave={ev => ((ev.currentTarget.style.background = "transparent"))}
+              >
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: e.color }} />
+                <span>{e.label}</span>
+                {e.hint && (
+                  <span style={{ marginLeft: "auto", fontSize: 9, color: theme.textMuted }}>
+                    {e.hint}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -331,10 +585,12 @@ function DnDFlow() {
   const theme = useTheme();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { nodes: initN, edges: initE } = useMemo(buildGraph, []);
-  
+
   const [nodes, setNodes, onNodesChange] = useNodesState(initN);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initE);
   const { screenToFlowPosition } = useReactFlow();
+
+  const [addMenu, setAddMenu] = useState<{ x: number; y: number } | null>(null);
 
   const onConnect = useCallback((p: Connection) => setEdges(eds => addEdge({ ...p, animated: true, style: { stroke: "#6b7280", strokeWidth: 1.5 }, deletable: true }, eds)), [setEdges]);
 
@@ -343,30 +599,75 @@ function DnDFlow() {
     event.dataTransfer.dropEffect = "move";
   }, []);
 
+  const spawnAtFlowPos = useCallback((type: string, flowPos: { x: number; y: number }) => {
+    const newNode: Node = { id: getId(), type, position: flowPos, data: {} };
+    setNodes((nds) => nds.concat(newNode));
+  }, [setNodes]);
+
+  const spawnAtCentre = useCallback((type: string) => {
+    const rect = reactFlowWrapper.current?.getBoundingClientRect();
+    if (!rect) return;
+    const flowPos = screenToFlowPosition({
+      x: rect.left + rect.width / 2,
+      y: rect.top  + rect.height / 2,
+    });
+    spawnAtFlowPos(type, flowPos);
+  }, [screenToFlowPosition, spawnAtFlowPos]);
+
   const onDrop = useCallback((event: React.DragEvent) => {
       event.preventDefault();
-
       const type = event.dataTransfer.getData("application/reactflow");
       if (typeof type === "undefined" || !type) return;
+      spawnAtFlowPos(type, screenToFlowPosition({ x: event.clientX, y: event.clientY }));
+    }, [screenToFlowPosition, spawnAtFlowPos]);
 
-      const position = screenToFlowPosition({
-        x: event.clientX,
-        y: event.clientY,
-      });
-      const newNode: Node = {
-        id: getId(),
-        type,
-        position,
-        data: {},
-      };
+  // Shift+A opens the quick-add menu at the cursor — Blender convention.
+  useEffect(() => {
+    let lastMouse = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    const trackMouse = (e: MouseEvent) => { lastMouse = { x: e.clientX, y: e.clientY }; };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.shiftKey && (e.key === "A" || e.key === "a")) {
+        const target = e.target as HTMLElement | null;
+        // Avoid hijacking while the user types in an input.
+        if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" ||
+                       target.isContentEditable)) return;
+        const rect = reactFlowWrapper.current?.getBoundingClientRect();
+        if (!rect) return;
+        if (lastMouse.x < rect.left || lastMouse.x > rect.right ||
+            lastMouse.y < rect.top  || lastMouse.y > rect.bottom) return;
+        e.preventDefault();
+        setAddMenu({ x: lastMouse.x - rect.left, y: lastMouse.y - rect.top });
+      } else if (e.key === "Escape") {
+        setAddMenu(null);
+      }
+    };
+    window.addEventListener("keydown",   onKey);
+    window.addEventListener("mousemove", trackMouse);
+    return () => {
+      window.removeEventListener("keydown",   onKey);
+      window.removeEventListener("mousemove", trackMouse);
+    };
+  }, []);
 
-      setNodes((nds) => nds.concat(newNode));
-    }, [screenToFlowPosition, setNodes]);
+  const pickFromMenu = useCallback((type: string) => {
+    if (!addMenu) return;
+    const rect = reactFlowWrapper.current?.getBoundingClientRect();
+    if (!rect) return;
+    spawnAtFlowPos(type, screenToFlowPosition({
+      x: rect.left + addMenu.x,
+      y: rect.top  + addMenu.y,
+    }));
+  }, [addMenu, screenToFlowPosition, spawnAtFlowPos]);
 
   return (
     <div className="w-full h-full flex">
-      <Sidebar />
-      <div className="flex-1 relative" ref={reactFlowWrapper}>
+      <Sidebar onSpawn={spawnAtCentre} />
+      <div
+        className="flex-1 relative"
+        ref={reactFlowWrapper}
+        onMouseDown={() => setAddMenu(null)}
+      >
+        <QuickAddMenu pos={addMenu} onClose={() => setAddMenu(null)} onPick={pickFromMenu} />
         <ReactFlow
           nodes={nodes} edges={edges}
           onNodesChange={onNodesChange}
@@ -385,7 +686,13 @@ function DnDFlow() {
           <Controls showInteractive={false} />
           <MiniMap
             nodeColor={n => {
-              const c: Record<string, string> = { dram:"#60a5fa", axi:"#818cf8", bram:"#34d399", mac:"#a78bfa", accum:"#f59e0b", postproc:"#fb923c", writeback:"#f472b6", host:"#94a3b8" };
+              const c: Record<string, string> = {
+                dram:"#60a5fa", axi:"#818cf8", bram:"#34d399",
+                mac:"#a78bfa", accum:"#f59e0b", postproc:"#fb923c",
+                writeback:"#f472b6", host:"#94a3b8",
+                gemv:"#22d3ee", cvo:"#e879f9", hpbuf:"#f87171",
+                uram:"#14b8a6", fmapcache:"#eab308",
+              };
               return c[n.type ?? ""] ?? "#4a4a4a";
             }}
             maskColor={theme.mode === "dark" ? "rgba(0,0,0,0.7)" : "rgba(255,255,255,0.7)"}
