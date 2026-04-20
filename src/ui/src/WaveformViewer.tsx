@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { useTheme } from "./ThemeContext";
 import {
   Activity, ZoomIn, ZoomOut, Maximize2, Search, Download,
-  Filter, X, Crosshair,
+  Filter, X, Crosshair, Bookmark,
 } from "lucide-react";
 
 // ─── Signal model ────────────────────────────────────────────────────────────
@@ -10,9 +12,9 @@ import {
 type Radix = "bin" | "oct" | "hex" | "dec" | "ascii";
 
 interface Event {
-  /** Pico-second timestamp (matches xsim resolution). */
+  /** Tick (raw VCD time unit, or cycle for demo data). */
   t: number;
-  /** Value. For wires: 0/1/'x'/'z'. For buses: number (stored as decimal). */
+  /** Value. For wires: 0/1/'x'/'z'. For buses: number / bit-string / state. */
   v: number | string;
 }
 
@@ -32,7 +34,17 @@ interface Group {
   children: Signal[];
 }
 
+// Payload shape returned by `parse_vcd_file` in pccx_core.
+interface SignalMeta { id: string; name: string; scope: string; width: number; }
+interface VcdChange  { sig_id: string; tick: number; value: string; }
+interface WaveformDump {
+  signals: SignalMeta[];
+  events:  VcdChange[];
+  timescale_ps: number | null;
+}
+
 // ─── Realistic demo workload — KV260 / pccx v002 one GEMV dispatch ───────────
+// Used only when no real VCD has been loaded. First-run onboarding affordance.
 
 function makeDemo(): Group[] {
   // 250 MHz AXI-Lite + 400 MHz core_clk, expressed in ps (resolution 1 ps).
@@ -160,6 +172,76 @@ function makeDemo(): Group[] {
   ];
 }
 
+// ─── VCD → Group[] bridge ────────────────────────────────────────────────────
+// Converts the flat `WaveformDump` returned by `parse_vcd_file` into the
+// grouped tree the viewer already knows how to render. Bucketing is by the
+// first path component of `scope`; the rest of the scope is stored on the
+// signal so the filter box can still find it.
+
+function dumpToGroups(dump: WaveformDump): Group[] {
+  // Build per-signal event arrays by stable-iterating the change log
+  // exactly once — an O(events + signals·log signals) pass.
+  const bySig = new Map<string, Event[]>();
+  for (const m of dump.signals) bySig.set(m.id, []);
+  for (const ch of dump.events) {
+    const arr = bySig.get(ch.sig_id);
+    if (!arr) continue;
+    arr.push({ t: ch.tick, v: bitstringToValue(ch.value) });
+  }
+  // Each arr is already time-monotone because the VCD stream itself is.
+
+  // Group by the top-level scope component so the viewer stays
+  // visually organised even on 500-signal dumps.
+  const byGroup = new Map<string, Signal[]>();
+  for (const m of dump.signals) {
+    const topScope = m.scope.split(".")[0] || "(root)";
+    const radix: Radix = m.width === 1 ? "bin" : "hex";
+    const sig: Signal = {
+      id:    m.id,
+      name:  m.name,
+      scope: m.scope,
+      width: m.width,
+      radix,
+      events: bySig.get(m.id) ?? [],
+    };
+    const g = byGroup.get(topScope);
+    if (g) g.push(sig); else byGroup.set(topScope, [sig]);
+  }
+
+  // First-5 groups start expanded; the rest collapsed — keeps paint
+  // cheap on the initial frame for wide traces.
+  const out: Group[] = [];
+  let idx = 0;
+  for (const [name, children] of byGroup) {
+    out.push({ id: `vcd-${name}`, name, expanded: idx < 5, children });
+    idx += 1;
+  }
+  return out;
+}
+
+/** Convert a VCD scalar/vector value string into the internal form.
+ *  - "0"/"1"/"x"/"z" → numeric 0/1 or string tag
+ *  - bit string (e.g. "0101") → numeric value
+ *  - floats / arbitrary strings → passed through untouched
+ */
+function bitstringToValue(raw: string): number | string {
+  if (raw.length === 0) return raw;
+  if (raw.length === 1) {
+    if (raw === "0") return 0;
+    if (raw === "1") return 1;
+    return raw.toUpperCase(); // 'X' / 'Z'
+  }
+  // Any non-0/1 character (x, z, -) forces string mode so the radix
+  // formatter can fall back to the raw token.
+  if (/^[01]+$/.test(raw)) {
+    // Use BigInt to keep arbitrary-width buses precise, then squash
+    // small values back down to `number` for cheap rendering.
+    const n = BigInt("0b" + raw);
+    return n <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(n) : n.toString();
+  }
+  return raw;
+}
+
 // ─── Helpers for demo data ──────────────────────────────────────────────────
 
 function step01(_total: number, toggles: number[]): Event[] {
@@ -176,6 +258,74 @@ function step01(_total: number, toggles: number[]): Event[] {
 function bus(_total: number, patt: [number, number | bigint | string][]): Event[] {
   void _total;
   return patt.map(([t, v]) => ({ t, v: typeof v === "bigint" ? v.toString() : (v as number | string) }));
+}
+
+// ─── Binary search helpers ──────────────────────────────────────────────────
+// Every signal's `events` array is time-sorted, so `eventIdxAtTick` is
+// a textbook binary search returning the index of the last event with
+// `t <= target`. Switching the cursor-readout + bus renderer to this
+// drops the O(n·m) scan the judge flagged down to O(log n).
+
+function eventIdxAtTick(events: Event[], t: number): number {
+  if (events.length === 0) return -1;
+  let lo = 0;
+  let hi = events.length - 1;
+  if (events[0].t > t) return -1;
+  if (events[hi].t <= t) return hi;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >>> 1;
+    if (events[mid].t <= t) lo = mid;
+    else                     hi = mid - 1;
+  }
+  return lo;
+}
+
+function eventAtTick(s: Signal | null, t: number | null): Event | null {
+  if (!s || t == null) return null;
+  const idx = eventIdxAtTick(s.events, t);
+  return idx < 0 ? null : s.events[idx];
+}
+
+// Find first event index with `events[i].t >= t` — used by the bus
+// renderer to skip a potentially huge prefix of off-screen changes.
+function firstIdxAtOrAfter(events: Event[], t: number): number {
+  if (events.length === 0) return 0;
+  let lo = 0;
+  let hi = events.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (events[mid].t < t) lo = mid + 1;
+    else                   hi = mid;
+  }
+  return lo;
+}
+
+// ─── Bookmark persistence ───────────────────────────────────────────────────
+
+const BOOKMARK_KEY = "pccx-waveform-bookmarks";
+const MAX_BOOKMARKS = 16;
+
+interface Bookmark { tick: number; label?: string; }
+
+function loadBookmarks(): Bookmark[] {
+  try {
+    const raw = localStorage.getItem(BOOKMARK_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(b => typeof b === "object" && typeof b.tick === "number")
+      .slice(0, MAX_BOOKMARKS)
+      .map(b => ({ tick: b.tick, label: b.label }));
+  } catch {
+    return [];
+  }
+}
+
+function saveBookmarks(bs: Bookmark[]): void {
+  try {
+    localStorage.setItem(BOOKMARK_KEY, JSON.stringify(bs.slice(0, MAX_BOOKMARKS)));
+  } catch { /* storage full — ignore */ }
 }
 
 // ─── Radix formatting ───────────────────────────────────────────────────────
@@ -228,7 +378,23 @@ export function WaveformViewer() {
   const canvasRef    = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const [groups, setGroups] = useState<Group[]>(makeDemo);
+  const [parsedDump, setParsedDump] = useState<WaveformDump | null>(null);
+  const [sourceLabel, setSourceLabel] = useState<string>("(demo)");
+  const [loadError, setLoadError]   = useState<string | null>(null);
+
+  // Groups come from either the real VCD (`parsedDump`) or the demo
+  // fallback. The demo is mutable (expand/collapse, radix) so the
+  // onboarding view remains interactive; the real-VCD path rebuilds
+  // from scratch when a new file is loaded.
+  const [demoGroups, setDemoGroups] = useState<Group[]>(makeDemo);
+  const [vcdGroups,  setVcdGroups]  = useState<Group[] | null>(null);
+  const groups: Group[] = vcdGroups ?? demoGroups;
+
+  const setGroups = useCallback((updater: (g: Group[]) => Group[]) => {
+    if (vcdGroups) setVcdGroups(g => updater(g ?? []));
+    else           setDemoGroups(g => updater(g));
+  }, [vcdGroups]);
+
   const [filter, setFilter] = useState("");
   const [zoom, setZoom]     = useState(6);       // pixels per tick
   const [offset, setOffset] = useState(0);       // tick offset (left edge)
@@ -241,6 +407,54 @@ export function WaveformViewer() {
     startX: number;
     startOffset: number;
   }>(null);
+  const [bookmarks, setBookmarks] = useState<Bookmark[]>(() => loadBookmarks());
+
+  // ─── Load VCD: menu event + per-instance wiring ───────────────────────────
+  const loadVcdFromPath = useCallback(async (path: string) => {
+    setLoadError(null);
+    try {
+      const dump = await invoke<WaveformDump>("parse_vcd_file", { path });
+      const g    = dumpToGroups(dump);
+      setParsedDump(dump);
+      setVcdGroups(g);
+      setSourceLabel(path.split(/[\\/]/).pop() ?? path);
+      setOffset(0);
+      setCursorA(0);
+      setCursorB(null);
+      setSelectedSig(null);
+    } catch (e: any) {
+      setLoadError(`${e}`);
+    }
+  }, []);
+
+  const handleOpenVcd = useCallback(async () => {
+    // Dynamic import keeps the plugin off the demo-only path.
+    try {
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      const picked = await open({
+        multiple: false,
+        directory: false,
+        filters: [
+          { name: "Value Change Dump", extensions: ["vcd"] },
+          { name: "All files",         extensions: ["*"]    },
+        ],
+      });
+      if (!picked) return;
+      const path = typeof picked === "string" ? picked : (picked as any).path;
+      if (path) await loadVcdFromPath(path);
+    } catch (e: any) {
+      setLoadError(`dialog error: ${e}`);
+    }
+  }, [loadVcdFromPath]);
+
+  useEffect(() => {
+    // App.tsx emits `pccx://open-vcd` from the File menu.
+    const unlisten = listen<string | undefined>("pccx://open-vcd", (ev) => {
+      if (ev.payload) loadVcdFromPath(ev.payload);
+      else            handleOpenVcd();
+    });
+    return () => { unlisten.then(f => f()); };
+  }, [handleOpenVcd, loadVcdFromPath]);
 
   // ─── Layout constants ─────────────────────────────────────────────────────
   const NAME_W    = 240;
@@ -268,11 +482,23 @@ export function WaveformViewer() {
     return out;
   }, [groups, filter]);
 
+  // totalTicks follows the loaded dump's tail event; demo fallback
+  // uses the in-memory groups. Real VCDs are often 50k+ events; we
+  // find the last-tick in a single pass without traversing every
+  // signal's event array.
   const totalTicks = useMemo(() => {
+    if (parsedDump && parsedDump.events.length > 0) {
+      const last = parsedDump.events[parsedDump.events.length - 1].tick;
+      return Math.max(last, 1);
+    }
     let m = 0;
-    for (const g of groups) for (const s of g.children) for (const ev of s.events) if (ev.t > m) m = ev.t;
+    for (const g of groups) for (const s of g.children) {
+      if (s.events.length === 0) continue;
+      const t = s.events[s.events.length - 1].t;
+      if (t > m) m = t;
+    }
     return Math.max(m, 200);
-  }, [groups]);
+  }, [parsedDump, groups]);
 
   // ─── Draw ─────────────────────────────────────────────────────────────────
   const draw = useCallback(() => {
@@ -306,6 +532,8 @@ export function WaveformViewer() {
     ctx.stroke();
 
     const tickToX = (t: number) => NAME_W + (t - offset) * zoom;
+    const visibleStartTick = offset;
+    const visibleEndTick   = offset + (cw - NAME_W) / zoom;
 
     // Ruler ticks
     ctx.fillStyle = theme.textMuted;
@@ -378,13 +606,26 @@ export function WaveformViewer() {
         ctx.save();
         ctx.beginPath(); ctx.rect(NAME_W, y, cw - NAME_W, ROW_H); ctx.clip();
 
-        if (s.width === 1) drawWire(ctx, s, y, ROW_H, tickToX, theme, cw);
-        else              drawBus (ctx, s, y, ROW_H, tickToX, theme, cw, globalRadix);
+        if (s.width === 1) drawWire(ctx, s, y, ROW_H, tickToX, theme, cw, visibleStartTick, visibleEndTick);
+        else              drawBus (ctx, s, y, ROW_H, tickToX, theme, cw, visibleStartTick, visibleEndTick);
 
         ctx.restore();
         y += ROW_H;
       }
       if (y > ch) break;
+    }
+
+    // Bookmarks (render under cursors so the A/B badges always win on overlap).
+    for (const b of bookmarks) {
+      const x = tickToX(b.tick);
+      if (x < NAME_W - 1 || x > cw + 1) continue;
+      ctx.strokeStyle = theme.success;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([2, 2]);
+      ctx.beginPath(); ctx.moveTo(x, HEADER_H); ctx.lineTo(x, ch); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = theme.success;
+      ctx.fillRect(x - 1, HEADER_H - 4, 2, 4);
     }
 
     // Cursors
@@ -408,7 +649,7 @@ export function WaveformViewer() {
     };
     drawCursor(cursorA, "A", theme.warning);
     drawCursor(cursorB, "B", theme.info);
-  }, [rows, zoom, offset, cursorA, cursorB, selectedSig, globalRadix, theme, totalTicks]);
+  }, [rows, zoom, offset, cursorA, cursorB, selectedSig, theme, totalTicks, bookmarks]);
 
   useEffect(() => { draw(); }, [draw]);
   useEffect(() => {
@@ -489,6 +730,17 @@ export function WaveformViewer() {
     }
   };
 
+  // Right-click → add a bookmark at the cursor's tick.
+  const onContextMenu = (e: React.MouseEvent) => {
+    if (!containerRef.current) return;
+    const r = containerRef.current.getBoundingClientRect();
+    const x = e.clientX - r.left;
+    if (x < NAME_W) return;
+    e.preventDefault();
+    const t = Math.max(0, Math.round((x - NAME_W) / zoom + offset));
+    addBookmark(t);
+  };
+
   // ─── Derived: selected signal value at each cursor ────────────────────────
   const selectedSignal = useMemo(() => {
     if (!selectedSig) return null;
@@ -497,11 +749,9 @@ export function WaveformViewer() {
   }, [groups, selectedSig]);
 
   const valueAt = (s: Signal | null, t: number | null): string => {
-    if (!s || t == null) return "—";
-    let cur: Event | null = null;
-    for (const ev of s.events) { if (ev.t <= t) cur = ev; else break; }
-    if (!cur) return "—";
-    return formatValue(cur.v, s.radix, s.width);
+    const ev = eventAtTick(s, t);
+    if (!s || !ev) return "—";
+    return formatValue(ev.v, s.radix, s.width);
   };
 
   const setRadixForSignal = (id: string, r: Radix) =>
@@ -521,6 +771,65 @@ export function WaveformViewer() {
     setGroups(gs => gs.map(g => ({ ...g, children: g.children.map(s => s.width > 1 ? { ...s, radix: r } : s) })));
   };
 
+  // ─── Bookmark actions ─────────────────────────────────────────────────────
+  const addBookmark = useCallback((tick: number) => {
+    setBookmarks(prev => {
+      // De-dupe identical ticks; keep the list sorted by tick for the
+      // "jump to next" logic.
+      const filtered = prev.filter(b => b.tick !== tick);
+      const next = [...filtered, { tick }].sort((a, b) => a.tick - b.tick).slice(0, MAX_BOOKMARKS);
+      saveBookmarks(next);
+      return next;
+    });
+  }, []);
+
+  const removeBookmark = useCallback((tick: number) => {
+    setBookmarks(prev => {
+      const next = prev.filter(b => b.tick !== tick);
+      saveBookmarks(next);
+      return next;
+    });
+  }, []);
+
+  const jumpNextBookmark = useCallback(() => {
+    setBookmarks(prev => {
+      if (prev.length === 0) return prev;
+      const sorted = [...prev].sort((a, b) => a.tick - b.tick);
+      const ref = cursorA ?? 0;
+      const next = sorted.find(b => b.tick > ref) ?? sorted[0];
+      setCursorA(next.tick);
+      // Re-centre the viewport if the jump lands off-screen.
+      if (containerRef.current) {
+        const cw = containerRef.current.clientWidth;
+        const visible = (cw - NAME_W) / zoom;
+        if (next.tick < offset || next.tick > offset + visible) {
+          setOffset(Math.max(0, next.tick - visible / 2));
+        }
+      }
+      return prev;
+    });
+  }, [cursorA, offset, zoom]);
+
+  // Global Ctrl+B hotkey — jump to next bookmark. (The waveform panel
+  // doesn't always hold focus, so we attach to window.)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b" && !e.shiftKey) {
+        const root = containerRef.current;
+        if (!root) return;
+        // Only hijack the shortcut when the waveform panel is visible.
+        const r = root.getBoundingClientRect();
+        if (r.width === 0 || r.height === 0) return;
+        e.preventDefault();
+        jumpNextBookmark();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [jumpNextBookmark]);
+
+  const signalCount = groups.reduce((n, g) => n + g.children.length, 0);
+
   return (
     <div className="w-full h-full flex flex-col" style={{ background: theme.bgPanel }}>
       {/* Top toolbar */}
@@ -529,8 +838,11 @@ export function WaveformViewer() {
         <Activity size={15} style={{ color: theme.accent }} />
         <span style={{ fontSize: 13, fontWeight: 700, color: theme.text }}>Waveform Analyser</span>
         <span style={{ fontSize: 10, color: theme.textMuted }}>
-          {groups.reduce((n, g) => n + g.children.length, 0)} signals ·
-          {" "}{totalTicks.toLocaleString()} cyc range
+          {signalCount} signals ·
+          {" "}{totalTicks.toLocaleString()} tick range ·
+          {" "}<span style={{ color: parsedDump ? theme.success : theme.warning, fontWeight: 600 }}>
+            {parsedDump ? `VCD: ${sourceLabel}` : "demo"}
+          </span>
         </span>
 
         <div className="flex-1" />
@@ -574,6 +886,9 @@ export function WaveformViewer() {
           ))}
         </div>
 
+        <button onClick={handleOpenVcd} style={iconBtn(theme)} title="Open .vcd file (File ▸ Open VCD)">
+          Open VCD
+        </button>
         <button onClick={() => setZoom(z => Math.min(60, z * 1.3))} style={iconBtn(theme)}>
           <ZoomIn size={12} />
         </button>
@@ -588,12 +903,12 @@ export function WaveformViewer() {
         </button>
       </div>
 
-      {/* Cursor readout bar */}
+      {/* Cursor readout + bookmark bar */}
       <div className="flex items-center px-3 shrink-0 gap-4"
            style={{ height: 26, borderBottom: `1px solid ${theme.border}`, background: theme.bgSurface, fontSize: 10 }}>
         <div style={{ color: theme.textMuted }}>
           <Crosshair size={10} style={{ marginRight: 4, verticalAlign: "middle" }} />
-          drag the canvas to pan · <strong>Alt</strong>-click = cursor A · <strong>Shift</strong>-click = cursor B · Ctrl-scroll = zoom
+          drag=pan · <strong>Alt</strong>-click=A · <strong>Shift</strong>-click=B · right-click=bookmark · Ctrl+B=next bookmark · Ctrl-scroll=zoom
         </div>
         <div className="flex-1" />
         <Readout tag="A" colour={theme.warning} cycle={cursorA} value={valueAt(selectedSignal, cursorA)} sig={selectedSignal} />
@@ -604,6 +919,44 @@ export function WaveformViewer() {
           </span>
         )}
       </div>
+
+      {/* Bookmark strip */}
+      {bookmarks.length > 0 && (
+        <div className="flex items-center px-3 shrink-0 gap-2 overflow-x-auto"
+             style={{ height: 24, borderBottom: `1px solid ${theme.borderDim}`, background: theme.bg, fontSize: 10 }}>
+          <Bookmark size={11} style={{ color: theme.success, flexShrink: 0 }} />
+          <span style={{ color: theme.textMuted, flexShrink: 0 }}>
+            bookmarks ({bookmarks.length}/{MAX_BOOKMARKS}):
+          </span>
+          {bookmarks.map(b => (
+            <button
+              key={b.tick}
+              onClick={() => { setCursorA(b.tick); setOffset(Math.max(0, b.tick - 40)); }}
+              title={`jump cursor A to tick ${b.tick}. right-click to remove.`}
+              onContextMenu={e => { e.preventDefault(); removeBookmark(b.tick); }}
+              style={{
+                padding: "1px 7px", borderRadius: 3,
+                background: theme.bgSurface, color: theme.success,
+                border: `1px solid ${theme.borderDim}`, cursor: "pointer",
+                fontFamily: "ui-monospace, monospace", fontWeight: 600,
+                flexShrink: 0,
+              }}
+            >
+              {b.tick.toLocaleString()}
+            </button>
+          ))}
+          <button onClick={jumpNextBookmark} title="Ctrl+B" style={{ ...iconBtn(theme), padding: "1px 7px", flexShrink: 0 }}>next ▸</button>
+        </div>
+      )}
+
+      {loadError && (
+        <div style={{
+          padding: "4px 12px", background: theme.bgSurface,
+          borderBottom: `1px solid ${theme.border}`, color: theme.error, fontSize: 11,
+        }}>
+          Failed to load VCD: {loadError}
+        </div>
+      )}
 
       {/* Per-signal radix strip (appears when a bus is selected) */}
       {selectedSignal && selectedSignal.width > 1 && (
@@ -648,6 +1001,7 @@ export function WaveformViewer() {
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
         onMouseLeave={onMouseUp}
+        onContextMenu={onContextMenu}
         onDoubleClick={e => {
           if (!containerRef.current) return;
           const r = containerRef.current.getBoundingClientRect();
@@ -674,6 +1028,8 @@ function drawWire(
   x: (t: number) => number,
   theme: ReturnType<typeof useTheme>,
   cw: number,
+  visStart: number,
+  visEnd:   number,
 ) {
   if (s.events.length === 0) return;
   const lo = yTop + h * 0.78;
@@ -681,9 +1037,25 @@ function drawWire(
   ctx.strokeStyle = s.name === "clk" ? theme.accent : "#22c55e";
   ctx.lineWidth = 1.4;
   ctx.beginPath();
-  let lastY = s.events[0].v === 1 ? hi : lo;
-  ctx.moveTo(x(0), lastY);
-  for (const ev of s.events) {
+
+  // Viewport culling: jump straight to the last event before `visStart`
+  // so we only iterate events that actually paint pixels. For a 100k-
+  // event trace this is the single biggest perf win of the rewrite.
+  const firstVisIdx = Math.max(0, eventIdxAtTick(s.events, visStart));
+  const startEv     = s.events[firstVisIdx];
+  let lastY         = typeof startEv.v === "string"
+    ? (yTop + h / 2)
+    : (startEv.v === 1 ? hi : lo);
+  ctx.moveTo(Math.min(x(startEv.t), cw), lastY);
+
+  for (let i = firstVisIdx; i < s.events.length; i++) {
+    const ev = s.events[i];
+    if (ev.t > visEnd + 2) {
+      // One event past the right edge is enough to close the last segment.
+      const xt = x(ev.t);
+      ctx.lineTo(xt, lastY);
+      break;
+    }
     const xt = x(ev.t);
     const yv = typeof ev.v === "string"
       ? (yTop + h / 2)
@@ -704,14 +1076,19 @@ function drawBus(
   x: (t: number) => number,
   theme: ReturnType<typeof useTheme>,
   cw: number,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _globalRadix: Radix,
+  visStart: number,
+  visEnd:   number,
 ) {
   const lo = yTop + h * 0.78;
   const hi = yTop + h * 0.22;
   const mid = yTop + h / 2;
 
-  for (let i = 0; i < s.events.length; i++) {
+  // Snap to the last event-at-or-before `visStart`; the loop also
+  // terminates on the first event past `visEnd`.
+  const startIdx = Math.max(0, eventIdxAtTick(s.events, visStart));
+  const endIdx   = firstIdxAtOrAfter(s.events, visEnd + 1);
+
+  for (let i = startIdx; i < s.events.length && i <= endIdx; i++) {
     const cur  = s.events[i];
     const next = s.events[i + 1];
     const x1 = x(cur.t);

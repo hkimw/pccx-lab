@@ -10,6 +10,7 @@ function buildMenus(act: (a: string) => () => void): Menu[] {
     { label: "File", items: [
       { label: "New Session",         shortcut: "Ctrl+N",       action: act("file.new") },
       { label: "Open .pccx…",         shortcut: "Ctrl+O",       action: act("file.open") },
+      { label: "Open VCD…",           shortcut: "Ctrl+Shift+O", action: act("file.openVcd") },
       { separator: true, label: "" },
       { label: "Save Session",        shortcut: "Ctrl+S",       action: act("file.save") },
       { label: "Save As…",            shortcut: "Ctrl+Shift+S", action: act("file.saveAs") },

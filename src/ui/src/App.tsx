@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { emit } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Group, Panel, Separator } from "react-resizable-panels";
 
@@ -239,6 +240,14 @@ function AppInner() {
           addMsg("system", `Export failed: ${e}. (chrome_trace writer may not be wired yet.)`);
         }
         break;
+      case "file.openVcd": {
+        // Switch to Waveform tab first so the panel mounts and listens
+        // for the open event; then trigger the native file picker.
+        setActiveTab("waves");
+        // `undefined` payload tells WaveformViewer to open its own dialog.
+        await emit("pccx://open-vcd", undefined);
+        break;
+      }
       case "file.exit": win.close(); break;
       case "help.about":
         addMsg("system", "pccx-lab v0.4.0 — NPU Architecture Profiler\nLicense: Apache 2.0\nModules: core · ui · ai_copilot · uvm_bridge");

@@ -349,6 +349,19 @@ fn merge_coverage(
     pccx_core::coverage::merge_jsonl(&refs).map_err(|e| e.to_string())
 }
 
+/// Parses an IEEE-1364 `.vcd` file (typically emitted by xsim /
+/// Verilator / Icarus) into a flat `WaveformDump`.  The returned
+/// JSON carries per-signal metadata plus the full value-change
+/// stream; the UI then per-signal binary-searches the events for
+/// O(log n) value-at-tick lookups.
+#[tauri::command]
+fn parse_vcd_file(
+    path: String,
+) -> Result<pccx_core::vcd::WaveformDump, String> {
+    pccx_core::vcd::parse_vcd_file(std::path::Path::new(&path))
+        .map_err(|e| e.to_string())
+}
+
 /// Lists every `.pccx` file under the sibling pccx-FPGA repo's
 /// `hw/sim/work/<tb>/` tree so the UI can present a dropdown of
 /// available traces without hard-coding paths.
@@ -500,6 +513,7 @@ async fn generate_report(state: State<'_, AppState>) -> Result<String, String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(AppState {
             trace_flat_buffer: Mutex::new(Vec::new()),
             license_token: Mutex::new(None),
@@ -523,6 +537,7 @@ pub fn run() {
             generate_markdown_report,
             detect_bottlenecks,
             merge_coverage,
+            parse_vcd_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
