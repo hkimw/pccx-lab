@@ -2,7 +2,11 @@ use pccx_core::pccx_format::{PccxFile, PccxHeader};
 use pccx_core::license::{get_license_info as core_license_info, validate_token, LicenseToken};
 use pccx_core::trace::NpuTrace;
 use pccx_core::hw_model::HardwareModel;
-use pccx_ai_copilot::{Extension, get_available_extensions, compress_context, generate_uvm_sequence};
+use pccx_core::roofline::{analyze as analyze_roofline_fn, RooflinePoint};
+use pccx_ai_copilot::{
+    Extension, compress_context, generate_uvm_sequence,
+    get_available_extensions, list_uvm_strategies as copilot_uvm_strategies,
+};
 use std::fs::File;
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, State};
@@ -125,6 +129,27 @@ fn compress_trace_context(state: State<'_, AppState>) -> Result<String, String> 
 #[tauri::command]
 fn generate_uvm_sequence_cmd(strategy: String) -> String {
     generate_uvm_sequence(&strategy)
+}
+
+/// Runs the roofline analysis on the currently-cached trace and returns the
+/// structured breakdown (arithmetic intensity, achieved GOPS, compute/memory
+/// bound classification) for the Roofline panel to render against.
+#[tauri::command]
+fn analyze_roofline(state: State<'_, AppState>) -> Result<RooflinePoint, String> {
+    let trace_guard = state.trace.lock().unwrap();
+    let trace = trace_guard.as_ref().ok_or("No trace loaded")?;
+    let hw = HardwareModel::pccx_reference();
+    Ok(analyze_roofline_fn(trace, &hw))
+}
+
+/// Enumerates every UVM strategy the ai_copilot's sequence generator accepts.
+/// The UI uses this to populate a dropdown so users never type invalid names.
+#[tauri::command]
+fn list_uvm_strategies() -> Vec<String> {
+    copilot_uvm_strategies()
+        .into_iter()
+        .map(|s| s.to_string())
+        .collect()
 }
 
 /// Parses Vivado `report_utilization` and `report_timing_summary` text outputs
@@ -430,6 +455,8 @@ pub fn run() {
             load_synth_report,
             run_verification,
             list_pccx_traces,
+            analyze_roofline,
+            list_uvm_strategies,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -162,6 +162,14 @@ pub fn compress_context(cycles: u64, bottlenecks: usize) -> String {
 }
 
 /// Generates a UVM sequence stub for the given bottleneck mitigation strategy.
+///
+/// Supported strategies (case-sensitive):
+/// * `l2_prefetch`        — stagger DMA reads by AXI tx overhead
+/// * `barrier_reduction`  — wavefront barrier instead of global sync
+/// * `dma_double_buffer`  — ping-pong compute / DMA across tile boundary
+/// * `systolic_pipeline_warmup` — pre-roll the MAC array before first tile
+/// * `weight_fifo_preload`      — fill HP weight FIFOs during setup window
+/// * anything else                → `generic_opt_seq` placeholder
 pub fn generate_uvm_sequence(strategy: &str) -> String {
     let (class_name, body) = match strategy {
         "l2_prefetch" => (
@@ -171,7 +179,7 @@ pub fn generate_uvm_sequence(strategy: &str) -> String {
                start_item(new dma_read_item(base_addr + i * stride, burst_len));\n\
                finish_item();\n\
                repeat(15) @(posedge clk);\n\
-             end"
+             end",
         ),
         "barrier_reduction" => (
             "barrier_reduction_seq",
@@ -179,11 +187,52 @@ pub fn generate_uvm_sequence(strategy: &str) -> String {
              for (int i = 0; i < NUM_CORES; i += WAVEFRONT_WIDTH) begin\n\
                fork foreach_wavefront(i, WAVEFRONT_WIDTH); join_none\n\
              end\n\
-             wait fork;"
+             wait fork;",
+        ),
+        "dma_double_buffer" => (
+            "dma_double_buffer_seq",
+            "// Ping-pong compute vs DMA across adjacent tile boundaries so\n\
+             // the MAC array never starves waiting on the next read.\n\
+             int buf = 0;\n\
+             foreach (tiles[t]) begin\n\
+               fork\n\
+                 begin  // DMA: read tile (t+1) into the idle buffer\n\
+                   if (t + 1 < tiles.size())\n\
+                     issue_dma_read(tile_addr[t+1], burst_len, buf ^ 1);\n\
+                 end\n\
+                 begin  // Compute: run MACs over tile t from the active buffer\n\
+                   run_gemm_tile(buf, tile_m, tile_n, tile_k);\n\
+                 end\n\
+               join\n\
+               buf ^= 1;\n\
+             end",
+        ),
+        "systolic_pipeline_warmup" => (
+            "systolic_pipeline_warmup_seq",
+            "// Pre-roll the systolic array with dummy zero weights so the\n\
+             // pipeline's fill latency is amortised before the first real\n\
+             // tile arrives. Drains the MAC stall fraction on cold start.\n\
+             for (int r = 0; r < PIPELINE_DEPTH; r++) begin\n\
+               start_item(new weight_item('0, '0));\n\
+               finish_item();\n\
+               @(posedge clk);\n\
+             end\n\
+             dispatch_first_tile();",
+        ),
+        "weight_fifo_preload" => (
+            "weight_fifo_preload_seq",
+            "// While the host is still staging feature maps, use the HP\n\
+             // lanes (HP0 upper / HP1 lower for W4A8) to front-load weight\n\
+             // FIFOs so GEMM_weight_dispatcher has valid pairs the moment\n\
+             // activation fetch completes.\n\
+             fork\n\
+               preload_fifo(.port(HP0), .chan(UPPER), .n_words(PREFETCH_DEPTH));\n\
+               preload_fifo(.port(HP1), .chan(LOWER), .n_words(PREFETCH_DEPTH));\n\
+             join",
         ),
         _ => (
             "generic_opt_seq",
-            "// TODO: implement optimisation-specific sequence"
+            "// TODO: implement optimisation-specific sequence",
         ),
     };
 
@@ -198,4 +247,51 @@ pub fn generate_uvm_sequence(strategy: &str) -> String {
         class_name = class_name,
         body = body,
     )
+}
+
+/// Lists every supported UVM strategy. Useful for UI pickers that want to
+/// enumerate options without hard-coding the match arms.
+pub fn list_uvm_strategies() -> Vec<&'static str> {
+    vec![
+        "l2_prefetch",
+        "barrier_reduction",
+        "dma_double_buffer",
+        "systolic_pipeline_warmup",
+        "weight_fifo_preload",
+    ]
+}
+
+#[cfg(test)]
+mod uvm_tests {
+    use super::*;
+
+    #[test]
+    fn test_every_strategy_produces_valid_stub() {
+        for s in list_uvm_strategies() {
+            let body = generate_uvm_sequence(s);
+            assert!(body.starts_with("class "),        "strategy {s}: no class header");
+            assert!(body.contains("uvm_object_utils"), "strategy {s}: missing uvm_object_utils");
+            assert!(body.contains("task body();"),     "strategy {s}: missing task body()");
+            assert!(body.contains("endclass"),         "strategy {s}: missing endclass");
+            assert!(!body.contains("generic_opt_seq"), "strategy {s} must produce a real stub");
+        }
+    }
+
+    #[test]
+    fn test_unknown_strategy_falls_back_to_generic() {
+        let body = generate_uvm_sequence("totally_fake_strategy");
+        assert!(body.contains("generic_opt_seq"));
+        assert!(body.contains("TODO"));
+    }
+
+    #[test]
+    fn test_class_names_distinct() {
+        let mut seen = std::collections::HashSet::new();
+        for s in list_uvm_strategies() {
+            let body = generate_uvm_sequence(s);
+            let first_line = body.lines().next().unwrap();
+            assert!(seen.insert(first_line.to_string()),
+                "duplicate class header: {first_line}");
+        }
+    }
 }
