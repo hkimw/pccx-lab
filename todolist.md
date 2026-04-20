@@ -84,3 +84,41 @@ Phase 12: pccx-FPGA V002 Coverage Push (다음 세션 대상)
 - [ ] `tb_GEMM_fmap_staggered_delay` 재도전 — xsim 에서 관찰된 col≥1 의
       "same-iter drive가 row_data 에 즉시 반영되는" 타이밍 패턴 재현.
 - [ ] NPU_Controller 통합 테스트 (`ctrl_npu_decoder` + `Global_Scheduler`).
+
+Phase 13: Scenario-Grade Visualisation + Testbench Authoring (2026-04-20 진행)
+- [x] `ScenarioFlow.tsx` — Gemma 3N E4B 디코드 스텝의 계층적 드릴다운
+      (decode_step → attn / ffn / lm_head → sub-stages). 블록 클릭 시
+      math 수식 + ISA opcode 시퀀스 (cycle-accurate, unit-별 색상 bar)
+      + Data Movement 다이어그램 (source→sink byte/cycle bar, 레이턴시
+      비례 빨-주-노-파 그라디언트).
+- [x] `TestbenchAuthor.tsx` — ISA / API / SV 3-뷰 편집기.
+      ISA 테이블이 authoritative 소스, API (C uca_*) 와 SV 테스트벤치
+      스켈레톤 (canonical `PASS:` 마커 포함) 자동 생성.
+      Copy / Download 버튼으로 바로 `hw/sim/run_verification.sh` 투입.
+- [x] `BottomPanel.tsx` — Log / Console / Live Telemetry 3-탭 하단
+      도킹. REPL 콘솔 (help / run_verification / analyze_roofline / …).
+      Live Telemetry 가 기본 탭.
+- [x] `FlameGraph` 121-span Gemma 3N 디코드 + **click-to-isolate**
+      (선택 span + 조상/자손만 색, 나머지는 55% 회색 dim) + vertical
+      stretch to fill canvas.
+- [x] i18n (`i18n.tsx`) — EN/KO 딕셔너리 + localStorage 영속. 기본 EN,
+      `navigator.language === "ko*"` 최초 로드 시에만 KO 기본값.
+- [x] Community / Enterprise 브랜딩 삭제 (License 뱃지, 메뉴,
+      ReportGenerator 제목, AI Copilot 시스템 프롬프트).
+
+Phase 14: UI 품질 패스 (2026-04-20 feedback batch)
+- [x] 우측 AI Copilot 패널: `minSize 20→16 %` / `maxSize 50→70 %` /
+      `minWidth 280→240 px` — 이전의 "줄이기만 되고 다시 늘릴 수 없음"
+      버그 해소.
+- [x] AI Copilot placeholder / hint / system 메시지 i18n 반영 — EN
+      모드에서도 한국어가 섞이는 문제 해소.
+- [x] Light mode 텍스트 가독성: `VerificationSuite` 의 `bg-black/20`,
+      `text-gray-*`, `hover:bg-white/5` 등 Tailwind 다크 전용 유틸리티
+      제거 → theme 토큰 사용. `MemoryDump` hover 색 동일 처리.
+- [ ] 상단 툴바/탭바 접기(collapse) 토글 — 아직 남음.
+- [ ] Waveform 드래그/선택/multi-radix(bin/oct/hex/dec)/배열/시그널 필터 — Vivado 급 업그레이드 필요.
+- [ ] Memory Dump 타임라인 + Visual Studio 급 시각화.
+- [ ] System Simulator: KV260 실 RTL 기반 강화.
+- [ ] Report: PDF 스타일 확장 + 표 추가 + methodology/glossary 섹션.
+- [ ] Verification / Roofline 콘텐츠 추가 심화.
+- [ ] TB Author GUI 위주로 추가 — 현재는 코드 편집 중심.
