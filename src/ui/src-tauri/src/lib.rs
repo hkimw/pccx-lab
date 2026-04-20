@@ -138,6 +138,101 @@ fn load_synth_report(
     pccx_core::synth_report::load_from_files(&utilization_path, &timing_path)
 }
 
+#[derive(serde::Serialize)]
+struct TbResult {
+    name: String,
+    verdict: String,
+    cycles: u64,
+}
+
+#[derive(serde::Serialize)]
+struct VerificationSummary {
+    testbenches: Vec<TbResult>,
+    synth_timing_met: Option<bool>,
+    synth_status: String,
+    stdout: String,
+}
+
+/// Spawns the `hw/sim/run_verification.sh` script inside the provided
+/// pccx-FPGA checkout, parses the canonical `PASS`/`FAIL` lines plus the
+/// synth status footer, and returns a structured summary.
+#[tauri::command]
+async fn run_verification(repo_path: String) -> Result<VerificationSummary, String> {
+    let script = format!("{}/hw/sim/run_verification.sh", repo_path);
+
+    let output = tokio::task::spawn_blocking(move || {
+        std::process::Command::new("bash").arg(&script).output()
+    })
+    .await
+    .map_err(|e| format!("join error: {e}"))?
+    .map_err(|e| format!("spawn error: {e}"))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    if !output.status.success() && stderr.trim().len() > 0 {
+        return Err(format!(
+            "run_verification.sh failed (exit {}): {}",
+            output.status.code().unwrap_or(-1),
+            stderr.trim()
+        ));
+    }
+
+    let mut testbenches = Vec::new();
+    for line in stdout.lines() {
+        let trimmed = line.trim_start();
+        if !trimmed.starts_with("tb_") {
+            continue;
+        }
+        let (name, rest) = match trimmed.split_once(char::is_whitespace) {
+            Some(pair) => pair,
+            None => continue,
+        };
+        let rest = rest.trim();
+        let (verdict, rest) = if let Some(r) = rest.strip_prefix("PASS:") {
+            ("PASS", r)
+        } else if let Some(r) = rest.strip_prefix("FAIL:") {
+            ("FAIL", r)
+        } else {
+            continue;
+        };
+        let cycles = rest
+            .trim()
+            .split_whitespace()
+            .next()
+            .and_then(|s| s.parse::<u64>().ok())
+            .unwrap_or(0);
+        testbenches.push(TbResult {
+            name: name.to_string(),
+            verdict: verdict.to_string(),
+            cycles,
+        });
+    }
+
+    let met     = stdout.contains("All user specified timing constraints are met");
+    let not_met = stdout.contains("Timing constraints are not met");
+    let synth_timing_met = if met {
+        Some(true)
+    } else if not_met {
+        Some(false)
+    } else {
+        None
+    };
+    let synth_status = if not_met {
+        "Timing constraints are not met.".into()
+    } else if met {
+        "All user specified timing constraints are met.".into()
+    } else {
+        String::new()
+    };
+
+    Ok(VerificationSummary {
+        testbenches,
+        synth_timing_met,
+        synth_status,
+        stdout,
+    })
+}
+
 #[tauri::command]
 async fn generate_report(state: State<'_, AppState>) -> Result<String, String> {
     // MutexGuard must not be held across an await point (not Send).
@@ -178,6 +273,7 @@ pub fn run() {
             generate_uvm_sequence_cmd,
             generate_report,
             load_synth_report,
+            run_verification,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

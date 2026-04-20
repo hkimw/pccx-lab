@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useTheme } from "./ThemeContext";
 import { CheckCircle, AlertOctagon, TerminalSquare, ShieldCheck, Bug, Activity, Cpu } from "lucide-react";
 import { SynthStatusCard } from "./SynthStatusCard";
+import { VerificationRunner } from "./VerificationRunner";
 
 type VerifyTab = "isa" | "api" | "uvm" | "synth";
 
@@ -9,6 +10,8 @@ const DEFAULT_UTIL_PATH =
   "../../../../pccx-FPGA-NPU-LLM-kv260/hw/build/reports/utilization_post_synth.rpt";
 const DEFAULT_TIMING_PATH =
   "../../../../pccx-FPGA-NPU-LLM-kv260/hw/build/reports/timing_summary_post_synth.rpt";
+const DEFAULT_REPO_PATH =
+  "../../../../pccx-FPGA-NPU-LLM-kv260";
 
 interface IsaResult {
   inst: string;
@@ -162,8 +165,9 @@ export function VerificationSuite() {
           {activeTab === "synth" && (
             <div className="flex flex-col h-full gap-3">
               <h3 className="text-sm font-bold flex items-center gap-2">
-                <Cpu size={16} /> Post-Synthesis Status (pccx-FPGA)
+                <Cpu size={16} /> pccx-FPGA Verification Dashboard
               </h3>
+              <VerificationRunner repoPath={DEFAULT_REPO_PATH} />
               <SynthStatusCard
                 utilizationPath={DEFAULT_UTIL_PATH}
                 timingPath={DEFAULT_TIMING_PATH}

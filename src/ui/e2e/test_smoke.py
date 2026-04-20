@@ -30,6 +30,9 @@ def test_synth_status_tab_reachable(driver):
         By.XPATH, "//button[normalize-space()='Synth Status']"
     ).click()
     heading = driver.find_element(
-        By.XPATH, "//h3[contains(., 'Post-Synthesis Status')]"
+        By.XPATH, "//h3[contains(., 'pccx-FPGA Verification Dashboard')]"
     )
     assert heading.is_displayed()
+    # Both widgets should be visible within the same tab.
+    driver.find_element(By.XPATH, "//*[contains(., 'Run Verification Suite')]")
+    driver.find_element(By.XPATH, "//*[contains(., 'Synthesis Status')]")
