@@ -138,7 +138,7 @@ fn load_synth_report(
     pccx_core::synth_report::load_from_files(&utilization_path, &timing_path)
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, Debug, PartialEq)]
 struct TbResult {
     name: String,
     verdict: String,
@@ -146,7 +146,7 @@ struct TbResult {
     pccx_path: Option<String>,
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, Debug, PartialEq)]
 struct VerificationSummary {
     testbenches: Vec<TbResult>,
     synth_timing_met: Option<bool>,
@@ -154,31 +154,12 @@ struct VerificationSummary {
     stdout: String,
 }
 
-/// Spawns the `hw/sim/run_verification.sh` script inside the provided
-/// pccx-FPGA checkout, parses the canonical `PASS`/`FAIL` lines plus the
-/// synth status footer, and returns a structured summary.
-#[tauri::command]
-async fn run_verification(repo_path: String) -> Result<VerificationSummary, String> {
-    let script = format!("{}/hw/sim/run_verification.sh", repo_path);
-    let repo_path_arg = repo_path.clone();
-
-    let output = tokio::task::spawn_blocking(move || {
-        std::process::Command::new("bash").arg(&script).output()
-    })
-    .await
-    .map_err(|e| format!("join error: {e}"))?
-    .map_err(|e| format!("spawn error: {e}"))?;
-
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    if !output.status.success() && stderr.trim().len() > 0 {
-        return Err(format!(
-            "run_verification.sh failed (exit {}): {}",
-            output.status.code().unwrap_or(-1),
-            stderr.trim()
-        ));
-    }
-
+/// Pure-function extraction of the stdout parser used by `run_verification`.
+/// Exposed for unit tests; the command wraps this plus the spawn machinery.
+fn parse_run_verification_stdout(
+    stdout: &str,
+    repo_path: &str,
+) -> (Vec<TbResult>, Option<bool>, String) {
     let mut testbenches = Vec::new();
     for line in stdout.lines() {
         let trimmed = line.trim_start();
@@ -203,7 +184,7 @@ async fn run_verification(repo_path: String) -> Result<VerificationSummary, Stri
             .next()
             .and_then(|s| s.parse::<u64>().ok())
             .unwrap_or(0);
-        let candidate = format!("{}/hw/sim/work/{}/{}.pccx", repo_path_arg, name, name);
+        let candidate = format!("{}/hw/sim/work/{}/{}.pccx", repo_path, name, name);
         let pccx_path = if std::path::Path::new(&candidate).is_file() {
             Some(candidate)
         } else {
@@ -234,12 +215,111 @@ async fn run_verification(repo_path: String) -> Result<VerificationSummary, Stri
         String::new()
     };
 
+    (testbenches, synth_timing_met, synth_status)
+}
+
+/// Spawns the `hw/sim/run_verification.sh` script inside the provided
+/// pccx-FPGA checkout, parses the canonical `PASS`/`FAIL` lines plus the
+/// synth status footer, and returns a structured summary.
+#[tauri::command]
+async fn run_verification(repo_path: String) -> Result<VerificationSummary, String> {
+    let script = format!("{}/hw/sim/run_verification.sh", repo_path);
+    let repo_path_arg = repo_path.clone();
+
+    let output = tokio::task::spawn_blocking(move || {
+        std::process::Command::new("bash").arg(&script).output()
+    })
+    .await
+    .map_err(|e| format!("join error: {e}"))?
+    .map_err(|e| format!("spawn error: {e}"))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    if !output.status.success() && stderr.trim().len() > 0 {
+        return Err(format!(
+            "run_verification.sh failed (exit {}): {}",
+            output.status.code().unwrap_or(-1),
+            stderr.trim()
+        ));
+    }
+
+    let (testbenches, synth_timing_met, synth_status) =
+        parse_run_verification_stdout(&stdout, &repo_path_arg);
+
     Ok(VerificationSummary {
         testbenches,
         synth_timing_met,
         synth_status,
         stdout,
     })
+}
+
+#[cfg(test)]
+mod parse_tests {
+    use super::*;
+
+    const FIXTURE_PASS: &str = r#"
+==> Running pccx-FPGA testbench suite
+
+TESTBENCH                                           RESULT
+---------                                           ------
+tb_GEMM_dsp_packer_sign_recovery                    PASS: 1024 cycles, both channels match golden.
+tb_mat_result_normalizer                            PASS: 256 cycles, both channels match golden.
+tb_GEMM_weight_dispatcher                           PASS: 128 cycles, both channels match golden.
+
+==> Synthesis status (from existing hw/build/reports):
+Timing constraints are not met.
+"#;
+
+    const FIXTURE_FAIL: &str = r#"
+tb_FROM_mat_result_packer                           FAIL: 3 mismatches over 4 cycles.
+tb_GEMM_dsp_packer_sign_recovery                    PASS: 1024 cycles, both channels match golden.
+
+All user specified timing constraints are met.
+"#;
+
+    #[test]
+    fn test_parse_three_passes_plus_fail_timing() {
+        let (tbs, met, status) =
+            parse_run_verification_stdout(FIXTURE_PASS, "/nonexistent/repo");
+        assert_eq!(tbs.len(), 3);
+        assert_eq!(tbs[0].name,   "tb_GEMM_dsp_packer_sign_recovery");
+        assert_eq!(tbs[0].verdict, "PASS");
+        assert_eq!(tbs[0].cycles,  1024);
+        assert_eq!(met, Some(false), "'not met' footer should be detected");
+        assert!(status.contains("not met"));
+    }
+
+    #[test]
+    fn test_parse_mixed_pass_fail_pass_timing() {
+        let (tbs, met, status) =
+            parse_run_verification_stdout(FIXTURE_FAIL, "/nonexistent/repo");
+        assert_eq!(tbs.len(), 2);
+        assert_eq!(tbs[0].verdict, "FAIL");
+        assert_eq!(tbs[0].cycles,  3);
+        assert_eq!(tbs[1].verdict, "PASS");
+        assert_eq!(met, Some(true));
+        assert!(status.contains("are met"));
+    }
+
+    #[test]
+    fn test_parse_ignores_non_tb_lines() {
+        let junk = "random noise\n==> heading\ntb_fake PASS: wrong format\n";
+        let (tbs, met, _) = parse_run_verification_stdout(junk, "/repo");
+        // "PASS:" without a colon suffix number still classifies but cycles=0.
+        assert_eq!(tbs.len(), 1);
+        assert_eq!(tbs[0].cycles, 0);
+        assert_eq!(met, None);
+    }
+
+    #[test]
+    fn test_pccx_path_missing_when_file_absent() {
+        let (tbs, _, _) = parse_run_verification_stdout(
+            "tb_foo PASS: 10 cycles.\n",
+            "/absolutely/not/a/real/path",
+        );
+        assert_eq!(tbs[0].pccx_path, None);
+    }
 }
 
 #[tauri::command]
