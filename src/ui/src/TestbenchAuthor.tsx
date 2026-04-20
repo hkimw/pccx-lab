@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useTheme } from "./ThemeContext";
 import { useI18n } from "./i18n";
-import { Terminal, FileCode, Binary, Code2, Copy, Download } from "lucide-react";
+import { Terminal, FileCode, Binary, Code2, Copy, Download, Plus, Trash2, GripVertical, Blocks } from "lucide-react";
 
 // ─── Shared scenario model ───────────────────────────────────────────────────
 //
@@ -179,14 +179,23 @@ function parseIsaFromText(txt: string): IsaInstr[] {
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-type View = "isa" | "api" | "sv";
+type View = "builder" | "isa" | "api" | "sv";
+
+const OPCODE_META: Record<IsaInstr["opcode"], { color: string; label: string; hint: string; template: string }> = {
+  OP_MEMCPY: { color: "#4ec86b", label: "MEMCPY", hint: "DDR ↔ BRM transfer",         template: "dst=brm_0  src=host  len=2048*2B" },
+  OP_MEMSET: { color: "#6b7280", label: "MEMSET", hint: "shape/size register setup",  template: "shape_ptr=0  size_ptr=0  (D=2048, H=6144)" },
+  OP_GEMV:   { color: "#4fc1ff", label: "GEMV",   hint: "W4A8 GEMV (matrix · vector)", template: "dst=q_reg  src=brm_0  flags=0x20" },
+  OP_GEMM:   { color: "#0098ff", label: "GEMM",   hint: "W4A8 GEMM (tile matmul)",     template: "dst=mat_out  src=a,b  flags=0x20" },
+  OP_CVO:    { color: "#dcdcaa", label: "CVO",    hint: "SFU: softmax / silu / rsqrt", template: "op=softmax  src=scores  dst=prob" },
+};
 
 export function TestbenchAuthor() {
   const theme = useTheme();
   const { t } = useI18n();
   const [isa, setIsa] = useState<IsaInstr[]>(DEFAULT_ISA);
-  const [active, setActive] = useState<View>("isa");
+  const [active, setActive] = useState<View>("builder");
   const [isaText_, setIsaText] = useState(isaText(DEFAULT_ISA));
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
 
   const apiCode = useMemo(() => apiFromIsa(isa), [isa]);
   const svCode  = useMemo(() => svFromIsa(isa),  [isa]);
@@ -195,6 +204,27 @@ export function TestbenchAuthor() {
     setIsaText(v);
     const parsed = parseIsaFromText(v);
     if (parsed.length > 0) setIsa(parsed);
+  };
+
+  // Block-editor mutations
+  const addBlock = (op: IsaInstr["opcode"]) => {
+    const next: IsaInstr[] = [...isa, { opcode: op, body: OPCODE_META[op].template, note: "" }];
+    setIsa(next); setIsaText(isaText(next));
+  };
+  const deleteBlock = (idx: number) => {
+    const next = isa.filter((_, i) => i !== idx);
+    setIsa(next); setIsaText(isaText(next));
+  };
+  const updateBlock = (idx: number, patch: Partial<IsaInstr>) => {
+    const next = isa.map((b, i) => i === idx ? { ...b, ...patch } : b);
+    setIsa(next); setIsaText(isaText(next));
+  };
+  const moveBlock = (from: number, to: number) => {
+    if (from === to) return;
+    const next = isa.slice();
+    const [x] = next.splice(from, 1);
+    next.splice(to, 0, x);
+    setIsa(next); setIsaText(isaText(next));
   };
 
   const tabBtn = (id: View, icon: React.ReactNode, label: string, hint: string) => (
@@ -251,29 +281,135 @@ export function TestbenchAuthor() {
       </div>
 
       <div className="flex items-center shrink-0" style={{ borderBottom: `1px solid ${theme.border}`, padding: "0 12px" }}>
+        {tabBtn("builder", <Blocks size={11}/>, "Builder", "Drag-drop opcode blocks — GUI-first authoring")}
         {tabBtn("isa", <Binary size={11}/>,  "ISA",     "Cycle-authoritative opcode list (editable)")}
         {tabBtn("api", <Code2 size={11}/>,   "API",     "C driver call sequence (generated from ISA)")}
         {tabBtn("sv",  <FileCode size={11}/>,"SV",      "SystemVerilog testbench skeleton (generated)")}
         <div className="flex-1" />
         <span style={{ fontSize: 10, color: theme.textMuted }}>
-          {readOnly ? "read-only (generated)" : "editable"}
+          {active === "builder" ? "GUI editor" : readOnly ? "read-only (generated)" : "editable"}
         </span>
       </div>
 
-      <textarea
-        readOnly={readOnly}
-        value={body}
-        onChange={e => onIsaChange(e.target.value)}
-        spellCheck={false}
-        style={{
-          flex: 1, padding: "12px 16px",
-          fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-          fontSize: 12, lineHeight: 1.55,
-          color: theme.text, background: theme.bg,
-          border: "none", outline: "none", resize: "none",
-          whiteSpace: "pre", overflow: "auto",
-        }}
-      />
+      {active === "builder" ? (
+        <div className="flex-1 flex overflow-hidden">
+          {/* Palette */}
+          <div className="shrink-0 flex flex-col overflow-y-auto" style={{ width: 180, borderRight: `1px solid ${theme.border}`, background: theme.bgEditor }}>
+            <div style={{ padding: "8px 12px", fontSize: 9, color: theme.textMuted, letterSpacing: "0.05em", borderBottom: `1px solid ${theme.border}`, background: theme.bgPanel }}>
+              OPCODE PALETTE
+            </div>
+            <div className="p-2 flex flex-col gap-1.5">
+              {(Object.keys(OPCODE_META) as IsaInstr["opcode"][]).map(op => {
+                const meta = OPCODE_META[op];
+                return (
+                  <button key={op} onClick={() => addBlock(op)} title={meta.hint}
+                    style={{
+                      padding: "8px 10px", fontSize: 11, fontWeight: 600,
+                      background: meta.color + "15", color: meta.color,
+                      border: `1px solid ${meta.color}44`, borderRadius: 4,
+                      textAlign: "left", cursor: "pointer",
+                      display: "flex", alignItems: "center", gap: 8,
+                    }}>
+                    <Plus size={10}/> {meta.label}
+                    <span style={{ marginLeft: "auto", fontSize: 9, color: theme.textMuted }}>add</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex-1"/>
+            <div style={{ padding: "8px 12px", fontSize: 9, color: theme.textMuted, borderTop: `1px solid ${theme.border}` }}>
+              Click a palette entry to append; drag a block's handle to reorder.
+            </div>
+          </div>
+
+          {/* Block canvas */}
+          <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2" style={{ background: theme.bg }}>
+            {isa.map((b, i) => {
+              const meta = OPCODE_META[b.opcode];
+              const isDragging = dragIdx === i;
+              return (
+                <div key={i}
+                  draggable
+                  onDragStart={e => { setDragIdx(i); e.dataTransfer.effectAllowed = "move"; }}
+                  onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; }}
+                  onDrop={e => { e.preventDefault(); if (dragIdx != null && dragIdx !== i) moveBlock(dragIdx, i); setDragIdx(null); }}
+                  onDragEnd={() => setDragIdx(null)}
+                  style={{
+                    background: theme.bgPanel,
+                    border: `1px solid ${isDragging ? theme.accent : meta.color + "44"}`,
+                    borderLeft: `4px solid ${meta.color}`,
+                    borderRadius: 5,
+                    padding: "10px 12px",
+                    display: "grid",
+                    gridTemplateColumns: "18px 72px 1fr 180px 24px",
+                    gap: 10,
+                    alignItems: "center",
+                    opacity: isDragging ? 0.55 : 1,
+                    cursor: isDragging ? "grabbing" : "default",
+                    transition: "all 0.1s",
+                  }}>
+                  <span style={{ color: theme.textMuted, cursor: "grab" }} title="drag to reorder"><GripVertical size={14}/></span>
+                  <select value={b.opcode} onChange={e => updateBlock(i, { opcode: e.target.value as IsaInstr["opcode"], body: OPCODE_META[e.target.value as IsaInstr["opcode"]].template })}
+                    style={{
+                      fontSize: 11, fontWeight: 700, color: meta.color,
+                      background: meta.color + "15", border: `1px solid ${meta.color}44`,
+                      borderRadius: 3, padding: "3px 6px", fontFamily: "ui-monospace, monospace",
+                      outline: "none", cursor: "pointer",
+                    }}>
+                    {(Object.keys(OPCODE_META) as IsaInstr["opcode"][]).map(op => (
+                      <option key={op} value={op}>{OPCODE_META[op].label}</option>
+                    ))}
+                  </select>
+                  <input
+                    value={b.body}
+                    onChange={e => updateBlock(i, { body: e.target.value })}
+                    placeholder={meta.template}
+                    style={{
+                      fontSize: 11, fontFamily: "ui-monospace, monospace",
+                      background: theme.bgInput, border: `1px solid ${theme.border}`,
+                      color: theme.text, borderRadius: 3, padding: "4px 8px", outline: "none",
+                    }}/>
+                  <input
+                    value={b.note ?? ""}
+                    onChange={e => updateBlock(i, { note: e.target.value })}
+                    placeholder="note (optional)"
+                    style={{
+                      fontSize: 10, fontStyle: "italic",
+                      background: "transparent", border: `1px dashed ${theme.borderDim}`,
+                      color: theme.textDim, borderRadius: 3, padding: "4px 8px", outline: "none",
+                    }}/>
+                  <button onClick={() => deleteBlock(i)} style={{ color: theme.textMuted, padding: 2, cursor: "pointer", border: "none", background: "transparent" }} title="delete">
+                    <Trash2 size={12}/>
+                  </button>
+                </div>
+              );
+            })}
+            {isa.length === 0 && (
+              <div style={{ padding: 40, textAlign: "center", color: theme.textMuted, fontSize: 12 }}>
+                No blocks. Click an opcode in the palette on the left to append.
+              </div>
+            )}
+            <div style={{ marginTop: 8, fontSize: 10, color: theme.textMuted }}>
+              {isa.length} block{isa.length !== 1 ? "s" : ""} · will generate {isa.length} ISA instructions and a <code>tb_scenario_auto</code> SV skeleton.
+            </div>
+          </div>
+        </div>
+      ) : (
+        <textarea
+          readOnly={readOnly}
+          value={body}
+          onChange={e => onIsaChange(e.target.value)}
+          spellCheck={false}
+          style={{
+            flex: 1, padding: "12px 16px",
+            fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+            fontSize: 12, lineHeight: 1.55,
+            color: theme.text, background: theme.bg,
+            border: "none", outline: "none", resize: "none",
+            whiteSpace: "pre", overflow: "auto",
+          }}
+        />
+      )}
 
       <div className="px-4 py-2 shrink-0" style={{
         borderTop: `1px solid ${theme.border}`, background: theme.bgPanel,
