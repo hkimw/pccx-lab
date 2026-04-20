@@ -1,0 +1,276 @@
+/// Unit and integration tests for pccx-core.
+///
+/// Run with: `cargo test -p pccx-core`
+#[cfg(test)]
+mod tests {
+    use pccx_core::{
+        cycle_estimator::{CycleEstimator, TileOperation},
+        hw_model::HardwareModel,
+        pccx_format::{PccxFile, PccxHeader, ArchConfig, TraceConfig, PayloadConfig, fnv1a_64,
+                      MAJOR_VERSION, MINOR_VERSION},
+        simulator::{SimConfig, generate_realistic_trace, save_dummy_pccx},
+        trace::{NpuTrace, NpuEvent, event_type_id},
+        license::{validate_token, issue_token, LicenseTier},
+    };
+    use std::io::Cursor;
+
+    // ─── HardwareModel ────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_hw_model_peak_tops() {
+        let hw = HardwareModel::pccx_reference();
+        // 32×32 MAC × 2 ops/MAC × 32 cores × 1 GHz = 2.097 TOPS
+        let tops = hw.peak_tops();
+        assert!(tops > 2.0 && tops < 3.0, "peak_tops should be ~2.05, got {tops}");
+    }
+
+    #[test]
+    fn test_cycles_to_us() {
+        let hw = HardwareModel::pccx_reference();
+        // 1000 cycles @ 1 GHz = 1.0 µs
+        let us = hw.cycles_to_us(1000);
+        assert!((us - 1.0).abs() < 1e-9, "Expected 1.0 µs, got {us}");
+    }
+
+    // ─── CycleEstimator ───────────────────────────────────────────────────────
+
+    #[test]
+    fn test_gemm_estimate_sanity() {
+        let hw = HardwareModel::pccx_reference();
+        let est = CycleEstimator::new(&hw);
+        let op  = TileOperation { m: 64, n: 64, k: 64, bytes_per_element: 2 };
+        let cycles = est.estimate_gemm_cycles(&op);
+        // At minimum it should be compute bound: 64³ / (32×32) = 8 cycles + pipeline
+        assert!(cycles >= 8 + hw.mac.pipeline_depth as u64,
+            "GEMM estimate too low: {cycles}");
+    }
+
+    #[test]
+    fn test_dma_zero_bytes() {
+        let hw  = HardwareModel::pccx_reference();
+        let est = CycleEstimator::new(&hw);
+        assert_eq!(est.estimate_dma_cycles(0), 0, "DMA with 0 bytes should return 0");
+    }
+
+    #[test]
+    fn test_dma_contended_slower_than_solo() {
+        let hw  = HardwareModel::pccx_reference();
+        let est = CycleEstimator::new(&hw);
+        let bytes = 1024 * 16; // 16 KB
+        let solo      = est.estimate_dma_cycles(bytes);
+        let contended = est.estimate_dma_cycles_contended(bytes, 32);
+        assert!(contended >= solo,
+            "Contended DMA ({contended}) should be >= solo ({solo})");
+    }
+
+    #[test]
+    fn test_arithmetic_intensity() {
+        let hw  = HardwareModel::pccx_reference();
+        let est = CycleEstimator::new(&hw);
+        let op  = TileOperation { m: 64, n: 64, k: 64, bytes_per_element: 2 };
+        let ai  = est.arithmetic_intensity(&op);
+        // 64³ ops / ((64*64 + 64*64)*2 bytes) = 262144 / 16384 = 16
+        assert!((ai - 16.0).abs() < 0.1, "Expected AI ≈ 16, got {ai}");
+    }
+
+    #[test]
+    fn test_is_compute_bound() {
+        let hw  = HardwareModel::pccx_reference();
+        let est = CycleEstimator::new(&hw);
+        // Large square tiles → compute bound
+        let large = TileOperation { m: 128, n: 128, k: 128, bytes_per_element: 2 };
+        // Small tiles with large bytes_per_element → memory bound
+        let small = TileOperation { m: 4, n: 4, k: 4, bytes_per_element: 4 };
+        assert!(est.is_compute_bound(&large), "128³ tile should be compute-bound");
+        assert!(!est.is_compute_bound(&small), "4³ FP32 tile should be memory-bound");
+    }
+
+    // ─── NpuTrace & flat buffer ───────────────────────────────────────────────
+
+    #[test]
+    fn test_event_type_id_mapping() {
+        let ev = NpuEvent {
+            core_id: 0, start_cycle: 0, duration: 1,
+            event_type: "DMA_WRITE".to_string(),
+        };
+        // This was the critical bug: DMA_WRITE must be 3, not 0
+        assert_eq!(ev.type_id(), event_type_id::DMA_WRITE,
+            "DMA_WRITE should map to type_id 3");
+        assert_ne!(ev.type_id(), event_type_id::UNKNOWN,
+            "DMA_WRITE must not map to UNKNOWN (0)");
+    }
+
+    #[test]
+    fn test_flat_buffer_layout() {
+        let trace = NpuTrace {
+            total_cycles: 1000,
+            events: vec![
+                NpuEvent { core_id: 5, start_cycle: 100, duration: 50, event_type: "MAC_COMPUTE".to_string() },
+                NpuEvent { core_id: 3, start_cycle: 200, duration: 30, event_type: "DMA_WRITE".to_string() },
+            ],
+        };
+        let buf = trace.to_flat_buffer();
+        assert_eq!(buf.len(), 48, "Two events × 24 bytes = 48 bytes");
+
+        // Verify first event
+        let core_id = u32::from_le_bytes(buf[0..4].try_into().unwrap());
+        assert_eq!(core_id, 5);
+        let start = u64::from_le_bytes(buf[4..12].try_into().unwrap());
+        assert_eq!(start, 100);
+        let type_id = u32::from_le_bytes(buf[20..24].try_into().unwrap());
+        assert_eq!(type_id, event_type_id::MAC_COMPUTE);
+
+        // Verify second event
+        let type_id2 = u32::from_le_bytes(buf[44..48].try_into().unwrap());
+        assert_eq!(type_id2, event_type_id::DMA_WRITE,
+            "DMA_WRITE should be type_id 3 in flat buffer");
+    }
+
+    #[test]
+    fn test_core_utilisation() {
+        let trace = NpuTrace {
+            total_cycles: 200,
+            events: vec![
+                NpuEvent { core_id: 0, start_cycle: 0, duration: 100, event_type: "MAC_COMPUTE".to_string() },
+                NpuEvent { core_id: 1, start_cycle: 0, duration: 50,  event_type: "MAC_COMPUTE".to_string() },
+            ],
+        };
+        let utils = trace.core_utilisation();
+        assert_eq!(utils.len(), 2);
+        let core0 = utils.iter().find(|(c, _)| *c == 0).unwrap();
+        let core1 = utils.iter().find(|(c, _)| *c == 1).unwrap();
+        assert!((core0.1 - 0.5).abs() < 1e-9, "Core 0 util should be 50%");
+        assert!((core1.1 - 0.25).abs() < 1e-9, "Core 1 util should be 25%");
+    }
+
+    #[test]
+    fn test_bincode_roundtrip() {
+        let trace = NpuTrace {
+            total_cycles: 999,
+            events: vec![
+                NpuEvent { core_id: 7, start_cycle: 42, duration: 13, event_type: "BARRIER_SYNC".to_string() },
+            ],
+        };
+        let payload = trace.to_payload();
+        let decoded = NpuTrace::from_payload(&payload).expect("bincode roundtrip failed");
+        assert_eq!(decoded.total_cycles, 999);
+        assert_eq!(decoded.events[0].core_id, 7);
+        assert_eq!(decoded.events[0].event_type, "BARRIER_SYNC");
+    }
+
+    // ─── PCCX Format ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_pccx_write_read_roundtrip() {
+        let payload = b"test_payload_bytes".to_vec();
+        let checksum = fnv1a_64(&payload);
+
+        let header = PccxHeader {
+            pccx_lab_version: "v0.4.0-test".to_string(),
+            arch: ArchConfig { mac_dims: (16, 16), isa_version: "1.0".to_string(), peak_tops: 1.0 },
+            trace: TraceConfig { cycles: 12345, cores: 4, clock_mhz: 500 },
+            payload: PayloadConfig {
+                encoding: "raw".to_string(),
+                byte_length: payload.len() as u64,
+                checksum_fnv64: Some(checksum),
+            },
+            format_minor: MINOR_VERSION,
+        };
+
+        let pccx_out = PccxFile { header: header.clone(), payload: payload.clone() };
+        let mut buf  = Vec::new();
+        pccx_out.write(&mut buf).expect("write failed");
+
+        // Verify magic bytes
+        assert_eq!(&buf[0..4], b"PCCX");
+        assert_eq!(buf[4], MAJOR_VERSION);
+        assert_eq!(buf[5], MINOR_VERSION);
+
+        // Roundtrip read
+        let mut cursor = Cursor::new(&buf);
+        let pccx_in   = PccxFile::read(&mut cursor).expect("read failed");
+        assert_eq!(pccx_in.header.pccx_lab_version, "v0.4.0-test");
+        assert_eq!(pccx_in.header.trace.cycles, 12345);
+        assert_eq!(pccx_in.header.trace.clock_mhz, 500);
+        assert_eq!(pccx_in.payload, payload);
+    }
+
+    #[test]
+    fn test_pccx_invalid_magic_rejected() {
+        let bad = b"XXXX\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
+        let result = PccxFile::read(&mut Cursor::new(bad));
+        assert!(result.is_err(), "Should reject non-PCCX magic");
+    }
+
+    #[test]
+    fn test_fnv1a_64_deterministic() {
+        let a = fnv1a_64(b"hello pccx");
+        let b = fnv1a_64(b"hello pccx");
+        assert_eq!(a, b, "FNV-1a must be deterministic");
+        let c = fnv1a_64(b"hello pccX");   // different case
+        assert_ne!(a, c, "FNV-1a must be sensitive to case");
+    }
+
+    // ─── Simulator ────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_generate_trace_has_all_event_types() {
+        let cfg   = SimConfig { tiles: 2, cores: 2, bytes_per_element: 2, tile_m: 16, tile_n: 16, tile_k: 16 };
+        let trace = generate_realistic_trace(&cfg);
+
+        let types: std::collections::HashSet<&str> = trace.events.iter()
+            .map(|e| e.event_type.as_str()).collect();
+
+        assert!(types.contains("MAC_COMPUTE"),    "Missing MAC_COMPUTE");
+        assert!(types.contains("DMA_READ"),       "Missing DMA_READ");
+        assert!(types.contains("DMA_WRITE"),      "Missing DMA_WRITE");
+        assert!(types.contains("SYSTOLIC_STALL"), "Missing SYSTOLIC_STALL");
+        assert!(types.contains("BARRIER_SYNC"),   "Missing BARRIER_SYNC");
+    }
+
+    #[test]
+    fn test_trace_event_count() {
+        // 2 tiles × 2 cores × 4 events/core + 2 cores × barrier = 2*(2*4+2) = 20
+        let cfg   = SimConfig { tiles: 2, cores: 2, bytes_per_element: 2, tile_m: 16, tile_n: 16, tile_k: 16 };
+        let trace = generate_realistic_trace(&cfg);
+        assert_eq!(trace.events.len(), 20, "Expected 20 events for 2 tiles × 2 cores");
+    }
+
+    #[test]
+    fn test_trace_monotone_global_cycle() {
+        // Each tile must advance global_cycle forward
+        let cfg   = SimConfig { tiles: 5, cores: 4, bytes_per_element: 2, tile_m: 32, tile_n: 32, tile_k: 32 };
+        let trace = generate_realistic_trace(&cfg);
+        assert!(trace.total_cycles > 0, "Total cycles must be positive");
+    }
+
+    // ─── License ──────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_license_token_roundtrip() {
+        let secret  = b"test-secret";
+        let token   = issue_token("test-licensee", "enterprise", 0, secret);
+        // Set env var so validate_token uses same key
+        std::env::set_var("PCCX_LICENSE_SECRET", "test-secret");
+        let lt = validate_token(&token).expect("token should validate");
+        assert_eq!(lt.licensee, "test-licensee");
+        assert_eq!(lt.tier, LicenseTier::Enterprise);
+        assert_eq!(lt.expires_at, 0);
+        std::env::remove_var("PCCX_LICENSE_SECRET");
+    }
+
+    #[test]
+    fn test_license_invalid_signature_rejected() {
+        let token = "fake-licensee.enterprise.0.deadbeefdeadbeef";
+        std::env::set_var("PCCX_LICENSE_SECRET", "some-secret");
+        let result = validate_token(token);
+        assert!(result.is_err(), "Tampered token should be rejected");
+        std::env::remove_var("PCCX_LICENSE_SECRET");
+    }
+
+    #[test]
+    fn test_license_malformed_rejected() {
+        let result = validate_token("not.a.valid.token.with.too.many.parts.blah");
+        assert!(result.is_err(), "Malformed token must be rejected");
+    }
+}

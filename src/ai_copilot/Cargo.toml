@@ -5,3 +5,5 @@ edition = "2021"
 
 [dependencies]
 pccx-core = { path = "../core" }
+serde.workspace = true
+serde_json.workspace = true

@@ -2,6 +2,12 @@
 name = "pccx-uvm-bridge"
 version = "0.1.0"
 edition = "2021"
+description = "SystemVerilog DPI-C bridge for the pccx NPU cycle estimator"
+
+# Export as a C-compatible shared library for DPI-C import in simulators
+# (Synopsys VCS, Cadence Xcelium, Questa, etc.)
+[lib]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 pccx-core = { path = "../core" }
