@@ -7,8 +7,8 @@
   font-weight: 400;
 
   color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: transparent;
+  color: #d4d4d4;
+  background-color: #1a1a1a;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -22,12 +22,24 @@ body {
   place-items: center;
   min-width: 320px;
   min-height: 100vh;
-  background-color: transparent !important;
+  background-color: #1a1a1a;
   overflow: hidden;
 }
 
 #root {
   width: 100vw;
   height: 100vh;
-  background-color: transparent;
+  background-color: #1a1a1a;
 }
+
+/* Scrollbar styling (Nsight-like) */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #424242; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #555; }
+
+/* animate-spin for loading states */
+@keyframes spin { to { transform: rotate(360deg); } }
+.animate-spin { animation: spin 1s linear infinite; }
+.animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
