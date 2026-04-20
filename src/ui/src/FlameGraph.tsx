@@ -23,22 +23,6 @@ export function FlameGraph() {
 
   const vp = useRef({ offset: 0, cpp: 1, dragging: false, lastX: 0 });
 
-  // A span is "kept in colour" when it is either the selected one, its
-  // parent (ancestor containing the selected range), or one of its
-  // descendants (contained inside the selected range). Every other span
-  // is rendered grey so the chosen execution path pops out.
-  function isHighlighted(span: Span, sel: Span | null): boolean {
-    if (!sel) return true;
-    if (span === sel) return true;
-    const spanEnd = span.start + span.duration;
-    const selEnd  = sel.start  + sel.duration;
-    // ancestor
-    if (span.depth < sel.depth && span.start <= sel.start && spanEnd >= selEnd) return true;
-    // descendant
-    if (span.depth > sel.depth && span.start >= sel.start && spanEnd <= selEnd) return true;
-    return false;
-  }
-
   useEffect(() => {
     // Models a Gemma 3N E4B single-token decode step on the pccx v002
     // KV260 floorplan. Each transformer layer is fully broken out into
@@ -208,44 +192,28 @@ export function FlameGraph() {
     ctx.fillStyle = theme.bgPanel;
     ctx.fillRect(0, 0, cw, ch);
 
+    const SPAN_H = 22;
     const paddingY = 20;
-    // Stretch span rows to fill the available height instead of wasting
-    // vertical space. Depth goes 0..3 for the Gemma decode scenario, so
-    // we size rows to `ch / (maxDepth + 1)` minus small gap.
-    const maxDepth = spans.reduce((m, s) => Math.max(m, s.depth), 0);
-    const rowGap   = 2;
-    const SPAN_H   = Math.max(22, Math.floor((ch - paddingY * 2 - rowGap * maxDepth) / (maxDepth + 1)));
 
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-
-    // Desaturate palette for un-selected spans
-    const dim = theme.mode === "dark" ? "#3a3a3a" : "#d4d4d4";
 
     for (const span of spans) {
       const x1 = (span.start - offset) / cpp;
       const w = span.duration / cpp;
 
-      if (x1 + w < 0 || x1 > cw) continue; // Culling
+      if (x1 + w < 0 || x1 > cw) continue;
 
-      const y = paddingY + span.depth * (SPAN_H + rowGap);
-
+      const y = paddingY + span.depth * (SPAN_H + 2);
       const drawX = Math.max(0, x1);
       const drawW = Math.min(cw - drawX, w - (drawX - x1));
-
       if (drawW <= 0) continue;
 
-      const active = isHighlighted(span, selected);
-
-      // Box
-      ctx.fillStyle = active ? span.color : dim;
-      ctx.globalAlpha = active ? 1 : 0.55;
+      ctx.fillStyle = span.color;
       ctx.beginPath();
-      ctx.roundRect(x1, y, w, SPAN_H, 3);
+      ctx.roundRect(x1, y, w, SPAN_H, 2);
       ctx.fill();
-      ctx.globalAlpha = 1;
 
-      // Border
       if (selected && span === selected) {
         ctx.strokeStyle = theme.accent;
         ctx.lineWidth = 2;
@@ -255,14 +223,12 @@ export function FlameGraph() {
       }
       ctx.stroke();
 
-      // Text if wide enough
       if (drawW > 30) {
-        ctx.fillStyle = active ? "#ffffff"
-                                : (theme.mode === "dark" ? "#777777" : "#999999");
-        ctx.font = "11px Inter, sans-serif";
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "10px Inter, sans-serif";
         ctx.save();
         ctx.beginPath(); ctx.rect(drawX, y, drawW, SPAN_H); ctx.clip();
-        ctx.fillText(span.name, Math.max(x1 + 6, 6), y + SPAN_H / 2);
+        ctx.fillText(span.name, Math.max(x1 + 4, 4), y + SPAN_H / 2);
         ctx.restore();
       }
     }
@@ -315,17 +281,14 @@ export function FlameGraph() {
       return;
     }
 
+    const SPAN_H = 22;
     const paddingY = 20;
-    const rowGap   = 2;
-    const ch = canvasRef.current?.height ? canvasRef.current.height / (window.devicePixelRatio || 1) : rect.height;
-    const maxDepth = spans.reduce((m, s) => Math.max(m, s.depth), 0);
-    const SPAN_H = Math.max(22, Math.floor((ch - paddingY * 2 - rowGap * maxDepth) / (maxDepth + 1)));
     const hCyc = vp.current.offset + mx * vp.current.cpp;
 
     // Find highest depth hit
     let hit: Span | null = null;
     for (const span of spans) {
-        const y = paddingY + span.depth * (SPAN_H + rowGap);
+        const y = paddingY + span.depth * (SPAN_H + 2);
         if (my >= y && my <= y + SPAN_H && hCyc >= span.start && hCyc <= span.start + span.duration) {
             if (!hit || span.depth > hit.depth) hit = span;
         }
@@ -375,6 +338,62 @@ export function FlameGraph() {
 
   const btnStyle = { fontSize: 10, padding: "2px 8px", borderRadius: 3, background: theme.bgSurface, color: theme.textDim, border: `1px solid ${theme.border}`, cursor: "pointer", transition: "all 0.2s" };
 
+  // Span → structured description map. Looks up by span.name or prefix.
+  function describeSpan(s: Span): { title: string; kind: string; what: string; where: string; cycles: string; tips: string[] } {
+    const name = s.name;
+    const cycKB = `${s.duration.toLocaleString()} cycles (start @ ${s.start.toLocaleString()})`;
+    const base = (kind: string, where: string, what: string, tips: string[]) => ({
+      title: name, kind, what, where, cycles: cycKB, tips,
+    });
+    if (/^layer_/.test(name))    return base("Transformer layer", "ctrl_npu_dispatcher → MAT_CORE + VEC_CORE",
+      "Full Gemma 3N E4B transformer block: RMSNorm → Q/K/V → RoPE → QK·softmax·AV → out-proj → FFN gate/up/SiLU/down → LAuReL + PLE shadow.",
+      ["Expand depth 2/3 to see per-op breakdown.", "Watch residual DMA at layer tail; often the long tail on L0/L1."]);
+    if (name === "embed_lookup")  return base("Embedding", "PLE shadow stream · 27-bit fmap cache",
+      "Shadow-embedding lookup for the input token. 2048×27-bit gather driven by the PLE front-end.",
+      ["Hot token IDs stay in L1 fmap cache.", "Miss path falls to URAM L2 (1.75 MB) then DDR4."]);
+    if (name.startsWith("dma_read"))  return base("DMA read", "HP Buffer FIFO · AXI-HP0/1",
+      "Burst read of weights or activations into the HP Buffer. Governed by AXI_BLEN and outstanding-read credits.",
+      ["Increase AXI burst length 16→64 to hide DRAM latency.", "Prefetcher should already be pipelining the next tile."]);
+    if (name.startsWith("dma_write"))  return base("DMA write", "AXI-HP2 · result FIFO",
+      "Write-back of partial results from the systolic accumulator back to the URAM staging area.",
+      ["Coalesce 4 × 27b outputs per beat where possible.", "Ensure no back-pressure from downstream normalize unit."]);
+    if (name === "rms_norm" || name === "rms_norm_pre")  return base("RMSNorm", "VEC_CORE · SFU · CVO normalize",
+      "Per-sample RMS normalisation with learned gain. Uses the CVO SFU's rsqrt approximation for 1/RMS.",
+      ["Fused with pre-attention scale on layer entry.", "Runs on a single SFU instance; avoid double-booking with softmax."]);
+    if (name.startsWith("q_proj") || name.startsWith("k_proj") || name.startsWith("v_proj"))
+      return base("Attention projection (GEMV)", "MAT_CORE · 32×32 systolic array",
+      "Q/K/V linear projections. Fused in W4A8 on the MAT_CORE array with the weight dispatcher's K-major tile order.",
+      ["Shared input activation — broadcast once.", "Kernel utilises the full 1024 DSP slices of the array."]);
+    if (name.startsWith("rope"))  return base("RoPE rotation", "VEC_CORE rotary unit",
+      "Rotary position embedding applied to Q/K. Uses pre-computed sin/cos tables staged in BRAM scratchpad.",
+      ["Rotation pairs (2i, 2i+1) processed SIMD-4 per cycle.", "Tables stored fp16; cast to BF16 for the rotate."]);
+    if (name.startsWith("qk_scores") || name.startsWith("softmax") || name.startsWith("av_"))
+      return base("Attention scores · softmax · AV", "MAT_CORE + SFU",
+      "QK^T → scale → causal mask → softmax → attention-value (AV) produce. Softmax is the serial critical path.",
+      ["Online softmax avoids a full pass.", "Mask application fused inside the score kernel."]);
+    if (name.startsWith("attn_out"))  return base("Attention output projection", "MAT_CORE · 32×32 systolic",
+      "Linear projection after attention. Result written back into the residual stream via the HP Buffer.",
+      ["Same tiling pattern as Q/K/V projection.", "Watch for accumulator-underflow on first K-stride."]);
+    if (name.startsWith("ffn_gate") || name.startsWith("ffn_up") || name.startsWith("ffn_down") || name === "silu")
+      return base("FFN (GLU)", "MAT_CORE (gate/up/down) · SFU (SiLU)",
+      "Gemma-style GLU FFN: SiLU(gate·x) ⊙ up·x → down. Down-projection is the memory-bandwidth dominant op.",
+      ["Down-projection reads the gate×up intermediate from URAM L2.", "SiLU(x) = x·sigmoid(x), fused into the SFU pipeline."]);
+    if (name.startsWith("laurel"))  return base("LAuReL branch", "VEC_CORE side-pipe",
+      "Low-rank parallel branch that is added into the residual stream alongside the main block output.",
+      ["Runs in parallel with the last MAT_CORE stage — double-check scheduler co-issue."]);
+    if (name.startsWith("ple") || name.startsWith("altup"))
+      return base("PLE shadow / altup", "fmap cache + PLE controller",
+      "Per-Layer Embedding shadow-stream update (altup) that runs every N layers to refresh the token embedding.",
+      ["Altup broadcast across 4 lanes.", "Kept cold in the main decode critical path."]);
+    if (name.startsWith("residual"))  return base("Residual add", "VEC_CORE add unit",
+      "x += block_output. Single-cycle per 32-lane BF16 add. Often masked by MAT_CORE DMA write.",
+      ["Fuse with the next RMSNorm when the scheduler allows."]);
+    if (name === "sample_token")  return base("Sampling", "Host-side · driver",
+      "Top-K / top-p sample from the LM-head logits to pick the next token.",
+      ["Host-path — not FPGA. Pipeline with the NEXT decode step's embed_lookup."]);
+    return base("Span", "—", "No description registered for this span name.", []);
+  }
+
   return (
     <div className="w-full h-full flex flex-col relative" style={{ background: theme.bgPanel }}>
       <div className="flex items-center px-3 gap-3 shrink-0" style={{ height: 30, borderBottom: `1px solid ${theme.border}` }}>
@@ -408,14 +427,11 @@ export function FlameGraph() {
             if (!rect) return;
             const mx = e.clientX - rect.left;
             const my = e.clientY - rect.top;
-            const paddingY = 20, rowGap = 2;
-            const ch = rect.height;
-            const maxDepth = spans.reduce((m, s) => Math.max(m, s.depth), 0);
-            const SPAN_H = Math.max(22, Math.floor((ch - paddingY * 2 - rowGap * maxDepth) / (maxDepth + 1)));
+            const SPAN_H = 22, paddingY = 20;
             const hCyc = vp.current.offset + mx * vp.current.cpp;
             let hit: Span | null = null;
             for (const span of spans) {
-              const y = paddingY + span.depth * (SPAN_H + rowGap);
+              const y = paddingY + span.depth * (SPAN_H + 2);
               if (my >= y && my <= y + SPAN_H && hCyc >= span.start && hCyc <= span.start + span.duration) {
                 if (!hit || span.depth > hit.depth) hit = span;
               }
@@ -445,12 +461,56 @@ export function FlameGraph() {
                </div>
                <p style={{ fontSize: 11, color: theme.text, marginBottom: 8, lineHeight: 1.5 }}>{aiAnalysis.text}</p>
                <div style={{ background: theme.mode === "dark" ? "#1e1e1e" : "#f5f5f5", padding: "8px 12px", borderRadius: 6, borderLeft: `3px solid ${theme.accent}` }}>
-                 <p style={{ fontSize: 10, color: theme.textDim }}>💡 <strong>AI Recommendation:</strong><br/>{aiAnalysis.rec}</p>
+                 <p style={{ fontSize: 10, color: theme.textDim }}>AI Recommendation:<br/>{aiAnalysis.rec}</p>
                </div>
-               <button onClick={() => setAiAnalysis(null)} className="absolute top-3 right-3" style={{ color: theme.textMuted }}>✕</button>
+               <button onClick={() => setAiAnalysis(null)} className="absolute top-3 right-3" style={{ color: theme.textMuted }}>X</button>
             </div>
         )}
       </div>
+
+      {/* Click-detail panel — appears only when a span is selected. */}
+      {selected && (() => {
+        const info = describeSpan(selected);
+        return (
+          <div className="shrink-0 flex flex-col" style={{
+            minHeight: 160, maxHeight: 260,
+            borderTop: `1px solid ${theme.border}`,
+            background: theme.mode === "dark" ? "#1a1a1a" : "#fafafa",
+          }}>
+            <div className="flex items-center gap-3 px-3" style={{ height: 28, borderBottom: `1px solid ${theme.border}`, background: theme.bgSurface }}>
+              <div className="w-2 h-2 rounded-full" style={{ background: selected.color }} />
+              <span style={{ fontSize: 11, fontWeight: 700, color: theme.text, fontFamily: "monospace" }}>{info.title}</span>
+              <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 3, background: theme.mode === "dark" ? "#2d2d2d" : "#e5e5e5", color: theme.textDim }}>{info.kind}</span>
+              <span style={{ fontSize: 10, color: theme.textDim, fontFamily: "monospace" }}>{info.cycles}</span>
+              <div className="flex-1" />
+              <button onClick={() => setSelected(null)} style={{ fontSize: 10, color: theme.textMuted, padding: "2px 6px" }}>close</button>
+            </div>
+            <div className="flex-1 overflow-auto p-3 space-y-3" style={{ fontSize: 11, color: theme.text }}>
+              <div>
+                <div style={{ fontSize: 9, color: theme.textMuted, marginBottom: 2, letterSpacing: "0.05em" }}>WHAT</div>
+                <div style={{ lineHeight: 1.5 }}>{info.what}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 9, color: theme.textMuted, marginBottom: 2, letterSpacing: "0.05em" }}>WHERE</div>
+                <div style={{ fontFamily: "monospace", fontSize: 11, color: theme.textDim }}>{info.where}</div>
+              </div>
+              {info.tips.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 9, color: theme.textMuted, marginBottom: 4, letterSpacing: "0.05em" }}>NOTES</div>
+                  <ul className="space-y-1" style={{ fontSize: 11, color: theme.textDim }}>
+                    {info.tips.map((tip, i) => (
+                      <li key={i} className="flex gap-2">
+                        <span style={{ color: selected.color, flexShrink: 0 }}>-</span>
+                        <span>{tip}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

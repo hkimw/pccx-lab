@@ -61,14 +61,13 @@ const TABS: { id: ActiveTab; label: string; icon: React.ReactNode }[] = [
 
 function ResizeHandle({ direction = "horizontal" }: { direction?: "horizontal" | "vertical" }) {
   const theme = useTheme();
-  const isDark = theme.mode === "dark";
   return (
     <Separator
-      className={`group relative ${direction === "vertical" ? "h-[6px]" : "w-[6px]"} flex items-center justify-center`}
-      style={{ background: theme.borderDim }}
+      className={`group relative ${direction === "vertical" ? "h-[6px]" : "w-[6px]"} flex items-center justify-center hover:bg-[var(--accent)]`}
+      style={{ background: theme.borderDim, ["--accent" as any]: theme.accent, cursor: direction === "vertical" ? "row-resize" : "col-resize" }}
     >
       <div
-        className="transition-all"
+        className="transition-all group-hover:bg-white"
         style={{
           ...(direction === "vertical"
             ? { width: 40, height: 3, borderRadius: 2 }
@@ -91,9 +90,21 @@ function AppInner() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("timeline");
   const [traceLoaded, setTraceLoaded] = useState(false);
   const [copilotVisible, setCopilotVisible] = useState(true);
-  const [copilotDock, setCopilotDock]       = useState<"left" | "right" | "bottom">("right");
+  const [copilotDock, setCopilotDock]       = useState<"left" | "right" | "bottom">(() => (localStorage.getItem("pccx-copilot-dock") as any) || "right");
   const [bottomVisible, setBottomVisible]   = useState(true);
+  const [bottomDock, setBottomDock]         = useState<"left" | "right" | "bottom">(() => (localStorage.getItem("pccx-bottom-dock") as any) || "bottom");
   const [cmdPaletteOpen, setCmdPaletteOpen] = useState(false);
+
+  // Persist dock choices
+  useEffect(() => { localStorage.setItem("pccx-copilot-dock", copilotDock); }, [copilotDock]);
+  useEffect(() => { localStorage.setItem("pccx-bottom-dock",  bottomDock);  }, [bottomDock]);
+
+  const dockBtn = (active: boolean) => ({
+    padding: 3, borderRadius: 3, cursor: "pointer",
+    background: active ? theme.accentBg : "transparent",
+    color: active ? theme.accent : theme.textMuted,
+    border: "none", display: "inline-flex" as const, alignItems: "center" as const,
+  });
 
   // Copilot Panel Component
   const renderCopilot = () => (
@@ -103,12 +114,12 @@ function AppInner() {
           <span style={{ fontSize: 11, fontWeight: 600, color: theme.textDim }}>AI Copilot</span>
           {copilotBusy && <span style={{ fontSize: 9, color: theme.accent }} className="animate-pulse">thinking…</span>}
           <div className="flex-1" />
-          <div className="flex gap-1 mr-2 opacity-50 hover:opacity-100 transition-opacity">
-             <button onClick={() => setCopilotDock("left")} title="Dock Left"><PanelLeftClose size={12}/></button>
-             <button onClick={() => setCopilotDock("bottom")} title="Dock Bottom"><PanelBottomClose size={12}/></button>
-             <button onClick={() => setCopilotDock("right")} title="Dock Right"><PanelRightClose size={12}/></button>
+          <div className="flex gap-0.5 mr-2" style={{ opacity: 0.7 }}>
+             <button onClick={() => setCopilotDock("left")}   title="Dock Left"   style={dockBtn(copilotDock === "left")}  ><PanelLeftClose size={12}/></button>
+             <button onClick={() => setCopilotDock("bottom")} title="Dock Bottom" style={dockBtn(copilotDock === "bottom")}><PanelBottomClose size={12}/></button>
+             <button onClick={() => setCopilotDock("right")}  title="Dock Right"  style={dockBtn(copilotDock === "right")} ><PanelRightClose size={12}/></button>
           </div>
-          <button onClick={() => setCopilotVisible(false)} className="ml-auto" style={{ fontSize: 11, color: theme.textMuted, cursor: "pointer" }}>✕</button>
+          <button onClick={() => setCopilotVisible(false)} style={{ fontSize: 11, color: theme.textMuted, cursor: "pointer", padding: "2px 4px" }} title="Close">X</button>
         </div>
 
         <div className="flex px-3 pb-2 pt-2 gap-2 shrink-0" style={{ borderBottom: `1px solid ${border}`, background: theme.bgHover }}>
@@ -315,109 +326,140 @@ function AppInner() {
 
       {/* Main */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Resizable layout */}
-        <Group direction="horizontal" className="flex-1">
-          {copilotVisible && copilotDock === "left" && (
-            <>
-              <Panel defaultSize={30} minSize={16} maxSize={70} style={{ minWidth: 240 }}>
-                {renderCopilot()}
-              </Panel>
-              <ResizeHandle />
-            </>
-          )}
-          
-          {/* Main editor area */}
-          <Panel defaultSize={copilotVisible && copilotDock !== "bottom" ? 75 : 100} minSize={40}>
-            <Group direction="vertical">
-              {/* Top: main content */}
-              <Panel defaultSize={bottomVisible ? 70 : 100} minSize={30}>
-                <div className="w-full h-full flex flex-col" style={{ background: bg }}>
-                  {/* Tab strip */}
-                  <div className="flex items-center shrink-0" style={{ height: 32, borderBottom: `1px solid ${border}`, background: panelBg }}>
-                    {TABS.map(t => (
-                      <button key={t.id} onClick={() => setActiveTab(t.id)}
-                        className="flex items-center gap-1.5 px-3 h-full transition-colors"
-                        style={{
-                          fontSize: 11, fontWeight: activeTab === t.id ? 600 : 400,
-                          color: activeTab === t.id ? theme.accent : theme.textMuted,
-                          borderBottom: activeTab === t.id ? `2px solid ${theme.accent}` : "2px solid transparent",
-                          borderRight: `1px solid ${border}`,
-                        }}>
-                        {t.icon} {t.label}
+        {/* Resizable layout.
+            Left / Right columns collect any panel with matching dock state.
+            Center column hosts main tabs + any "bottom"-docked panels
+            stacked vertically. Resize handles between every pair. */}
+        {(() => {
+          const copilotLeft    = copilotVisible && copilotDock === "left";
+          const copilotRight   = copilotVisible && copilotDock === "right";
+          const copilotBottom  = copilotVisible && copilotDock === "bottom";
+          const bottomLeft     = bottomVisible && bottomDock === "left";
+          const bottomRight    = bottomVisible && bottomDock === "right";
+          const bottomBottom   = bottomVisible && bottomDock === "bottom";
+          const hasLeft        = copilotLeft || bottomLeft;
+          const hasRight       = copilotRight || bottomRight;
+          const hasBottomStack = copilotBottom || bottomBottom;
+          return (
+          <Group orientation="horizontal" className="flex-1">
+            {hasLeft && (
+              <>
+                <Panel defaultSize={24} minSize={12} maxSize={70} style={{ minWidth: 240 }}>
+                   <Group orientation="vertical">
+                     {copilotLeft && (
+                       <Panel defaultSize={bottomLeft ? 60 : 100} minSize={20}>
+                         {renderCopilot()}
+                       </Panel>
+                     )}
+                     {copilotLeft && bottomLeft && <ResizeHandle direction="vertical" />}
+                     {bottomLeft && (
+                       <Panel defaultSize={copilotLeft ? 40 : 100} minSize={20}>
+                         <BottomPanel dock={bottomDock} onDockChange={setBottomDock} onClose={() => setBottomVisible(false)} />
+                       </Panel>
+                     )}
+                   </Group>
+                </Panel>
+                <ResizeHandle />
+              </>
+            )}
+            <Panel defaultSize={hasLeft && hasRight ? 52 : (hasLeft || hasRight ? 76 : 100)} minSize={40}>
+              <Group orientation="vertical">
+                <Panel defaultSize={hasBottomStack ? 68 : 100} minSize={30}>
+                  <div className="w-full h-full flex flex-col" style={{ background: bg }}>
+                    <div className="flex items-center shrink-0 overflow-x-auto" style={{ height: 32, borderBottom: `1px solid ${border}`, background: panelBg }}>
+                      {TABS.map(t => (
+                        <button key={t.id} onClick={() => setActiveTab(t.id)}
+                          className="flex items-center gap-1.5 px-3 h-full transition-colors shrink-0"
+                          style={{
+                            fontSize: 11, fontWeight: activeTab === t.id ? 600 : 400,
+                            color: activeTab === t.id ? theme.accent : theme.textMuted,
+                            borderBottom: activeTab === t.id ? `2px solid ${theme.accent}` : "2px solid transparent",
+                            borderRight: `1px solid ${border}`,
+                          }}>
+                          {t.icon} {t.label}
+                        </button>
+                      ))}
+                      <div className="flex-1" />
+                      <button title="IPC Benchmark" onClick={handleTestIPC}
+                        className="px-2 h-full flex items-center justify-center transition-colors"
+                        style={{ color: theme.warning }}>
+                        <Zap size={13} />
                       </button>
-                    ))}
-                    <div className="flex-1" />
-                    <button title="IPC Benchmark" onClick={handleTestIPC}
-                      className="px-2 h-full flex items-center justify-center transition-colors"
-                      style={{ color: theme.warning }}>
-                      <Zap size={13} />
-                    </button>
-                    <button title="AI Copilot" onClick={() => setCopilotVisible(v => !v)}
-                      className="px-2 h-full flex items-center justify-center transition-colors"
-                      style={{ color: copilotVisible ? theme.accent : theme.textMuted }}>
-                      <MessageSquare size={13} />
-                    </button>
-                    <div className="px-2">
-                      {traceLoaded
-                        ? <Badge color="green" variant="soft" size="1">● trace</Badge>
-                        : <Badge color="gray" variant="soft" size="1">○ no trace</Badge>}
+                      <button title="AI Copilot" onClick={() => setCopilotVisible(v => !v)}
+                        className="px-2 h-full flex items-center justify-center transition-colors"
+                        style={{ color: copilotVisible ? theme.accent : theme.textMuted }}>
+                        <MessageSquare size={13} />
+                      </button>
+                      <div className="px-2">
+                        {traceLoaded
+                          ? <Badge color="green" variant="soft" size="1">trace loaded</Badge>
+                          : <Badge color="gray"  variant="soft" size="1">no trace</Badge>}
+                      </div>
+                    </div>
+                    <div className="flex-1 overflow-hidden">
+                      {activeTab === "timeline"   && <Timeline />}
+                      {activeTab === "flamegraph" && <FlameGraph />}
+                      {activeTab === "hardware"   && <HardwareVisualizer />}
+                      {activeTab === "memory"     && <MemoryDump />}
+                      {activeTab === "waves"      && <WaveformViewer />}
+                      {activeTab === "nodes"      && <NodeEditor />}
+                      {activeTab === "canvas"     && <CanvasView />}
+                      {activeTab === "code"       && <CodeEditor />}
+                      {activeTab === "report"     && <ReportBuilder />}
+                      {activeTab === "extensions" && <ExtensionManager />}
+                      {activeTab === "verify"     && <VerificationSuite />}
+                      {activeTab === "roofline"   && <Roofline />}
+                      {activeTab === "scenario"   && <ScenarioFlow />}
+                      {activeTab === "tb_author"  && <TestbenchAuthor />}
                     </div>
                   </div>
+                </Panel>
 
-                  {/* Tab content */}
-                  <div className="flex-1 overflow-hidden">
-                    {activeTab === "timeline"   && <Timeline />}
-                    {activeTab === "flamegraph" && <FlameGraph />}
-                    {activeTab === "hardware"   && <HardwareVisualizer />}
-                    {activeTab === "memory"     && <MemoryDump />}
-                    {activeTab === "waves"      && <WaveformViewer />}
-                    {activeTab === "nodes"      && <NodeEditor />}
-                    {activeTab === "canvas"     && <CanvasView />}
-                    {activeTab === "code"       && <CodeEditor />}
-                    {activeTab === "report"     && <ReportBuilder />}
-                    {activeTab === "extensions" && <ExtensionManager />}
-                    {activeTab === "verify"     && <VerificationSuite />}
-                    {activeTab === "roofline"   && <Roofline />}
-                    {activeTab === "scenario"   && <ScenarioFlow />}
-                    {activeTab === "tb_author"  && <TestbenchAuthor />}
-                  </div>
-                </div>
-              </Panel>
-
-              {/* Bottom tabbed panel — Log / Console / Live Telemetry */}
-              {(bottomVisible || (copilotVisible && copilotDock === "bottom")) && (
-                <>
-                  <ResizeHandle direction="vertical" />
-                  <Panel defaultSize={30} minSize={10} maxSize={50}>
-                     <Group direction="horizontal">
-                        {bottomVisible && (
-                          <Panel defaultSize={copilotDock === "bottom" && copilotVisible ? 50 : 100}>
-                            <BottomPanel />
-                          </Panel>
-                        )}
-                        {bottomVisible && copilotVisible && copilotDock === "bottom" && <ResizeHandle/>}
-                        {copilotVisible && copilotDock === "bottom" && (
-                          <Panel defaultSize={bottomVisible ? 50 : 100}>
-                             {renderCopilot()}
-                          </Panel>
-                        )}
-                     </Group>
-                  </Panel>
-                </>
-              )}
-            </Group>
-          </Panel>
-
-          {/* AI Copilot panel (Right Dock) */}
-          {copilotVisible && copilotDock === "right" && (
-            <>
-              <ResizeHandle />
-              <Panel defaultSize={30} minSize={16} maxSize={70} style={{ minWidth: 240 }}>
-                 {renderCopilot()}
-              </Panel>
-            </>
-          )}
-        </Group>
+                {hasBottomStack && (
+                  <>
+                    <ResizeHandle direction="vertical" />
+                    <Panel defaultSize={32} minSize={10} maxSize={70}>
+                       <Group orientation="horizontal">
+                          {bottomBottom && (
+                            <Panel defaultSize={copilotBottom ? 60 : 100} minSize={20}>
+                              <BottomPanel dock={bottomDock} onDockChange={setBottomDock} onClose={() => setBottomVisible(false)} />
+                            </Panel>
+                          )}
+                          {bottomBottom && copilotBottom && <ResizeHandle />}
+                          {copilotBottom && (
+                            <Panel defaultSize={bottomBottom ? 40 : 100} minSize={20}>
+                              {renderCopilot()}
+                            </Panel>
+                          )}
+                       </Group>
+                    </Panel>
+                  </>
+                )}
+              </Group>
+            </Panel>
+            {hasRight && (
+              <>
+                <ResizeHandle />
+                <Panel defaultSize={24} minSize={12} maxSize={70} style={{ minWidth: 240 }}>
+                  <Group orientation="vertical">
+                    {copilotRight && (
+                      <Panel defaultSize={bottomRight ? 60 : 100} minSize={20}>
+                        {renderCopilot()}
+                      </Panel>
+                    )}
+                    {copilotRight && bottomRight && <ResizeHandle direction="vertical" />}
+                    {bottomRight && (
+                      <Panel defaultSize={copilotRight ? 40 : 100} minSize={20}>
+                        <BottomPanel dock={bottomDock} onDockChange={setBottomDock} onClose={() => setBottomVisible(false)} />
+                      </Panel>
+                    )}
+                  </Group>
+                </Panel>
+              </>
+            )}
+          </Group>
+          );
+        })()}
 
         {/* Right Activity Bar (VS Code Secondary Side Bar style) */}
         <div style={{ width: 42, background: theme.bgPanel, borderLeft: `1px solid ${theme.border}`, display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 8, gap: 6, zIndex: 10 }}>

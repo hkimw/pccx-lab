@@ -53,7 +53,7 @@ const LIGHT = {
   info:    "#1a85ff",
 };
 
-type Theme = typeof DARK & { toggle: () => void };
+type Theme = (typeof DARK | typeof LIGHT) & { toggle: () => void };
 
 const ThemeContext = createContext<Theme>(null!);
 

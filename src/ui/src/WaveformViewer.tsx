@@ -648,8 +648,15 @@ export function WaveformViewer() {
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
         onMouseLeave={onMouseUp}
+        onDoubleClick={e => {
+          if (!containerRef.current) return;
+          const r = containerRef.current.getBoundingClientRect();
+          const x = e.clientX - r.left;
+          if (x < NAME_W) return;
+          setOffset(0); setZoom(8); // fit view
+        }}
         onWheel={onWheel}
-        style={{ cursor: dragState?.kind === "pan" ? "grabbing" : "default" }}
+        style={{ cursor: dragState?.kind === "pan" ? "grabbing" : (dragState ? "ew-resize" : "grab") }}
       >
         <canvas ref={canvasRef} className="absolute inset-0" />
       </div>

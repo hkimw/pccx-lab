@@ -1,7 +1,15 @@
 import { useState, useEffect, useRef } from "react";
 import { useTheme } from "./ThemeContext";
 import { useI18n } from "./i18n";
-import { Terminal, Activity, Info, Trash2 } from "lucide-react";
+import { Terminal, Activity, Info, Trash2, PanelLeftClose, PanelRightClose, PanelBottomClose, X } from "lucide-react";
+
+export type DockPos = "left" | "right" | "bottom";
+
+interface BottomPanelProps {
+  dock?: DockPos;
+  onDockChange?: (d: DockPos) => void;
+  onClose?: () => void;
+}
 
 // ─── Log entry ───────────────────────────────────────────────────────────────
 
@@ -25,7 +33,7 @@ interface TelemetrySample {
 
 type BottomTab = "log" | "console" | "telemetry";
 
-export function BottomPanel() {
+export function BottomPanel({ dock = "bottom", onDockChange, onClose }: BottomPanelProps = {}) {
   const theme = useTheme();
   const { t }  = useI18n();
   const [active, setActive] = useState<BottomTab>("telemetry");
@@ -172,6 +180,13 @@ export function BottomPanel() {
         <TabBtn icon={<Terminal size={11} />} label={t("bottom.console")}   active={active === "console"}   onClick={() => setActive("console")} />
         <TabBtn icon={<Activity size={11} />} label={t("bottom.telemetry")} active={active === "telemetry"} onClick={() => setActive("telemetry")} />
         <div className="flex-1" />
+        {onDockChange && (
+          <div className="flex items-center gap-0.5 mr-2" style={{ opacity: 0.7 }}>
+            <DockBtn active={dock === "left"}   onClick={() => onDockChange("left")}   title="Dock left"><PanelLeftClose size={12}/></DockBtn>
+            <DockBtn active={dock === "bottom"} onClick={() => onDockChange("bottom")} title="Dock bottom"><PanelBottomClose size={12}/></DockBtn>
+            <DockBtn active={dock === "right"}  onClick={() => onDockChange("right")}  title="Dock right"><PanelRightClose size={12}/></DockBtn>
+          </div>
+        )}
         <button
           onClick={() => {
             if (active === "log") setLogs([]);
@@ -188,6 +203,11 @@ export function BottomPanel() {
         >
           <Trash2 size={10} /> {t("panel.clear")}
         </button>
+        {onClose && (
+          <button onClick={onClose} title="Close" style={{ marginLeft: 6, color: theme.textMuted, padding: 2, cursor: "pointer" }}>
+            <X size={12} />
+          </button>
+        )}
       </div>
 
       {/* Body */}
@@ -328,6 +348,25 @@ function Legend({ dot, label }: { dot: string; label: string }) {
       <span style={{ width: 8, height: 8, borderRadius: "50%", background: dot }} />
       {label}
     </span>
+  );
+}
+
+function DockBtn({ active, onClick, title, children }:
+                 { active: boolean; onClick: () => void; title: string; children: ReactLike }) {
+  const theme = useTheme();
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      style={{
+        padding: 3, borderRadius: 3, cursor: "pointer",
+        background: active ? theme.accentBg : "transparent",
+        color: active ? theme.accent : theme.textMuted,
+        border: "none", display: "inline-flex", alignItems: "center",
+      }}
+    >
+      {children}
+    </button>
   );
 }
 
