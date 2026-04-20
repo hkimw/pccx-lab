@@ -52,6 +52,16 @@ pub fn detect(trace: &NpuTrace, config: &DetectorConfig) -> Vec<BottleneckInterv
         return Vec::new();
     }
 
+    // Average over the number of cores so share stays in [0, 1] on
+    // multi-core traces where every core runs a DMA in the same window.
+    let n_cores = trace
+        .events
+        .iter()
+        .map(|e| e.core_id + 1)
+        .max()
+        .unwrap_or(1)
+        .max(1) as u64;
+
     let n_windows = ((trace.total_cycles + config.window_cycles - 1) / config.window_cycles) as usize;
     // Per-window occupancy per class. `[window][kind] => cycles`.
     let mut occ: Vec<[u64; 4]> = vec![[0; 4]; n_windows];
@@ -89,7 +99,7 @@ pub fn detect(trace: &NpuTrace, config: &DetectorConfig) -> Vec<BottleneckInterv
         if win_end <= win_start {
             continue;
         }
-        let span = (win_end - win_start) as f64;
+        let span = (win_end - win_start) as f64 * n_cores as f64;
         for (ki, cycles) in per_kind.iter().enumerate() {
             let share = *cycles as f64 / span;
             if share >= config.threshold {

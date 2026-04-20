@@ -5,6 +5,7 @@
 use pccx_core::pccx_format::PccxFile;
 use pccx_core::trace::NpuTrace;
 use pccx_core::hw_model::HardwareModel;
+use pccx_core::{analyze_roofline, detect_bottlenecks, bottleneck::DetectorConfig, render_markdown};
 use std::env;
 use std::fs::File;
 use std::io::{self, BufRead};
@@ -34,14 +35,34 @@ fn main() -> anyhow::Result<()> {
     }
 
     if args.len() < 2 {
-        eprintln!("Usage: {} <path/to/trace.pccx> [--util] [--bottleneck <ratio>] [--source <script.pccx_tcl>]", args[0]);
+        eprintln!(
+            "Usage: {} <path/to/trace.pccx> [flags]\n  \
+             --util                   per-core MAC utilisation bar chart\n  \
+             --bottleneck <ratio>     legacy per-event DMA hotspot filter (default 0.5)\n  \
+             --roofline               arithmetic intensity + compute/memory-bound verdict\n  \
+             --windows <cycles>       window size for the new bottleneck detector\n  \
+             --threshold <ratio>      share-of-window threshold (default 0.5)\n  \
+             --report-md              emit a Markdown summary to stdout\n  \
+             --source <script>        run a pccx_tcl-style batch script",
+            args[0]
+        );
         std::process::exit(1);
     }
 
     let file_path = &args[1];
     let show_util       = args.contains(&"--util".to_string());
+    let show_roofline   = args.contains(&"--roofline".to_string());
+    let emit_report_md  = args.contains(&"--report-md".to_string());
     let bottleneck_ratio: f64 = args.windows(2)
         .find(|w| w[0] == "--bottleneck")
+        .and_then(|w| w[1].parse().ok())
+        .unwrap_or(0.5);
+    let window_cycles: u64 = args.windows(2)
+        .find(|w| w[0] == "--windows")
+        .and_then(|w| w[1].parse().ok())
+        .unwrap_or(256);
+    let window_threshold: f64 = args.windows(2)
+        .find(|w| w[0] == "--threshold")
         .and_then(|w| w[1].parse().ok())
         .unwrap_or(0.5);
 
@@ -161,6 +182,47 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
+    // Roofline analysis (opt-in).
+    if show_roofline {
+        println!();
+        println!("── Roofline ────────────────────────────────────────────");
+        let point = analyze_roofline(&trace, &hw);
+        let ai = if point.arithmetic_intensity.is_finite() {
+            format!("{:.2}", point.arithmetic_intensity)
+        } else {
+            "∞ (no DMA)".to_string()
+        };
+        println!("  Arithmetic intensity : {ai} ops/byte");
+        println!("  Achieved             : {:.2} GOPS", point.achieved_gops);
+        println!("  Peak compute         : {:.0} GOPS", point.peak_gops);
+        println!("  Peak memory BW       : {:.1} GB/s", point.peak_bw_gbps);
+        println!("  MAC cycles           : {}", point.mac_cycles);
+        println!("  DMA bytes (est.)     : {}", point.dma_bytes_estimate);
+        println!("  Verdict              : {}",
+            if point.compute_bound { "✓ compute-bound" } else { "⚠ memory-bound" });
+    }
+
+    // New windowed bottleneck detector (more precise than the ratio filter).
+    println!();
+    println!("── Windowed Bottleneck Detector ({} cyc, ≥{:.0}% share) ──",
+        window_cycles, window_threshold * 100.0);
+    let intervals = detect_bottlenecks(&trace, &DetectorConfig {
+        window_cycles,
+        threshold: window_threshold,
+    });
+    if intervals.is_empty() {
+        println!("  No contended windows above threshold.");
+    } else {
+        println!("  {} contended window(s):", intervals.len());
+        for (i, iv) in intervals.iter().take(8).enumerate() {
+            println!("  [{i}] {:?} share={:.0}% range=[{}..{}] events={}",
+                iv.kind, iv.share * 100.0, iv.start_cycle, iv.end_cycle, iv.event_count);
+        }
+        if intervals.len() > 8 {
+            println!("  ... and {} more.", intervals.len() - 8);
+        }
+    }
+
     // Sample first event
     if let Some(first) = trace.events.first() {
         println!();
@@ -168,6 +230,12 @@ fn main() -> anyhow::Result<()> {
         println!("  Core={} Type={} Start={} Duration={}",
             first.core_id, first.event_type, first.start_cycle, first.duration);
         println!("  Type ID (flat buf): {}", first.type_id());
+    }
+
+    if emit_report_md {
+        println!();
+        println!("── Markdown Report ─────────────────────────────────────");
+        print!("{}", render_markdown(Some(&trace), None));
     }
 
     println!();
