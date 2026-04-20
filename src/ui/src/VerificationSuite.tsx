@@ -1,10 +1,25 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { useTheme } from "./ThemeContext";
 import { CheckCircle, AlertOctagon, TerminalSquare, ShieldCheck, Bug, Activity, Cpu } from "lucide-react";
 import { SynthStatusCard } from "./SynthStatusCard";
 import { VerificationRunner } from "./VerificationRunner";
 import { RooflineCard } from "./RooflineCard";
 import { BottleneckCard } from "./BottleneckCard";
+
+// Default fixtures shipped under hw/sim/coverage/fixtures/ — resolved
+// relative to the Tauri binary working directory. Override via
+// VerificationSuite props when embedding elsewhere.
+const DEFAULT_RUNS = [
+  "../../../../hw/sim/coverage/fixtures/run_a.jsonl",
+  "../../../../hw/sim/coverage/fixtures/run_b.jsonl",
+  "../../../../hw/sim/coverage/fixtures/run_c.jsonl",
+];
+
+interface CovBin    { id: string; hits: number; goal: number; }
+interface CovGroup  { name: string; bins: CovBin[]; }
+interface CrossTuple { a_group: string; b_group: string; a_bin: string; b_bin: string; hits: number; goal: number; }
+interface MergedCoverage { groups: CovGroup[]; crosses: CrossTuple[]; }
 
 type VerifyTab = "isa" | "api" | "uvm" | "synth";
 
@@ -189,129 +204,174 @@ export function VerificationSuite() {
 }
 
 /* ─── UVM Coverage Panel ──────────────────────────────────────────────────── */
+// Data is fetched from `invoke('merge_coverage', { runs })`. The legacy
+// hard-coded coverpoint / regression-history literal arrays were removed
+// in T-2 — do not reintroduce.
 
-interface CoverPoint {
-  name: string;
-  group: string;
-  bins: number;
-  hits: number;
-}
-
-const COVER_GROUPS: CoverPoint[] = [
-  { name: "gemm_tile_shape",       group: "MAT_CORE", bins: 16, hits: 16 },
-  { name: "gemm_k_stride",         group: "MAT_CORE", bins: 8,  hits: 8  },
-  { name: "gemm_accum_roll",       group: "MAT_CORE", bins: 4,  hits: 4  },
-  { name: "gemv_lane_sel",         group: "VEC_CORE", bins: 4,  hits: 4  },
-  { name: "gemv_reduce_tree",      group: "VEC_CORE", bins: 5,  hits: 5  },
-  { name: "sfu_op_kind",           group: "SFU",      bins: 6,  hits: 6  },
-  { name: "sfu_exp_range",         group: "SFU",      bins: 16, hits: 15 },
-  { name: "mem_axi_burst_len",     group: "MEM_ctrl", bins: 5,  hits: 5  },
-  { name: "mem_hp_backpressure",   group: "MEM_ctrl", bins: 4,  hits: 4  },
-  { name: "mem_uram_bank_hit",     group: "MEM_ctrl", bins: 8,  hits: 7  },
-  { name: "ctrl_isa_opcode",       group: "frontend", bins: 24, hits: 22 },
-  { name: "ctrl_barrier_kind",     group: "frontend", bins: 3,  hits: 3  },
-  { name: "ctrl_dispatch_credit",  group: "frontend", bins: 8,  hits: 8  },
-];
-
-const REG_HISTORY = [
-  { day: "04-13", pass: 22, fail: 1 },
-  { day: "04-14", pass: 23, fail: 0 },
-  { day: "04-15", pass: 23, fail: 0 },
-  { day: "04-16", pass: 23, fail: 2 },
-  { day: "04-17", pass: 24, fail: 1 },
-  { day: "04-18", pass: 25, fail: 0 },
-  { day: "04-19", pass: 25, fail: 0 },
-  { day: "04-20", pass: 25, fail: 0 },
-];
+type CovSubTab = "heatmap" | "cross";
 
 function UVMCoveragePanel() {
   const theme = useTheme();
-  const totalBins = COVER_GROUPS.reduce((a, c) => a + c.bins, 0);
-  const hitBins   = COVER_GROUPS.reduce((a, c) => a + c.hits, 0);
-  const pct = (hitBins / totalBins) * 100;
+  const [merged, setMerged] = useState<MergedCoverage | null>(null);
+  const [err, setErr]       = useState<string | null>(null);
+  const [sub, setSub]       = useState<CovSubTab>("heatmap");
+
+  useEffect(() => {
+    invoke<MergedCoverage>("merge_coverage", { runs: DEFAULT_RUNS })
+      .then(setMerged)
+      .catch((e) => setErr(String(e)));
+  }, []);
+
+  if (err)    return <div style={{ color: theme.error, fontSize: 12 }}>merge_coverage failed: {err}</div>;
+  if (!merged) return <div style={{ color: theme.textMuted, fontSize: 12 }}>Loading coverage…</div>;
+
+  const totalBins = merged.groups.reduce((a, g) => a + g.bins.length, 0);
+  const hitBins   = merged.groups.reduce(
+    (a, g) => a + g.bins.filter((b) => b.hits > 0).length, 0);
+  const pct = totalBins === 0 ? 0 : (hitBins / totalBins) * 100;
 
   return (
     <div className="flex flex-col h-full gap-4">
       <h3 className="text-sm font-bold flex items-center gap-2">
-        <Bug size={16} /> UVM Coverage — pccx v002
+        <Bug size={16} /> UVM Coverage — pccx v002 (merged {DEFAULT_RUNS.length} runs)
       </h3>
 
       <div className="grid grid-cols-4 gap-3">
         <StatCard label="functional"   value={`${pct.toFixed(1)}%`} tone={pct > 95 ? "ok" : pct > 80 ? "warn" : "bad"} />
         <StatCard label="bins covered" value={`${hitBins} / ${totalBins}`} />
-        <StatCard label="coverpoints"  value={`${COVER_GROUPS.length}`} />
-        <StatCard label="last regr"    value="25/25 PASS" tone="ok" />
+        <StatCard label="groups"       value={`${merged.groups.length}`} />
+        <StatCard label="cross tuples" value={`${merged.crosses.length}`} />
       </div>
 
-      <div className="grid grid-cols-2 gap-4 flex-1 min-h-0">
-        <div className="rounded border overflow-hidden flex flex-col" style={{ borderColor: theme.border, background: theme.bgPanel }}>
-          <div style={{ padding: "8px 12px", fontSize: 10, fontWeight: 700, color: theme.textMuted, letterSpacing: "0.05em", borderBottom: `1px solid ${theme.border}` }}>
-            COVERPOINT HEATMAP
-          </div>
-          <div className="flex-1 overflow-auto p-3 grid gap-1.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))" }}>
-            {COVER_GROUPS.map(cp => {
-              const covPct = (cp.hits / cp.bins) * 100;
-              const bgColor = covPct === 100 ? "#22c55e" : covPct > 80 ? "#eab308" : "#ef4444";
-              return (
-                <div key={cp.name} style={{
-                  background: bgColor + "22",
-                  border: `1px solid ${bgColor}66`,
-                  borderRadius: 4, padding: "6px 8px",
-                  fontSize: 10,
-                }}>
-                  <div style={{ fontFamily: "monospace", fontSize: 10, color: theme.text, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{cp.name}</div>
-                  <div style={{ fontSize: 9, color: theme.textMuted, marginTop: 2 }}>{cp.group}</div>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-                    <span style={{ color: bgColor, fontWeight: 700 }}>{covPct.toFixed(0)}%</span>
-                    <span style={{ color: theme.textDim, fontFamily: "monospace" }}>{cp.hits}/{cp.bins}</span>
-                  </div>
-                  {/* Bin dots */}
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 2, marginTop: 4 }}>
-                    {Array.from({ length: cp.bins }).map((_, i) => (
-                      <span key={i} style={{
-                        width: 6, height: 6, borderRadius: 1,
-                        background: i < cp.hits ? bgColor : theme.borderDim,
-                      }}/>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+      <div className="flex rounded p-1 gap-1 self-start" style={{ border: `1px solid ${theme.border}`, background: theme.bg }}>
+        {(["heatmap", "cross"] as CovSubTab[]).map((id) => (
+          <button
+            key={id}
+            onClick={() => setSub(id)}
+            className="px-3 py-1 rounded text-[11px] font-medium"
+            style={{
+              background: sub === id ? theme.accentBg : "transparent",
+              color: sub === id ? theme.accent : theme.textMuted,
+            }}
+          >
+            {id === "heatmap" ? "Group Heatmap" : "Cross Heatmap"}
+          </button>
+        ))}
+      </div>
 
-        <div className="rounded border overflow-hidden flex flex-col" style={{ borderColor: theme.border, background: theme.bgPanel }}>
-          <div style={{ padding: "8px 12px", fontSize: 10, fontWeight: 700, color: theme.textMuted, letterSpacing: "0.05em", borderBottom: `1px solid ${theme.border}` }}>
-            REGRESSION HISTORY — last 8 days
-          </div>
-          <div className="flex-1 overflow-auto p-3 flex flex-col gap-2">
-            {REG_HISTORY.map(r => {
-              const total = r.pass + r.fail;
-              const failPct = (r.fail / Math.max(1, total)) * 100;
-              return (
-                <div key={r.day} className="flex items-center gap-2" style={{ fontSize: 10 }}>
-                  <span style={{ fontFamily: "monospace", color: theme.textMuted, width: 44 }}>{r.day}</span>
-                  <div style={{ flex: 1, height: 16, background: theme.bgSurface, borderRadius: 2, position: "relative", overflow: "hidden" }}>
-                    <div style={{ width: `${(r.pass / total) * 100}%`, height: "100%", background: theme.success, position: "absolute", left: 0 }}/>
-                    <div style={{ width: `${failPct}%`, height: "100%", background: theme.error, position: "absolute", left: `${(r.pass / total) * 100}%` }}/>
-                    <span style={{ position: "absolute", top: 1, left: 6, color: "#fff", fontSize: 9, fontWeight: 700 }}>
-                      {r.pass}P {r.fail > 0 ? `· ${r.fail}F` : ""}
-                    </span>
-                  </div>
-                  <span style={{
-                    fontFamily: "monospace",
-                    fontWeight: 700,
-                    color: r.fail === 0 ? theme.success : theme.error,
-                    width: 32, textAlign: "right",
-                  }}>{((r.pass / total) * 100).toFixed(0)}%</span>
-                </div>
-              );
-            })}
-            <div className="mt-2 p-2 rounded" style={{ background: theme.bgSurface, border: `1px solid ${theme.border}`, fontSize: 10, color: theme.textDim }}>
-              Trend: stable since 2026-04-18. Two FAILs on 2026-04-16 traced to a weight-dispatcher K-stride
-              corner case — fixed in commit <code>f38c1</code>.
+      <div className="flex-1 min-h-0">
+        {sub === "heatmap" ? <GroupHeatmap groups={merged.groups} /> :
+                             <CrossHeatmap crosses={merged.crosses} />}
+      </div>
+    </div>
+  );
+}
+
+function GroupHeatmap({ groups }: { groups: CovGroup[] }) {
+  const theme = useTheme();
+  return (
+    <div className="rounded border overflow-hidden flex flex-col h-full" style={{ borderColor: theme.border, background: theme.bgPanel }}>
+      <div className="flex items-center justify-between" style={{ padding: "8px 12px", fontSize: 10, fontWeight: 700, color: theme.textMuted, letterSpacing: "0.05em", borderBottom: `1px solid ${theme.border}` }}>
+        <span>COVERPOINT HEATMAP — hits / goal per bin</span>
+        <span style={{ color: theme.textDim, fontWeight: 500 }}>goal% turns red &lt; 80</span>
+      </div>
+      <div className="flex-1 overflow-auto p-3 grid gap-1.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}>
+        {groups.map((g) => {
+          const totalHits = g.bins.reduce((a, b) => a + b.hits, 0);
+          const totalGoal = g.bins.reduce((a, b) => a + b.goal, 0);
+          const covPct    = totalGoal === 0
+            ? (g.bins.length ? 100 : 0)
+            : Math.min(100, (totalHits / totalGoal) * 100);
+          const isRed     = totalGoal > 0 && totalHits / totalGoal < 0.8;
+          const bgColor   = isRed ? "#ef4444" : covPct === 100 ? "#22c55e" : "#eab308";
+          return (
+            <div key={g.name} style={{
+              background: bgColor + "22", border: `1px solid ${bgColor}66`,
+              borderRadius: 4, padding: "6px 8px", fontSize: 10,
+            }}>
+              <div style={{ fontFamily: "monospace", fontSize: 10, color: theme.text, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{g.name}</div>
+              <div style={{ fontSize: 9, color: theme.textMuted, marginTop: 2 }}>{g.bins.length} bins</div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+                <span style={{ color: bgColor, fontWeight: 700 }}>{covPct.toFixed(0)}%</span>
+                <span style={{ color: theme.textDim, fontFamily: "monospace" }}>{totalHits}/{totalGoal}</span>
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 2, marginTop: 4 }}>
+                {g.bins.map((b) => {
+                  const binPct  = b.goal === 0 ? (b.hits > 0 ? 100 : 0) : Math.min(100, (b.hits / b.goal) * 100);
+                  const binRed  = b.goal > 0 && b.hits / b.goal < 0.8;
+                  const binCol  = binRed ? "#ef4444" : binPct === 100 ? "#22c55e" : "#eab308";
+                  return (
+                    <span key={b.id}
+                      title={`${b.id}: ${b.hits}/${b.goal} (${binPct.toFixed(0)}%)`}
+                      style={{ width: 8, height: 8, borderRadius: 1, background: binCol }}/>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function CrossHeatmap({ crosses }: { crosses: CrossTuple[] }) {
+  const theme = useTheme();
+  // Filter the canonical (gemm_k_stride × mem_hp_backpressure) cross.
+  const rel = crosses.filter(
+    (c) => c.a_group === "gemm_k_stride" && c.b_group === "mem_hp_backpressure");
+  const aBins = ["1", "2", "4", "8", "16", "32", "64", "128"];            // 8
+  const bBins = ["lo", "mid", "hi", "critical"];                          // 4
+  const cell  = (a: string, b: string) => rel.find((c) => c.a_bin === a && c.b_bin === b);
+
+  return (
+    <div className="rounded border overflow-hidden flex flex-col h-full" style={{ borderColor: theme.border, background: theme.bgPanel }}>
+      <div className="flex items-center justify-between" style={{ padding: "8px 12px", fontSize: 10, fontWeight: 700, color: theme.textMuted, letterSpacing: "0.05em", borderBottom: `1px solid ${theme.border}` }}>
+        <span>CROSS HEATMAP — gemm_k_stride × mem_hp_backpressure (8 × 4)</span>
+        <span style={{ color: theme.textDim, fontWeight: 500 }}>goal% &lt; 80 → red</span>
+      </div>
+      <div className="flex-1 overflow-auto p-3">
+        <table style={{ borderCollapse: "separate", borderSpacing: 2, fontSize: 10 }}>
+          <thead>
+            <tr>
+              <th style={{ color: theme.textMuted, padding: "0 6px" }}>stride \ bp</th>
+              {bBins.map((b) => (
+                <th key={b} style={{ color: theme.textDim, fontFamily: "monospace", padding: "0 8px" }}>{b}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {aBins.map((a) => (
+              <tr key={a}>
+                <td style={{ color: theme.textDim, fontFamily: "monospace", padding: "0 6px" }}>{a}</td>
+                {bBins.map((b) => {
+                  const c     = cell(a, b);
+                  const hits  = c?.hits ?? 0;
+                  const goal  = c?.goal ?? 0;
+                  const ratio = goal === 0 ? (hits > 0 ? 1 : 0) : hits / goal;
+                  const pct   = Math.min(100, ratio * 100);
+                  const isRed = goal > 0 && ratio < 0.8;
+                  const col   = isRed ? "#ef4444" : ratio >= 1 ? "#22c55e" : "#eab308";
+                  const tip   = `(${a}, ${b}) — ${hits}/${goal} hits, ${pct.toFixed(0)}%${isRed ? " — below 80% goal" : ""}`;
+                  return (
+                    <td key={b} title={tip}
+                        style={{
+                          width: 52, height: 34, textAlign: "center",
+                          background: col + "33", border: `1px solid ${col}88`,
+                          color: col, fontWeight: 700, borderRadius: 3,
+                          cursor: "help",
+                        }}>
+                      {hits}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div className="mt-3 p-2 rounded" style={{ background: theme.bgSurface, border: `1px solid ${theme.border}`, fontSize: 10, color: theme.textDim }}>
+          Each cell shows merged hits across run_a + run_b + run_c.
+          Hover for (a_bin, b_bin, hits, goal%). Red = &lt; 80% goal.
         </div>
       </div>
     </div>

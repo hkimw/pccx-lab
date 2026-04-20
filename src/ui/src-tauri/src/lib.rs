@@ -336,6 +336,19 @@ struct TraceEntry {
     size_bytes: u64,
 }
 
+/// Merges one or more JSONL coverage-run files (emitted by the xsim
+/// testbench suite) into a unified `MergedCoverage` structure. Bin
+/// hits are summed across runs; the largest observed `goal` per bin
+/// is retained. Empty `runs` vector returns an empty merge.
+#[tauri::command]
+fn merge_coverage(
+    runs: Vec<String>,
+) -> Result<pccx_core::coverage::MergedCoverage, String> {
+    let paths: Vec<std::path::PathBuf> = runs.iter().map(std::path::PathBuf::from).collect();
+    let refs:  Vec<&std::path::Path>   = paths.iter().map(|p| p.as_path()).collect();
+    pccx_core::coverage::merge_jsonl(&refs).map_err(|e| e.to_string())
+}
+
 /// Lists every `.pccx` file under the sibling pccx-FPGA repo's
 /// `hw/sim/work/<tb>/` tree so the UI can present a dropdown of
 /// available traces without hard-coding paths.
@@ -509,6 +522,7 @@ pub fn run() {
             list_uvm_strategies,
             generate_markdown_report,
             detect_bottlenecks,
+            merge_coverage,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
