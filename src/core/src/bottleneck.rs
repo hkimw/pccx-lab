@@ -135,12 +135,7 @@ mod tests {
     use crate::trace::NpuEvent;
 
     fn mk_ev(t: &str, start: u64, dur: u64) -> NpuEvent {
-        NpuEvent {
-            core_id: 0,
-            start_cycle: start,
-            duration: dur,
-            event_type: t.to_string(),
-        }
+        NpuEvent::new(0, start, dur, t)
     }
 
     #[test]

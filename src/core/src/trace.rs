@@ -11,7 +11,25 @@ pub mod event_type_id {
     pub const DMA_WRITE: u32 = 3;
     pub const SYSTOLIC_STALL: u32 = 4;
     pub const BARRIER_SYNC: u32 = 5;
+    /// Driver-surface `uca_*` API boundary crossing. Mirrors CUPTI's
+    /// `CUpti_ActivityAPI` record shape: one event per entry/exit pair,
+    /// with `api_name` carrying the qualified call identifier. See
+    /// research_findings.md Gap 4 (CUPTI / ROCTracer / Canopy SOSP 2017).
+    pub const API_CALL: u32 = 6;
 }
+
+/// Canonical event-type names, indexed by `event_type_id::*`. Exposed
+/// so UI parsers and writers share one source of truth (keeps
+/// `FlameGraph.tsx:EVENT_TYPE_NAMES` in lock-step with Rust).
+pub const EVENT_TYPE_NAMES: &[(&str, u32)] = &[
+    ("UNKNOWN",        event_type_id::UNKNOWN),
+    ("MAC_COMPUTE",    event_type_id::MAC_COMPUTE),
+    ("DMA_READ",       event_type_id::DMA_READ),
+    ("DMA_WRITE",      event_type_id::DMA_WRITE),
+    ("SYSTOLIC_STALL", event_type_id::SYSTOLIC_STALL),
+    ("BARRIER_SYNC",   event_type_id::BARRIER_SYNC),
+    ("API_CALL",       event_type_id::API_CALL),
+];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NpuEvent {
@@ -19,8 +37,13 @@ pub struct NpuEvent {
     pub start_cycle: u64,
     pub duration: u64,
     /// String tag — canonical values: "MAC_COMPUTE", "DMA_READ", "DMA_WRITE",
-    /// "SYSTOLIC_STALL", "BARRIER_SYNC"
+    /// "SYSTOLIC_STALL", "BARRIER_SYNC", "API_CALL"
     pub event_type: String,
+    /// Qualified API name (e.g. `"uca_submit_cmd"`) when
+    /// `event_type == "API_CALL"`, otherwise `None`. Mirrors
+    /// CUPTI's `CUpti_ActivityAPI.cbid` / callback-id resolution.
+    #[serde(default)]
+    pub api_name: Option<String>,
 }
 
 impl NpuEvent {
@@ -33,7 +56,27 @@ impl NpuEvent {
             "DMA_WRITE"      => event_type_id::DMA_WRITE,
             "SYSTOLIC_STALL" => event_type_id::SYSTOLIC_STALL,
             "BARRIER_SYNC"   => event_type_id::BARRIER_SYNC,
+            "API_CALL"       => event_type_id::API_CALL,
             _                => event_type_id::UNKNOWN,
+        }
+    }
+
+    /// Constructs a non-API event (the common case). `api_name` stays
+    /// `None` so the extra field in `NpuEvent` never leaks into
+    /// callers that pre-date the API_CALL variant.
+    pub fn new(core_id: u32, start_cycle: u64, duration: u64, event_type: impl Into<String>) -> Self {
+        Self { core_id, start_cycle, duration, event_type: event_type.into(), api_name: None }
+    }
+
+    /// Constructs an `API_CALL` event tagged with the qualified `uca_*`
+    /// name. Duration is the measured entry→exit span in cycles.
+    pub fn api_call(core_id: u32, start_cycle: u64, duration: u64, api_name: impl Into<String>) -> Self {
+        Self {
+            core_id,
+            start_cycle,
+            duration,
+            event_type: "API_CALL".into(),
+            api_name: Some(api_name.into()),
         }
     }
 }

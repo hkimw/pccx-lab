@@ -99,21 +99,11 @@ fn parse_log(text: &str) -> anyhow::Result<Outcome> {
 fn build_trace(outcome: &Outcome, core_id: u32) -> NpuTrace {
     let mut events = Vec::with_capacity((outcome.cycles + outcome.errors) as usize);
     for c in 0..outcome.cycles {
-        events.push(NpuEvent {
-            core_id,
-            start_cycle: c,
-            duration: 1,
-            event_type: "MAC_COMPUTE".into(),
-        });
+        events.push(NpuEvent::new(core_id, c, 1, "MAC_COMPUTE"));
     }
     // Each mismatch in the testbench surfaces as a pipeline stall visualisation.
     for e in 0..outcome.errors {
-        events.push(NpuEvent {
-            core_id,
-            start_cycle: e,
-            duration: 1,
-            event_type: "SYSTOLIC_STALL".into(),
-        });
+        events.push(NpuEvent::new(core_id, e, 1, "SYSTOLIC_STALL"));
     }
     NpuTrace {
         total_cycles: outcome.cycles.max(1),

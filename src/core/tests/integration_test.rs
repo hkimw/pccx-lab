@@ -90,10 +90,7 @@ mod tests {
 
     #[test]
     fn test_event_type_id_mapping() {
-        let ev = NpuEvent {
-            core_id: 0, start_cycle: 0, duration: 1,
-            event_type: "DMA_WRITE".to_string(),
-        };
+        let ev = NpuEvent::new(0, 0, 1, "DMA_WRITE");
         // This was the critical bug: DMA_WRITE must be 3, not 0
         assert_eq!(ev.type_id(), event_type_id::DMA_WRITE,
             "DMA_WRITE should map to type_id 3");
@@ -106,8 +103,8 @@ mod tests {
         let trace = NpuTrace {
             total_cycles: 1000,
             events: vec![
-                NpuEvent { core_id: 5, start_cycle: 100, duration: 50, event_type: "MAC_COMPUTE".to_string() },
-                NpuEvent { core_id: 3, start_cycle: 200, duration: 30, event_type: "DMA_WRITE".to_string() },
+                NpuEvent::new(5, 100, 50, "MAC_COMPUTE"),
+                NpuEvent::new(3, 200, 30, "DMA_WRITE"),
             ],
         };
         let buf = trace.to_flat_buffer();
@@ -132,8 +129,8 @@ mod tests {
         let trace = NpuTrace {
             total_cycles: 200,
             events: vec![
-                NpuEvent { core_id: 0, start_cycle: 0, duration: 100, event_type: "MAC_COMPUTE".to_string() },
-                NpuEvent { core_id: 1, start_cycle: 0, duration: 50,  event_type: "MAC_COMPUTE".to_string() },
+                NpuEvent::new(0, 0, 100, "MAC_COMPUTE"),
+                NpuEvent::new(1, 0, 50,  "MAC_COMPUTE"),
             ],
         };
         let utils = trace.core_utilisation();
@@ -149,7 +146,7 @@ mod tests {
         let trace = NpuTrace {
             total_cycles: 999,
             events: vec![
-                NpuEvent { core_id: 7, start_cycle: 42, duration: 13, event_type: "BARRIER_SYNC".to_string() },
+                NpuEvent::new(7, 42, 13, "BARRIER_SYNC"),
             ],
         };
         let payload = trace.to_payload();
@@ -231,10 +228,17 @@ mod tests {
 
     #[test]
     fn test_trace_event_count() {
-        // 2 tiles × 2 cores × 4 events/core + 2 cores × barrier = 2*(2*4+2) = 20
+        // 8 canonical API_CALL prelude events +
+        // 2 tiles × 2 cores × 4 events/core + 2 cores × barrier = 8 + 2*(2*4+2) = 28
         let cfg   = SimConfig { tiles: 2, cores: 2, bytes_per_element: 2, tile_m: 16, tile_n: 16, tile_k: 16 };
         let trace = generate_realistic_trace(&cfg);
-        assert_eq!(trace.events.len(), 20, "Expected 20 events for 2 tiles × 2 cores");
+        assert_eq!(trace.events.len(), 28,
+                   "Expected 28 events = 8 API_CALL prelude + 20 (2 tiles × 2 cores)");
+        // Sanity-check: the first 8 events are the canonical uca_* surface calls.
+        let api_count = trace.events.iter()
+            .filter(|e| e.event_type == "API_CALL")
+            .count();
+        assert_eq!(api_count, 8, "simulator must emit 8 canonical uca_* API_CALL events");
     }
 
     #[test]

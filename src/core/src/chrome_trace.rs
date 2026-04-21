@@ -95,9 +95,9 @@ mod tests {
         NpuTrace {
             total_cycles: 1000,
             events: vec![
-                NpuEvent { core_id: 0, start_cycle: 0,   duration: 400, event_type: "MAC_COMPUTE".into() },
-                NpuEvent { core_id: 1, start_cycle: 400, duration: 200, event_type: "DMA_READ".into()    },
-                NpuEvent { core_id: 2, start_cycle: 600, duration: 200, event_type: "BARRIER_SYNC".into()},
+                NpuEvent::new(0, 0,   400, "MAC_COMPUTE"),
+                NpuEvent::new(1, 400, 200, "DMA_READ"),
+                NpuEvent::new(2, 600, 200, "BARRIER_SYNC"),
             ],
         }
     }

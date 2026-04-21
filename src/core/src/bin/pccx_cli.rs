@@ -116,6 +116,7 @@ fn main() -> anyhow::Result<()> {
     let mut dma_w_count  = 0usize;
     let mut stall_count  = 0usize;
     let mut barrier_count = 0usize;
+    let mut api_count    = 0usize;
     let mut other_count  = 0usize;
     for ev in &trace.events {
         match ev.event_type.as_str() {
@@ -124,6 +125,7 @@ fn main() -> anyhow::Result<()> {
             "DMA_WRITE"      => dma_w_count  += 1,
             "SYSTOLIC_STALL" => stall_count  += 1,
             "BARRIER_SYNC"   => barrier_count += 1,
+            "API_CALL"       => api_count    += 1,
             _                => other_count  += 1,
         }
     }
@@ -132,6 +134,7 @@ fn main() -> anyhow::Result<()> {
     println!("  DMA_WRITE      : {dma_w_count}");
     println!("  SYSTOLIC_STALL : {stall_count}");
     println!("  BARRIER_SYNC   : {barrier_count}");
+    println!("  API_CALL       : {api_count}");
     if other_count > 0 {
         println!("  OTHER          : {other_count}");
     }

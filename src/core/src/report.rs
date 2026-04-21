@@ -149,8 +149,8 @@ mod tests {
         let trace = NpuTrace {
             total_cycles: 100,
             events: vec![
-                NpuEvent { core_id: 0, start_cycle: 0,  duration: 50, event_type: "MAC_COMPUTE".into() },
-                NpuEvent { core_id: 1, start_cycle: 50, duration: 50, event_type: "DMA_READ".into() },
+                NpuEvent::new(0, 0,  50, "MAC_COMPUTE"),
+                NpuEvent::new(1, 50, 50, "DMA_READ"),
             ],
         };
         let md = render_markdown(Some(&trace), None);

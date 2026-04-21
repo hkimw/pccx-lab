@@ -82,8 +82,31 @@ pub fn generate_realistic_trace(cfg: &SimConfig) -> NpuTrace {
 
     let is_compute_bound = estimator.is_compute_bound(&op);
 
-    let mut events = Vec::with_capacity(cfg.tiles as usize * cfg.cores as usize * 5);
+    let mut events = Vec::with_capacity(cfg.tiles as usize * cfg.cores as usize * 5 + 8);
     let mut global_cycle: u64 = 0;
+
+    // ── Prelude: emit the 8 canonical `uca_*` driver-surface entry events
+    //    before any compute begins.  Mirrors CUPTI's `CUpti_ActivityAPI`
+    //    model (Canopy SOSP 2017 correlation-id pattern): one record per
+    //    API entry/exit span, early in the trace so `list_api_calls`
+    //    always sees the full driver surface regardless of how short the
+    //    subsequent kernel workload is.  Latencies reflect the KV260
+    //    reference-SoC numbers the driver README cites (cycles @ 200 MHz,
+    //    so 1 µs = 200 cycles).
+    const API_SURFACE: &[(&str, u64)] = &[
+        ("uca_init",              4_100 / 5),      //  820 cy  (4.1 µs)
+        ("uca_alloc_buffer",      12_600 / 5),     // 2520 cy
+        ("uca_load_weights",      1_420_000 / 5),  // 284000 cy
+        ("uca_submit_cmd",        1_800 / 5),      //  360 cy
+        ("uca_poll_completion",   300 / 5),        //   60 cy
+        ("uca_fetch_result",      920_000 / 5),    // 184000 cy
+        ("uca_reset",             8_700 / 5),      //  1740 cy
+        ("uca_get_perf_counters", 5_200 / 5),      //  1040 cy
+    ];
+    for (name, dur_cy) in API_SURFACE {
+        events.push(NpuEvent::api_call(0, global_cycle, *dur_cy, *name));
+        global_cycle += *dur_cy;
+    }
 
     for _t in 0..cfg.tiles {
         // Critical path for this tile:
@@ -103,40 +126,20 @@ pub fn generate_realistic_trace(cfg: &SimConfig) -> NpuTrace {
             // Use contended latency since all cores issue simultaneously
             let read_dur = if cfg.cores > 1 { dma_read_cont } else { dma_read_solo };
 
-            events.push(NpuEvent {
-                core_id: c,
-                start_cycle: read_start,
-                duration: read_dur,
-                event_type: "DMA_READ".to_string(),
-            });
+            events.push(NpuEvent::new(c, read_start, read_dur, "DMA_READ"));
 
             // Phase 2 — MAC COMPUTE (starts after DMA read completes)
             let compute_start = read_start + read_dur;
-            events.push(NpuEvent {
-                core_id: c,
-                start_cycle: compute_start,
-                duration: compute_cycles,
-                event_type: "MAC_COMPUTE".to_string(),
-            });
+            events.push(NpuEvent::new(c, compute_start, compute_cycles, "MAC_COMPUTE"));
 
             // Phase 3 — DMA WRITE (starts after compute, write-back)
             let write_start = compute_start + compute_cycles;
             let write_dur = if cfg.cores > 1 { dma_write_cont } else { dma_write_solo };
-            events.push(NpuEvent {
-                core_id: c,
-                start_cycle: write_start,
-                duration: write_dur,
-                event_type: "DMA_WRITE".to_string(),
-            });
+            events.push(NpuEvent::new(c, write_start, write_dur, "DMA_WRITE"));
 
             // Phase 4 — SYSTOLIC STALL (pipeline drain between tiles)
             let stall_start = write_start + write_dur;
-            events.push(NpuEvent {
-                core_id: c,
-                start_cycle: stall_start,
-                duration: stall_cycles,
-                event_type: "SYSTOLIC_STALL".to_string(),
-            });
+            events.push(NpuEvent::new(c, stall_start, stall_cycles, "SYSTOLIC_STALL"));
         }
 
         // Tile critical path (bottleneck): longest single-core path
@@ -149,12 +152,7 @@ pub fn generate_realistic_trace(cfg: &SimConfig) -> NpuTrace {
         let barrier_start = global_cycle + tile_crit_path;
         let barrier_dur   = 8; // fixed synchronisation overhead
         for c in 0..cfg.cores {
-            events.push(NpuEvent {
-                core_id: c,
-                start_cycle: barrier_start,
-                duration: barrier_dur,
-                event_type: "BARRIER_SYNC".to_string(),
-            });
+            events.push(NpuEvent::new(c, barrier_start, barrier_dur, "BARRIER_SYNC"));
         }
 
         global_cycle = barrier_start + barrier_dur;

@@ -145,9 +145,9 @@ mod tests {
         NpuTrace {
             total_cycles: 20,
             events: vec![
-                NpuEvent { core_id: 1, start_cycle: 2,  duration: 5, event_type: "MAC_COMPUTE".into() },
-                NpuEvent { core_id: 0, start_cycle: 8,  duration: 4, event_type: "DMA_READ".into() },
-                NpuEvent { core_id: 3, start_cycle: 13, duration: 2, event_type: "SYSTOLIC_STALL".into() },
+                NpuEvent::new(1, 2,  5, "MAC_COMPUTE"),
+                NpuEvent::new(0, 8,  4, "DMA_READ"),
+                NpuEvent::new(3, 13, 2, "SYSTOLIC_STALL"),
             ],
         }
     }
