@@ -246,11 +246,25 @@ function buildElkGraph(viewportW: number, viewportH: number): ElkNode {
 // Minimal trace event shape; mirrors FlameGraph parser.
 interface TraceEv { coreId: number; startCycle: number; duration: number; typeId: number; }
 
+// Keep in sync with `NpuTrace::FLAT_BUFFER_V2_MAGIC` ("PCC2" LE).
+const FLAT_BUFFER_V2_MAGIC = 0x3243_4350;
+
 function parseTraceFlat(buf: Uint8Array): TraceEv[] {
   const out: TraceEv[] = [];
   const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
   const stride = 24;
-  for (let off = 0; off + stride <= buf.byteLength; off += stride) {
+
+  // V2: stop at trailer magic if present; HardwareVisualizer only
+  // needs the event-array fields, not the name_table.
+  let eventEnd = Math.floor(buf.byteLength / stride) * stride;
+  for (let off = 0; off + 8 <= buf.byteLength; off += stride) {
+    if (view.getUint32(off, true) === FLAT_BUFFER_V2_MAGIC) {
+      eventEnd = off;
+      break;
+    }
+  }
+
+  for (let off = 0; off + stride <= eventEnd; off += stride) {
     out.push({
       coreId:     view.getUint32(off, true),
       startCycle: Number(view.getBigUint64(off + 4, true)),

@@ -15,6 +15,9 @@ interface TraceEvent {
   startCycle: number;
   duration: number;
   typeId: number;
+  /** Qualified `uca_*` name; populated only for API_CALL events that
+   * appear in the flat-buffer v2 `name_table` trailer. */
+  name?: string;
 }
 
 // Canonical layer hierarchy used when binning the flat trace into
@@ -29,6 +32,10 @@ const EVENT_TYPE_NAMES: Record<number, string> = {
   5: "barrier_sync",
   6: "api_call",
 };
+
+// Flat-buffer v2 trailer magic — "PCC2" in little-endian ASCII.  Must
+// match `NpuTrace::FLAT_BUFFER_V2_MAGIC` in `src/core/src/trace.rs`.
+const FLAT_BUFFER_V2_MAGIC = 0x3243_4350;
 
 const EVENT_TYPE_COLORS: Record<number, string> = {
   1: "#4fc1ff",
@@ -59,13 +66,16 @@ export function events_to_spans(
   let nextLane = 2;
   let maxEnd = 0;
   for (const ev of events) {
-    const name = layer_hierarchy[ev.typeId] || "unknown";
+    // For API_CALL (typeId=6) events whose qualified `uca_*` name is
+    // carried in the flat-buffer v2 trailer, substitute the real
+    // symbol — otherwise fall back to the generic layer label.
+    const baseName = (ev.typeId === 6 && ev.name) ? ev.name : (layer_hierarchy[ev.typeId] || "unknown");
     const end = ev.startCycle + ev.duration;
     if (end > maxEnd) maxEnd = end;
     let depth = coreLanes.get(ev.coreId);
     if (depth == null) { depth = nextLane++; coreLanes.set(ev.coreId, depth); }
     spans.push({
-      name: `${name}@core${ev.coreId}`,
+      name: `${baseName}@core${ev.coreId}`,
       start: ev.startCycle,
       duration: Math.max(1, ev.duration),
       depth,
@@ -81,7 +91,19 @@ function parseFlatBuffer(buf: Uint8Array): TraceEvent[] {
   const events: TraceEvent[] = [];
   const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
   const stride = 24;
-  for (let off = 0; off + stride <= buf.byteLength; off += stride) {
+
+  // Scan the fixed-stride section.  Stop when we hit the v2 trailer
+  // magic at a 24-byte-aligned boundary — anything after that belongs
+  // to the name_table, not the event array.
+  let eventEnd = Math.floor(buf.byteLength / stride) * stride;
+  for (let off = 0; off + 8 <= buf.byteLength; off += stride) {
+    if (view.getUint32(off, true) === FLAT_BUFFER_V2_MAGIC) {
+      eventEnd = off;
+      break;
+    }
+  }
+
+  for (let off = 0; off + stride <= eventEnd; off += stride) {
     events.push({
       coreId:     view.getUint32(off, true),
       // u64 decoded via two u32 halves; traces fit comfortably in f64 precision.
@@ -90,6 +112,27 @@ function parseFlatBuffer(buf: Uint8Array): TraceEvent[] {
       typeId:     view.getUint32(off + 20, true),
     });
   }
+
+  // Decode the optional v2 name_table trailer — skipped silently when
+  // absent so v1 payloads (events only, no trailer) still parse.
+  if (eventEnd + 8 <= buf.byteLength &&
+      view.getUint32(eventEnd, true) === FLAT_BUFFER_V2_MAGIC) {
+    const nameCount = view.getUint32(eventEnd + 4, true);
+    let cur = eventEnd + 8;
+    const decoder = new TextDecoder("utf-8");
+    for (let i = 0; i < nameCount; i++) {
+      if (cur + 6 > buf.byteLength) break;
+      const idx = view.getUint32(cur, true);
+      const len = view.getUint16(cur + 4, true);
+      cur += 6;
+      if (cur + len > buf.byteLength) break;
+      if (idx < events.length) {
+        events[idx].name = decoder.decode(buf.subarray(cur, cur + len));
+      }
+      cur += len;
+    }
+  }
+
   return events;
 }
 
@@ -100,6 +143,10 @@ export function FlameGraph() {
   const [spans, setSpans] = useState<Span[]>([]);
   const [totalCycles, setTotalCycles] = useState(0);
   const [loading, setLoading] = useState(true);
+  /** True when we fell through to the empty-state fallback (no trace
+   * loaded).  Drives the toolbar `(synthetic)` badge so users never
+   * mistake the placeholder for a real run. */
+  const [synthetic, setSynthetic] = useState(false);
   const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string } | null>(null);
   const [aiAnalysis, setAiAnalysis] = useState<{ text: string; rec: string } | null>(null);
   const [selected, setSelected]   = useState<Span | null>(null);
@@ -178,8 +225,10 @@ export function FlameGraph() {
     // Primary path: pull the trace payload from core/ and derive spans
     // via the shared helper so `detect_bottlenecks` and the chart
     // render from one shape (fixes the judge's "data-layer
-    // schizophrenia" finding).  Fall back to the Gemma 3N literal
-    // demo tree only if no trace is loaded yet.
+    // schizophrenia" finding).  When no trace is loaded we render an
+    // honest empty-state panel with a `(synthetic)` badge — the old
+    // hard-coded demo tree was deleted in R-4 T-3 because it lied
+    // about provenance (see cycle/round_004/implemented_T3.md).
     (async () => {
       try {
         const payload = await invoke<Uint8Array>("fetch_trace_payload");
@@ -191,152 +240,22 @@ export function FlameGraph() {
             const end = tspans.reduce((m, s) => Math.max(m, s.start + s.duration), 0);
             setSpans(tspans);
             setTotalCycles(end);
+            setSynthetic(false);
             vp.current.cpp = Math.max(1, end) / 1000;
             setLoading(false);
             return;
           }
         }
-      } catch { /* fall through to demo tree */ }
+      } catch { /* fall through to empty state */ }
 
-      // ── Fallback: Gemma 3N E4B literal demo (ONLY when no trace) ──
+      // Empty-state: no trace loaded.  Clear spans so the canvas stays
+      // blank; the toolbar `(synthetic)` badge + the centred
+      // "no trace loaded" message below make the state unmistakable.
       if (cancelled) return;
-      const d = theme.mode === "dark";
-    const PALETTE = {
-      root:     d ? "#374151" : "#e5e7eb",
-      layer:    d ? "#1f2937" : "#f3f4f6",
-      norm:     "#64748b",
-      qkv:      "#0ea5e9",   // attention projections
-      rope:     "#0284c7",
-      scores:   "#a855f7",   // QK · softmax · AV
-      attnOut:  "#6366f1",
-      ffnGate:  "#f59e0b",
-      ffnUp:    "#f97316",
-      ffnDown:  "#ea580c",
-      silu:     "#eab308",
-      laurel:   "#8b5cf6",
-      ple:      "#14b8a6",
-      residual: "#22c55e",
-      dmaRead:  "#6a9955",
-      mac:      "#4fc1ff",
-      dmaWrite: "#dcdcaa",
-      stall:    "#c586c0",
-    };
-
-    const demo: Span[] = [];
-    const N_LAYERS = 10;  // sample — Gemma 3N has 35 total; rest aggregated.
-    const layerCycles = 420;
-    const embedCycles = 180;
-    const sampleCycles = 140;
-
-    let t = 0;
-    const rootStart = 0;
-
-    // --- Embedding lookup + initial RMSNorm ---
-    demo.push({ name: "embed_lookup",           start: t,            duration: 80,  depth: 1, color: PALETTE.ple });
-    demo.push({ name: "dma_read · 2048 × 27b",  start: t + 5,        duration: 60,  depth: 2, color: PALETTE.dmaRead });
-    demo.push({ name: "rms_norm_pre",           start: t + 80,       duration: 40,  depth: 1, color: PALETTE.norm });
-    demo.push({ name: "altup_broadcast[0..3]",  start: t + 120,      duration: 60,  depth: 1, color: PALETTE.ple });
-    t += embedCycles;
-
-    // --- 10 transformer layers, one breakdown per layer ---
-    for (let L = 0; L < N_LAYERS; L++) {
-      const layerStart = t;
-      demo.push({ name: `layer_${L}`, start: layerStart, duration: layerCycles, depth: 1, color: PALETTE.layer });
-
-      // pre-attention RMSNorm
-      demo.push({ name: "rms_norm", start: t, duration: 18, depth: 2, color: PALETTE.norm });
-      t += 18;
-
-      // Q / K / V GEMV projections (shared D×D)
-      const qkvDur = 80;
-      demo.push({ name: "QKV_proj (GEMV)", start: t, duration: qkvDur, depth: 2, color: PALETTE.qkv });
-      demo.push({ name: "dma_read · W_qkv",    start: t,          duration: 14, depth: 3, color: PALETTE.dmaRead });
-      demo.push({ name: "mac · 3×D×D",         start: t + 14,     duration: qkvDur - 20, depth: 3, color: PALETTE.mac });
-      demo.push({ name: "dma_write · q,k,v",   start: t + qkvDur - 6, duration: 6,  depth: 3, color: PALETTE.dmaWrite });
-      t += qkvDur;
-
-      // RoPE rotation (θ = 10 000 local / 1 000 000 global, 5-layer cycle)
-      const rope = L % 5 === 4 ? "RoPE_global" : "RoPE_local";
-      demo.push({ name: rope, start: t, duration: 22, depth: 2, color: PALETTE.rope });
-      t += 22;
-
-      // Cross-layer KV cache: layers 20..34 reuse 18/19 — model here by
-      // skipping the K/V write on ≥20 (we don't reach 20 in N_LAYERS=10,
-      // but keep the split so a future N_LAYERS=35 looks right).
-      const ownsKV = L < 20;
-      if (ownsKV) {
-        demo.push({ name: "kv_cache_write", start: t, duration: 12, depth: 2, color: PALETTE.dmaWrite });
-        t += 12;
-      }
-
-      // Attention scores: Q·Kᵀ → softmax → A·V
-      const scoresStart = t;
-      const scoresDur = 110;
-      demo.push({ name: "attn_scores (softmax skipped-scaling)", start: scoresStart, duration: scoresDur, depth: 2, color: PALETTE.scores });
-      demo.push({ name: "Q·Kᵀ (GEMM)",        start: scoresStart,        duration: 40, depth: 3, color: PALETTE.mac });
-      demo.push({ name: "cvo · exp+reduce",   start: scoresStart + 40,   duration: 28, depth: 3, color: PALETTE.scores });
-      demo.push({ name: "cvo · recip",        start: scoresStart + 68,   duration: 12, depth: 3, color: PALETTE.scores });
-      demo.push({ name: "A·V (GEMM)",         start: scoresStart + 80,   duration: 30, depth: 3, color: PALETTE.mac });
-      t += scoresDur;
-
-      // Output projection
-      const outDur = 40;
-      demo.push({ name: "attn_out (GEMV)", start: t, duration: outDur, depth: 2, color: PALETTE.attnOut });
-      demo.push({ name: "mac · D×D",  start: t + 4,       duration: outDur - 10, depth: 3, color: PALETTE.mac });
-      t += outDur;
-
-      // Residual add (AltUp: four streams updated)
-      demo.push({ name: "altup_residual (xs[0..3])", start: t, duration: 14, depth: 2, color: PALETTE.residual });
-      t += 14;
-
-      // post-attention RMSNorm
-      demo.push({ name: "rms_norm", start: t, duration: 14, depth: 2, color: PALETTE.norm });
-      t += 14;
-
-      // FFN: gate (with Gaussian Top-K sparsity), up, SiLU, down + LAuReL parallel branch
-      const ffnStart = t;
-      const ffnDur = 92;
-      demo.push({ name: "ffn + LAuReL", start: ffnStart, duration: ffnDur, depth: 2, color: PALETTE.ffnGate });
-      demo.push({ name: "gate (topK ~5%)",     start: ffnStart,          duration: 26, depth: 3, color: PALETTE.ffnGate });
-      demo.push({ name: "stall · mask_apply",  start: ffnStart + 10,     duration: 6,  depth: 3, color: PALETTE.stall });
-      demo.push({ name: "up",                  start: ffnStart + 26,     duration: 22, depth: 3, color: PALETTE.ffnUp });
-      demo.push({ name: "silu",                start: ffnStart + 48,     duration: 8,  depth: 3, color: PALETTE.silu });
-      demo.push({ name: "down",                start: ffnStart + 56,     duration: 24, depth: 3, color: PALETTE.ffnDown });
-      demo.push({ name: "laurel (D×64, 64×D)", start: ffnStart + 40,     duration: 32, depth: 3, color: PALETTE.laurel });
-      demo.push({ name: "scale 1/√2",          start: ffnStart + 72,     duration: 8,  depth: 3, color: PALETTE.scores });
-      t = ffnStart + ffnDur;
-
-      // PLE shadow stream update (layers 0..9 → xs[1..3] only)
-      demo.push({ name: "ple_shadow (xs[1..3])", start: t, duration: 18, depth: 2, color: PALETTE.ple });
-      t += 18;
-
-      // fill remainder with a small DMA/write-back
-      const slack = layerStart + layerCycles - t;
-      if (slack > 0) {
-        demo.push({ name: "barrier_sync", start: t, duration: slack, depth: 2, color: PALETTE.stall });
-        t = layerStart + layerCycles;
-      }
-    }
-
-    // --- Remaining 25 layers aggregated as one bar ---
-    const restDur = (35 - N_LAYERS) * layerCycles;
-    demo.push({ name: "layers 10..34 (aggregated)", start: t, duration: restDur, depth: 1, color: PALETTE.layer });
-    demo.push({ name: "rms_norm + attn + ffn × 25", start: t, duration: restDur, depth: 2, color: PALETTE.norm });
-    t += restDur;
-
-    // --- LM head + sampler ---
-    demo.push({ name: "lm_head (GEMV)",     start: t,                 duration: 90,            depth: 1, color: PALETTE.attnOut });
-    demo.push({ name: "mac · Vocab × D",    start: t + 8,             duration: 72,            depth: 2, color: PALETTE.mac });
-    demo.push({ name: "cvo · topk_sampler", start: t + 90,            duration: sampleCycles - 90, depth: 1, color: PALETTE.scores });
-    t += sampleCycles;
-
-    // Root spans the whole decode step.
-    demo.unshift({ name: "decode_step_0 (Gemma 3N E4B)", start: rootStart, duration: t, depth: 0, color: PALETTE.root });
-
-    setSpans(demo);
-    setTotalCycles(t);
-    vp.current.cpp = t / 1000;
-    setLoading(false);
+      setSpans([]);
+      setTotalCycles(0);
+      setSynthetic(true);
+      setLoading(false);
     })();
     return () => { cancelled = true; };
   }, [theme.mode]);
@@ -613,6 +532,23 @@ export function FlameGraph() {
     <div className="w-full h-full flex flex-col relative" style={{ background: theme.bgPanel }}>
       <div className="flex items-center px-3 gap-3 shrink-0" style={{ height: 30, borderBottom: `1px solid ${theme.border}` }}>
         <span style={{ fontSize: 10, fontWeight: 700, color: theme.textMuted, letterSpacing: "0.05em" }}>FLAME GRAPH</span>
+        {synthetic && (
+          <span
+            aria-label="Synthetic fallback — no real trace loaded"
+            style={{
+              fontSize: 9,
+              fontWeight: 700,
+              letterSpacing: "0.04em",
+              padding: "1px 6px",
+              borderRadius: 3,
+              background: theme.error ? `${theme.error}22` : "#f5933320",
+              color: theme.error ?? "#f59e0b",
+              border: `1px solid ${theme.error ?? "#f59e0b"}55`,
+            }}
+            title="No .pccx trace is loaded — the panel below is an honest placeholder, not real data.">
+            (synthetic)
+          </span>
+        )}
         <button aria-label="Fit flame graph to viewport" onClick={() => { if(containerRef.current) { vp.current.offset=0; vp.current.cpp = totalCycles / containerRef.current.clientWidth; draw(); setAiAnalysis(null); } }} style={btnStyle} className="hover:opacity-80">Fit All</button>
         <button aria-label="Find dominant bottleneck" onClick={handleAIHotspot} style={{ ...btnStyle, background: theme.accent, color: "#fff", border: `1px solid ${theme.accent}`, display: "flex", alignItems: "center", gap: 4 }} className="hover:opacity-80">
            Find Bottleneck
@@ -686,6 +622,22 @@ export function FlameGraph() {
         onMouseMove={onMouseMove}
       >
         <canvas ref={canvasRef} className="absolute inset-0" />
+        {/* Empty-state overlay — rendered only when no trace is loaded.
+            R-4 T-3 replaces the old Gemma 3N literal demo tree with an
+            honest placeholder so users never mistake the fallback for
+            a real run. */}
+        {synthetic && !loading && spans.length === 0 && (
+          <div
+            className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none"
+            style={{ color: theme.textMuted, gap: 6 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.05em" }}>
+              no trace loaded · (synthetic)
+            </div>
+            <div style={{ fontSize: 10, color: theme.textFaint }}>
+              Open a <code style={{ fontFamily: "monospace" }}>.pccx</code> file to populate the flame graph.
+            </div>
+          </div>
+        )}
         {tooltip && (
           <div className="absolute z-50 pointer-events-none rounded px-2 py-1.5 shadow-xl transition-all" style={{
             left: tooltip.x, top: tooltip.y, fontSize: 10, whiteSpace: "pre",
