@@ -20,6 +20,10 @@ struct AppState {
     pub license_token: Mutex<Option<LicenseToken>>,
     /// Cached trace for analytics commands (deserialized from pccx payload).
     pub trace: Mutex<Option<NpuTrace>>,
+    /// Second trace slot for FlameGraph Compare-run (Gregg IEEE SW 2018
+    /// differential flame-graph contract).  Populated by `load_pccx_alt`
+    /// and consumed by `fetch_trace_payload_b`.
+    pub trace_b: Mutex<Option<NpuTrace>>,
 }
 
 // ─── Tauri Commands ───────────────────────────────────────────────────────────
@@ -86,6 +90,40 @@ fn validate_license(token: String, state: State<'_, AppState>) -> Result<serde_j
 async fn fetch_trace_payload(state: State<'_, AppState>) -> Result<Vec<u8>, String> {
     let buf = state.trace_flat_buffer.lock().unwrap().clone();
     Ok(buf)
+}
+
+/// Loads a second `.pccx` file into the `trace_b` slot so the FlameGraph
+/// can render a deterministic differential view (Gregg IEEE SW 2018 §III-D).
+/// Does not touch the primary trace nor the flat buffer.
+#[tauri::command]
+fn load_pccx_alt(path: String, state: State<'_, AppState>) -> Result<PccxHeader, String> {
+    let mut file = File::open(&path).map_err(|e| format!("Cannot open '{}': {}", path, e))?;
+    let pccx = PccxFile::read(&mut file).map_err(|e| e.to_string())?;
+
+    if pccx.header.payload.encoding == "bincode" {
+        let trace = NpuTrace::from_payload(&pccx.payload)
+            .map_err(|e| format!("Payload decode error: {}", e))?;
+        *state.trace_b.lock().unwrap() = Some(trace);
+    } else {
+        return Err(format!(
+            "Unsupported payload encoding '{}' for compare trace",
+            pccx.header.payload.encoding
+        ));
+    }
+    Ok(pccx.header)
+}
+
+/// Returns the flat 24-byte-struct buffer for the second trace, or an
+/// error if `load_pccx_alt` has not been called yet.  The UI turns
+/// that error into the `VerificationSuite.tsx:149-155` placeholder
+/// empty-state rather than any synthetic fallback.
+#[tauri::command]
+async fn fetch_trace_payload_b(state: State<'_, AppState>) -> Result<Vec<u8>, String> {
+    let guard = state.trace_b.lock().unwrap();
+    match guard.as_ref() {
+        Some(trace) => Ok(trace.to_flat_buffer()),
+        None => Err("No compare trace loaded — call load_pccx_alt first".into()),
+    }
 }
 
 /// Returns per-core utilisation percentages as a JSON array of {core_id, util} objects.
@@ -399,26 +437,22 @@ fn validate_isa_trace(
         .map_err(|e| format!("Cannot read ISA commit log '{}': {}", path, e))
 }
 
-/// Returns one row per distinct `uca_*` driver surface call.
-/// Populated from the cached trace when present — currently an
-/// `API_CALL`-tagged event kind is not produced by the v002
-/// generator so we fall through to the synthetic fallback ring
-/// (which replays the canonical 8-call warm-up sequence).  Once
-/// the trace format grows an `API_CALL` variant this command
-/// will read it directly and the fallback becomes a zero-trace
-/// only path.
+/// Returns one row per distinct `uca_*` driver-surface call, sourced
+/// **exclusively** from the cached `.pccx` event stream via
+/// `api_ring::list_from_trace`. Round-3 T-1: the synthetic literal
+/// fallback has been removed — when no trace is loaded or the trace
+/// carries zero `API_CALL` events we surface an empty Vec and the
+/// UI's empty-state branch runs (Yuan OSDI 2014 loud-fallback).
 #[tauri::command]
 fn list_api_calls(
     state: State<'_, AppState>,
 ) -> Result<Vec<pccx_core::api_ring::ApiCall>, String> {
-    // The v002 generator does not emit `API_CALL` events yet, so we
-    // return the synthetic-fallback rows — this is honest: the same
-    // deterministic 8 rows the driver README cites for the KV260
-    // reference, not hand-carried UI literals.  Once the trace
-    // format grows an `API_CALL` variant, read `state.trace` and
-    // replay it through an `ApiRing` here.
-    drop(state.trace.lock().unwrap());
-    Ok(pccx_core::api_ring::synthetic_fallback())
+    let trace_guard = state.trace.lock().unwrap();
+    let Some(trace) = trace_guard.as_ref() else {
+        // No trace cached — match `VerificationSuite.tsx:449` empty state.
+        return Ok(Vec::new());
+    };
+    Ok(pccx_core::api_ring::list_from_trace(trace))
 }
 
 /// Lists every `.pccx` file under the sibling pccx-FPGA repo's
@@ -577,6 +611,7 @@ pub fn run() {
             trace_flat_buffer: Mutex::new(Vec::new()),
             license_token: Mutex::new(None),
             trace: Mutex::new(None),
+            trace_b: Mutex::new(None),
         })
         .invoke_handler(tauri::generate_handler![
             load_pccx,
@@ -584,6 +619,8 @@ pub fn run() {
             get_license_info,
             validate_license,
             fetch_trace_payload,
+            load_pccx_alt,
+            fetch_trace_payload_b,
             get_core_utilisation,
             compress_trace_context,
             generate_uvm_sequence_cmd,
