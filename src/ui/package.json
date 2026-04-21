@@ -19,6 +19,7 @@
     "@xyflow/react": "^12.10.2",
     "echarts": "^6.0.0",
     "echarts-for-react": "^3.0.6",
+    "elkjs": "^0.9.3",
     "lucide-react": "^1.8.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

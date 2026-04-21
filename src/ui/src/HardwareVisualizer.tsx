@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useTheme } from "./ThemeContext";
 import { Play, Pause, SkipForward, SkipBack, RotateCcw, Cpu, ChevronRight, ChevronDown, Search } from "lucide-react";
+import ELK, { type ElkNode, type ElkExtendedEdge } from "elkjs/lib/elk.bundled.js";
+import { invoke } from "@tauri-apps/api/core";
 
 /* ─────────────────────────────────────────────────────────────────────────
  * pccx v002 KV260 module hierarchy.
@@ -163,6 +165,117 @@ function stateColor(s: UnitState, t: ReturnType<typeof useTheme>): string {
   return t.borderDim;
 }
 
+/* ─── Block-diagram topology (node-id only; coords come from ELK) ────
+ * Per Schulze/Spönemann/von Hanxleden ACM TOCHI 2014 (doi:10.1145/2629477)
+ * and Gansner/Koutsofios/North/Vo IEEE TSE 1993, the four-phase layered
+ * algorithm produces stable positions from structure alone. Sizes are
+ * kind-driven (control lanes narrow, cores tall). Edges carry the
+ * `event_type` id they belong to so trace events can light them up.  */
+
+// Event type IDs must match `src/core/src/trace.rs::event_type_id`.
+const EV_MAC_COMPUTE    = 1;
+const EV_DMA_READ       = 2;
+const EV_DMA_WRITE      = 3;
+const EV_SYSTOLIC_STALL = 4;
+const EV_BARRIER_SYNC   = 5;
+
+interface DiagramNode { id: string; w: number; h: number; }
+interface DiagramEdge {
+  from: string; to: string; label?: string;
+  eventTypes: number[];                  // trace-driven alive()
+  fallback: (c: number) => boolean;       // old literal range
+}
+
+const DIAGRAM_NODES: DiagramNode[] = [
+  { id: "Frontend",   w: 196, h: 46 },
+  { id: "Decoder",    w: 196, h: 40 },
+  { id: "Dispatcher", w: 196, h: 40 },
+  { id: "MAT_CORE",   w: 240, h: 96 },
+  { id: "VEC_CORE",   w: 240, h: 60 },
+  { id: "SFU",        w: 240, h: 60 },
+  { id: "MEM",        w: 240, h: 116 },
+  { id: "AXI",        w: 240, h: 80 },
+  { id: "HP0",        w: 64,  h: 24 },
+  { id: "HP1",        w: 64,  h: 24 },
+  { id: "HP2",        w: 64,  h: 24 },
+  { id: "AXIL",       w: 64,  h: 24 },
+];
+
+const DIAGRAM_EDGES: DiagramEdge[] = [
+  { from: "Frontend",   to: "Decoder",    eventTypes: [EV_BARRIER_SYNC],              fallback: c => c >= 20 && c < 60 },
+  { from: "Decoder",    to: "Dispatcher", eventTypes: [EV_BARRIER_SYNC],              fallback: c => c >= 30 && c < 80 },
+  { from: "Dispatcher", to: "MAT_CORE",   eventTypes: [EV_MAC_COMPUTE, EV_SYSTOLIC_STALL], fallback: c => c >= 40 && c < 950 },
+  { from: "Dispatcher", to: "VEC_CORE",   eventTypes: [EV_BARRIER_SYNC],              fallback: c => c >= 400 && c < 600, label: "RoPE" },
+  { from: "Dispatcher", to: "SFU",        eventTypes: [EV_BARRIER_SYNC],              fallback: c => c >= 700 && c < 820, label: "softmax" },
+  { from: "Dispatcher", to: "MEM",        eventTypes: [EV_DMA_READ, EV_DMA_WRITE],    fallback: c => c >= 40 && c < 1024 },
+  { from: "MEM",        to: "MAT_CORE",   eventTypes: [EV_DMA_READ],                  fallback: c => c >= 60 && c < 900, label: "weight/fmap" },
+  { from: "MAT_CORE",   to: "MEM",        eventTypes: [EV_DMA_WRITE],                 fallback: c => c >= 950 && c < 1024, label: "result" },
+  { from: "MEM",        to: "AXI",        eventTypes: [EV_DMA_READ, EV_DMA_WRITE],    fallback: c => c >= 0 && c < 1024 },
+  { from: "AXI",        to: "HP0",        eventTypes: [EV_DMA_READ],                  fallback: c => c >= 0 && c < 900 },
+  { from: "AXI",        to: "HP1",        eventTypes: [EV_DMA_READ, EV_DMA_WRITE],    fallback: c => c >= 60 && c < 1024 },
+  { from: "AXI",        to: "HP2",        eventTypes: [EV_DMA_WRITE],                 fallback: c => c >= 950 && c < 1024 },
+  { from: "AXI",        to: "AXIL",       eventTypes: [EV_BARRIER_SYNC],              fallback: c => c >= 0 && c < 30 },
+];
+
+/** ELK-layered graph factory. Uses algorithm=layered + FIXED_SIDE ports
+ * (Schulze 2014) so AXI-HP / ACP pins stay on the right side mirroring
+ * AMD UG904 device-view convention. */
+function buildElkGraph(viewportW: number, viewportH: number): ElkNode {
+  const children: ElkNode[] = DIAGRAM_NODES.map(n => ({
+    id: n.id, width: n.w, height: n.h,
+  }));
+  const edges: ElkExtendedEdge[] = DIAGRAM_EDGES.map((e, i) => ({
+    id: `e${i}`, sources: [e.from], targets: [e.to],
+  }));
+  return {
+    id: "root",
+    layoutOptions: {
+      "elk.algorithm": "layered",
+      "elk.direction": "RIGHT",
+      "elk.layered.spacing.nodeNodeBetweenLayers": "56",
+      "elk.spacing.nodeNode": "18",
+      "elk.padding": "[top=26,left=20,bottom=20,right=20]",
+      "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+      "elk.layered.crossingMinimization.strategy": "LAYER_SWEEP",
+      "elk.aspectRatio": String(Math.max(1, viewportW / Math.max(1, viewportH))),
+    },
+    children, edges,
+  };
+}
+
+// Minimal trace event shape; mirrors FlameGraph parser.
+interface TraceEv { coreId: number; startCycle: number; duration: number; typeId: number; }
+
+function parseTraceFlat(buf: Uint8Array): TraceEv[] {
+  const out: TraceEv[] = [];
+  const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  const stride = 24;
+  for (let off = 0; off + stride <= buf.byteLength; off += stride) {
+    out.push({
+      coreId:     view.getUint32(off, true),
+      startCycle: Number(view.getBigUint64(off + 4, true)),
+      duration:   Number(view.getBigUint64(off + 12, true)),
+      typeId:     view.getUint32(off + 20, true),
+    });
+  }
+  return out;
+}
+
+/** Trace-driven alive(): edge lights up when an event of a matching
+ * `typeId` is within [cycle-16, cycle+16]. Falls back to the literal
+ * cycle window when no trace has loaded. */
+function edgeAlive(edge: DiagramEdge, cycle: number, events: TraceEv[]): boolean {
+  if (events.length === 0) return edge.fallback(cycle);
+  const lo = cycle - 16, hi = cycle + 16;
+  const wanted = edge.eventTypes;
+  for (const ev of events) {
+    if (!wanted.includes(ev.typeId)) continue;
+    const s = ev.startCycle, e = ev.startCycle + ev.duration;
+    if (e >= lo && s <= hi) return true;
+  }
+  return false;
+}
+
 /* ─── Flatten helpers ──────────────────────────────────────────────── */
 
 function walk(m: Module, depth: number, out: { m: Module; depth: number }[]) {
@@ -180,6 +293,10 @@ export function HardwareVisualizer() {
   const [cycle,    setCycle]    = useState(500);
   const [playing,  setPlaying]  = useState(true);
   const [speed,    setSpeed]    = useState(1);
+  // ELK-computed node rectangles.  Populated on mount + on resize.
+  const [layout, setLayout] = useState<Record<string, { x: number; y: number; w: number; h: number }>>({});
+  // Trace events (drives edgeAlive); empty → edges fall back to cycle ranges.
+  const [traceEvents, setTraceEvents] = useState<TraceEv[]>([]);
 
   // Auto-advance
   useEffect(() => {
@@ -210,7 +327,54 @@ export function HardwareVisualizer() {
   const selectedMod = useMemo(() => flat.find(n => n.m.id === selected)?.m ?? HIERARCHY, [flat, selected]);
   const selState = stateAtCycle(selected, cycle);
 
-  /* ─── Block-diagram canvas ────────────────────────────────────── */
+  /* ─── Trace events (once on mount) ───────────────────────────── */
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const payload = await invoke<Uint8Array>("fetch_trace_payload");
+        const bytes = payload instanceof Uint8Array ? payload : new Uint8Array(payload as ArrayBufferLike);
+        if (bytes.byteLength >= 24 && !cancelled) {
+          setTraceEvents(parseTraceFlat(bytes));
+        }
+      } catch { /* keep empty; edges fall back to literal cycle windows */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  /* ─── ELK auto-layout (mount + resize) ─────────────────────────
+   * Builds a `layered` graph from DIAGRAM_NODES/EDGES and stores the
+   * computed x/y/w/h per id. On throw we keep the last successful
+   * layout (empty → draw cycle pauses gracefully).  */
+  useEffect(() => {
+    const wrap = containerRef.current;
+    if (!wrap) return;
+    const elk = new ELK();
+
+    const runLayout = async () => {
+      const rect = wrap.getBoundingClientRect();
+      if (rect.width < 2 || rect.height < 2) return;
+      const graph = buildElkGraph(rect.width, rect.height);
+      try {
+        const res = await elk.layout(graph);
+        const next: Record<string, { x: number; y: number; w: number; h: number }> = {};
+        for (const c of res.children ?? []) {
+          next[c.id] = {
+            x: c.x ?? 0, y: c.y ?? 0,
+            w: c.width ?? 100, h: c.height ?? 40,
+          };
+        }
+        setLayout(next);
+      } catch { /* keep previous layout on error */ }
+    };
+
+    runLayout();
+    const ro = new ResizeObserver(() => { runLayout(); });
+    ro.observe(wrap);
+    return () => ro.disconnect();
+  }, []);
+
+  /* ─── Block-diagram canvas (redraws on layout / cycle / theme) ── */
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -227,67 +391,19 @@ export function HardwareVisualizer() {
     ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, rect.width, rect.height);
 
-    // Layout: 3-column swim lanes — Frontend | Cores | MEM+AXI
-    const LANES = [
-      { x: 20,   w: 220, title: "Control" },
-      { x: 260,  w: 380, title: "Compute" },
-      { x: 660,  w: rect.width - 680, title: "Memory / IO" },
-    ];
+    // If ELK hasn't populated yet, show a spinner-equivalent hint.
+    if (Object.keys(layout).length === 0) {
+      ctx.fillStyle = theme.textMuted;
+      ctx.font = "10px Inter, sans-serif";
+      ctx.fillText("ELK auto-layout pending…", 16, 22);
+      return;
+    }
 
-    // Draw lane headers
-    ctx.font = "10px Inter, sans-serif";
-    ctx.fillStyle = theme.textMuted;
-    LANES.forEach(l => {
-      ctx.fillText(l.title.toUpperCase(), l.x + 8, 14);
-      ctx.strokeStyle = theme.borderDim;
-      ctx.setLineDash([2, 3]);
-      ctx.beginPath();
-      ctx.moveTo(l.x + l.w + 10, 0);
-      ctx.lineTo(l.x + l.w + 10, rect.height);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    });
-
-    // Module placements
-    const placement: Record<string, { x: number; y: number; w: number; h: number }> = {
-      "Frontend":   { x: 32,  y: 32,  w: 196, h: 46 },
-      "Decoder":    { x: 32,  y: 92,  w: 196, h: 40 },
-      "Dispatcher": { x: 32,  y: 146, w: 196, h: 40 },
-
-      "MAT_CORE":   { x: 272, y: 32,  w: 240, h: 96 },
-      "VEC_CORE":   { x: 272, y: 142, w: 240, h: 60 },
-      "SFU":        { x: 272, y: 216, w: 240, h: 60 },
-
-      "MEM":        { x: 672, y: 32,  w: 240, h: 116 },
-      "AXI":        { x: 672, y: 160, w: 240, h: 80 },
-      "HP0":        { x: 922, y: 32,  w: 64,  h: 24 },
-      "HP1":        { x: 922, y: 60,  w: 64,  h: 24 },
-      "HP2":        { x: 922, y: 88,  w: 64,  h: 24 },
-      "AXIL":       { x: 922, y: 116, w: 64,  h: 24 },
-    };
-
-    // Connections (cycle-live — colour by current traffic)
-    const edges: { from: string; to: string; label?: string; alive: (c: number) => boolean }[] = [
-      { from: "Frontend",   to: "Decoder",    alive: c => c >= 20 && c < 60 },
-      { from: "Decoder",    to: "Dispatcher", alive: c => c >= 30 && c < 80 },
-      { from: "Dispatcher", to: "MAT_CORE",   alive: c => c >= 40 && c < 950 },
-      { from: "Dispatcher", to: "VEC_CORE",   alive: c => c >= 400 && c < 600, label: "RoPE" },
-      { from: "Dispatcher", to: "SFU",        alive: c => c >= 700 && c < 820, label: "softmax" },
-      { from: "Dispatcher", to: "MEM",        alive: c => c >= 40 && c < 1024 },
-      { from: "MEM",        to: "MAT_CORE",   alive: c => c >= 60 && c < 900, label: "weight/fmap" },
-      { from: "MAT_CORE",   to: "MEM",        alive: c => c >= 950 && c < 1024, label: "result" },
-      { from: "MEM",        to: "AXI",        alive: c => c >= 0 && c < 1024 },
-      { from: "AXI",        to: "HP0",        alive: c => c >= 0 && c < 900 },
-      { from: "AXI",        to: "HP1",        alive: c => c >= 60 && c < 1024 },
-      { from: "AXI",        to: "HP2",        alive: c => c >= 950 && c < 1024 },
-      { from: "AXI",        to: "AXIL",       alive: c => c >= 0 && c < 30 },
-    ];
-
-    // Draw edges first
-    for (const e of edges) {
-      const a = placement[e.from]; const b = placement[e.to];
+    // Draw edges first — use ELK-computed coordinates.
+    for (const e of DIAGRAM_EDGES) {
+      const a = layout[e.from]; const b = layout[e.to];
       if (!a || !b) continue;
-      const active = e.alive(cycle);
+      const active = edgeAlive(e, cycle, traceEvents);
       ctx.strokeStyle = active ? theme.accent : theme.borderDim;
       ctx.lineWidth = active ? 2 : 1;
       ctx.setLineDash(active ? [] : [3, 3]);
@@ -322,7 +438,7 @@ export function HardwareVisualizer() {
     // Draw modules
     ctx.font = "11px Inter, sans-serif";
     ctx.textBaseline = "middle";
-    for (const [id, p] of Object.entries(placement)) {
+    for (const [id, p] of Object.entries(layout)) {
       const state = stateAtCycle(id, cycle);
       const mod = flat.find(n => n.m.id === id)?.m;
       const baseColor = mod ? KIND_COLOR[mod.kind] : theme.borderDim;
@@ -372,7 +488,7 @@ export function HardwareVisualizer() {
     ctx.fillStyle = theme.textMuted;
     ctx.font = "10px ui-monospace, monospace";
     ctx.fillText(`cycle ${cycle}`, rect.width - 90, rect.height - 10);
-  }, [cycle, theme, selected, flat]);
+  }, [cycle, theme, selected, flat, layout, traceEvents]);
 
   return (
     <div className="w-full h-full flex flex-col" style={{ background: theme.bgPanel }}>
