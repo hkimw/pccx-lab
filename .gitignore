@@ -41,6 +41,8 @@ imgui.ini
 .claudesignore
 .gemini/
 pccx-lab-bootstrap-task.md
+CLAUDE.md
+AGENTS.md
 
 # ─── Local reference material (external project mirrors, PDFs, etc.) ───
 reference_to_cheet/
