@@ -224,8 +224,8 @@ export function MemoryDump() {
   };
 
   return (
-    <div className="w-full h-full flex flex-col overflow-hidden" style={{ background: theme.bg }}>
-      <div className="flex items-center px-3 shrink-0 gap-3"
+    <main role="main" aria-label="Memory dump" className="w-full h-full flex flex-col overflow-hidden" style={{ background: theme.bg }}>
+      <div role="toolbar" aria-label="Memory dump toolbar" className="flex items-center px-3 shrink-0 gap-3"
            style={{ height: 44, borderBottom: `1px solid ${theme.border}`, background: theme.bgEditor }}>
         <Database size={15} style={{ color: theme.accent }} />
         <span style={{ fontWeight: 700, fontSize: 13 }}>Memory Dump</span>
@@ -264,7 +264,7 @@ export function MemoryDump() {
               color: theme.text,
             }}
           />
-          <button onClick={tryJump} style={{
+          <button aria-label="Jump to address" onClick={tryJump} style={{
             fontSize: 10, padding: "1px 8px", borderRadius: 3,
             background: theme.accent, color: "#fff", border: "none", cursor: "pointer",
           }}>Go</button>
@@ -332,7 +332,7 @@ export function MemoryDump() {
                          display: "flex", alignItems: "center" }}>
             <span>Watches</span>
             <span className="flex-1" />
-            <button onClick={addWatch} title="Add current cursor as watch" style={{
+            <button aria-label="Pin current cursor as watch" onClick={addWatch} title="Add current cursor as watch" style={{
               fontSize: 9, padding: "1px 7px", borderRadius: 3,
               background: "transparent", color: theme.accent,
               border: `1px solid ${theme.accent}`, cursor: "pointer",
@@ -355,7 +355,7 @@ export function MemoryDump() {
                       color: theme.text, border: "none", outline: "none", fontWeight: 600,
                     }}
                   />
-                  <button onClick={() => removeWatch(w.id)} style={{
+                  <button aria-label={`Remove watch ${w.label}`} onClick={() => removeWatch(w.id)} style={{
                     fontSize: 9, background: "transparent", border: "none",
                     color: theme.textFaint, cursor: "pointer", padding: 0,
                   }}>✕</button>
@@ -469,6 +469,6 @@ export function MemoryDump() {
           {highlight && search && ` · ${rows.filter(searchMatches).length} rows match '${highlight}'`}
         </span>
       </div>
-    </div>
+    </main>
   );
 }

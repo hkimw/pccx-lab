@@ -111,6 +111,7 @@ function buildMenus(act: (a: string) => () => void): Menu[] {
     ]},
     { label: "Help", items: [
       { label: "Documentation",       shortcut: "F1",           action: act("help.docs") },
+      { label: "Keyboard Shortcuts",  shortcut: "?",            action: act("help.shortcuts") },
       { label: ".pccx Format Spec",                             action: act("help.format") },
       { label: "DPI-C API Reference",                           action: act("help.dpic") },
       { separator: true, label: "" },
@@ -125,12 +126,12 @@ function buildMenus(act: (a: string) => () => void): Menu[] {
 function Dropdown({ menu, onClose }: { menu: Menu; onClose: () => void }) {
   const theme = useTheme();
   return (
-    <div className="absolute top-full left-0 z-50 min-w-[230px] py-1 rounded-sm shadow-2xl"
+    <div role="menu" aria-label={`${menu.label} menu`} className="absolute top-full left-0 z-50 min-w-[230px] py-1 rounded-sm shadow-2xl"
       style={{ background: theme.bgSurface, border: `1px solid ${theme.border}` }}>
       {menu.items.map((item, i) => {
-        if (item.separator) return <div key={i} className="my-1" style={{ borderTop: `1px solid ${theme.borderDim}` }} />;
+        if (item.separator) return <div key={i} role="separator" className="my-1" style={{ borderTop: `1px solid ${theme.borderDim}` }} />;
         return (
-          <button key={i} disabled={item.disabled} onClick={() => { item.action?.(); onClose(); }}
+          <button key={i} role="menuitem" aria-label={item.label} aria-disabled={item.disabled} disabled={item.disabled} onClick={() => { item.action?.(); onClose(); }}
             style={{ width: "100%", textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "5px 16px", fontSize: 11,
               color: item.disabled ? theme.textFaint : theme.text, cursor: item.disabled ? "not-allowed" : "pointer",
               background: "transparent", border: "none" }}
@@ -162,10 +163,15 @@ export function MenuBar({ onAction }: MenuBarProps) {
   }, []);
 
   return (
-    <div ref={barRef} className="flex items-center" style={{ pointerEvents: "all" }}>
+    <div ref={barRef} role="menubar" aria-label="Application menu" className="flex items-center" style={{ pointerEvents: "all" }}>
       {menus.map(m => (
         <div key={m.label} className="relative">
-          <button onClick={() => setOpenMenu(openMenu === m.label ? null : m.label)}
+          <button
+            role="menuitem"
+            aria-label={`${m.label} menu`}
+            aria-haspopup="menu"
+            aria-expanded={openMenu === m.label}
+            onClick={() => setOpenMenu(openMenu === m.label ? null : m.label)}
             onMouseEnter={() => { if (openMenu) setOpenMenu(m.label); }}
             style={{
               padding: "0 12px", height: 36, fontSize: 11, fontWeight: 500,

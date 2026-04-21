@@ -26,6 +26,7 @@ import { Roofline }          from "./Roofline";
 import { BottomPanel }       from "./BottomPanel";
 import { ScenarioFlow }      from "./ScenarioFlow";
 import { TestbenchAuthor }   from "./TestbenchAuthor";
+import { ShortcutHelp, useShortcutHelp } from "./useShortcuts";
 
 import { Badge, Button, Flex, TextField } from "@radix-ui/themes";
 import {
@@ -95,6 +96,7 @@ function AppInner() {
   const [bottomVisible, setBottomVisible]   = useState(true);
   const [bottomDock, setBottomDock]         = useState<"left" | "right" | "bottom">(() => (localStorage.getItem("pccx-bottom-dock") as any) || "bottom");
   const [cmdPaletteOpen, setCmdPaletteOpen] = useState(false);
+  const shortcutHelp = useShortcutHelp();
 
   // Persist dock choices
   useEffect(() => { localStorage.setItem("pccx-copilot-dock", copilotDock); }, [copilotDock]);
@@ -116,11 +118,11 @@ function AppInner() {
           {copilotBusy && <span style={{ fontSize: 9, color: theme.accent }} className="animate-pulse">thinking…</span>}
           <div className="flex-1" />
           <div className="flex gap-0.5 mr-2" style={{ opacity: 0.7 }}>
-             <button onClick={() => setCopilotDock("left")}   title="Dock Left"   style={dockBtn(copilotDock === "left")}  ><PanelLeftClose size={12}/></button>
-             <button onClick={() => setCopilotDock("bottom")} title="Dock Bottom" style={dockBtn(copilotDock === "bottom")}><PanelBottomClose size={12}/></button>
-             <button onClick={() => setCopilotDock("right")}  title="Dock Right"  style={dockBtn(copilotDock === "right")} ><PanelRightClose size={12}/></button>
+             <button aria-label="Dock Copilot left"   onClick={() => setCopilotDock("left")}   title="Dock Left"   style={dockBtn(copilotDock === "left")}  ><PanelLeftClose size={12}/></button>
+             <button aria-label="Dock Copilot bottom" onClick={() => setCopilotDock("bottom")} title="Dock Bottom" style={dockBtn(copilotDock === "bottom")}><PanelBottomClose size={12}/></button>
+             <button aria-label="Dock Copilot right"  onClick={() => setCopilotDock("right")}  title="Dock Right"  style={dockBtn(copilotDock === "right")} ><PanelRightClose size={12}/></button>
           </div>
-          <button onClick={() => setCopilotVisible(false)} style={{ fontSize: 11, color: theme.textMuted, cursor: "pointer", padding: "2px 4px" }} title="Close">X</button>
+          <button aria-label="Close Copilot panel" onClick={() => setCopilotVisible(false)} style={{ fontSize: 11, color: theme.textMuted, cursor: "pointer", padding: "2px 4px" }} title="Close">X</button>
         </div>
 
         <div className="flex px-3 pb-2 pt-2 gap-2 shrink-0" style={{ borderBottom: `1px solid ${border}`, background: theme.bgHover }}>
@@ -252,6 +254,7 @@ function AppInner() {
       case "help.about":
         addMsg("system", "pccx-lab v0.4.0 — NPU Architecture Profiler\nLicense: Apache 2.0\nModules: core · ui · ai_copilot · uvm_bridge");
         break;
+      case "help.shortcuts": shortcutHelp.setOpen(true); break;
       default: addMsg("system", `[${action}] — Coming soon`);
     }
   };
@@ -332,12 +335,13 @@ function AppInner() {
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden select-none" style={{ background: bg, color: theme.text }}>
       <CommandPalette open={cmdPaletteOpen} setOpen={setCmdPaletteOpen} onAction={handleMenuAction} />
+      <ShortcutHelp open={shortcutHelp.open} onClose={() => shortcutHelp.setOpen(false)} />
       
       {/* Title + Menu */}
       <TitleBar subtitle={header?.trace?.cycles ? `${header.trace.cycles.toLocaleString()} cycles` : undefined}>
         <MenuBar onAction={handleMenuAction} />
         <div className="flex-1" />
-        <button onClick={theme.toggle} className="mr-2 p-1 rounded hover:bg-white/10 transition-colors" title={isDark ? "Light mode" : "Dark mode"}>
+        <button aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"} onClick={theme.toggle} className="mr-2 p-1 rounded hover:bg-white/10 transition-colors" title={isDark ? "Light mode" : "Dark mode"}>
           {isDark ? <Sun size={13} className="text-yellow-400" /> : <Moon size={13} className="text-gray-600" />}
         </button>
       </TitleBar>
@@ -399,12 +403,12 @@ function AppInner() {
                         </button>
                       ))}
                       <div className="flex-1" />
-                      <button title="IPC Benchmark" onClick={handleTestIPC}
+                      <button aria-label="Run IPC benchmark" title="IPC Benchmark" onClick={handleTestIPC}
                         className="px-2 h-full flex items-center justify-center transition-colors"
                         style={{ color: theme.warning }}>
                         <Zap size={13} />
                       </button>
-                      <button title="AI Copilot" onClick={() => setCopilotVisible(v => !v)}
+                      <button aria-label="Toggle AI Copilot panel" title="AI Copilot" onClick={() => setCopilotVisible(v => !v)}
                         className="px-2 h-full flex items-center justify-center transition-colors"
                         style={{ color: copilotVisible ? theme.accent : theme.textMuted }}>
                         <MessageSquare size={13} />
@@ -481,14 +485,14 @@ function AppInner() {
         })()}
 
         {/* Right Activity Bar (VS Code Secondary Side Bar style) */}
-        <div style={{ width: 42, background: theme.bgPanel, borderLeft: `1px solid ${theme.border}`, display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 8, gap: 6, zIndex: 10 }}>
-          <button onClick={() => setCopilotVisible(v => !v)} title="AI Copilot" style={{ padding: 6, borderRadius: 4, cursor: "pointer", background: copilotVisible ? theme.bgHover : "transparent", transition: "all 0.15s" }}>
+        <aside role="toolbar" aria-label="Activity bar" aria-orientation="vertical" style={{ width: 42, background: theme.bgPanel, borderLeft: `1px solid ${theme.border}`, display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 8, gap: 6, zIndex: 10 }}>
+          <button aria-label="Toggle AI Copilot panel" onClick={() => setCopilotVisible(v => !v)} title="AI Copilot" style={{ padding: 6, borderRadius: 4, cursor: "pointer", background: copilotVisible ? theme.bgHover : "transparent", transition: "all 0.15s" }}>
             <BrainCircuit size={18} color={copilotVisible ? theme.accent : theme.textMuted} />
           </button>
-          <button onClick={() => setBottomVisible(v => !v)} title="Live Telemetry" style={{ padding: 6, borderRadius: 4, cursor: "pointer", background: bottomVisible ? theme.bgHover : "transparent", transition: "all 0.15s" }}>
+          <button aria-label="Toggle live telemetry panel" onClick={() => setBottomVisible(v => !v)} title="Live Telemetry" style={{ padding: 6, borderRadius: 4, cursor: "pointer", background: bottomVisible ? theme.bgHover : "transparent", transition: "all 0.15s" }}>
             <Activity size={18} color={bottomVisible ? theme.success : theme.textMuted} />
           </button>
-        </div>
+        </aside>
       </div>
 
       {/* Status Bar */}

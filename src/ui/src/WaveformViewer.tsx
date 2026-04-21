@@ -831,9 +831,9 @@ export function WaveformViewer() {
   const signalCount = groups.reduce((n, g) => n + g.children.length, 0);
 
   return (
-    <div className="w-full h-full flex flex-col" style={{ background: theme.bgPanel }}>
+    <main role="main" aria-label="Waveform viewer" className="w-full h-full flex flex-col" style={{ background: theme.bgPanel }}>
       {/* Top toolbar */}
-      <div className="flex items-center px-3 shrink-0 gap-2"
+      <div role="toolbar" aria-label="Waveform toolbar" className="flex items-center px-3 shrink-0 gap-2"
            style={{ height: 44, borderBottom: `1px solid ${theme.border}`, background: theme.bgEditor }}>
         <Activity size={15} style={{ color: theme.accent }} />
         <span style={{ fontSize: 13, fontWeight: 700, color: theme.text }}>Waveform Analyser</span>
@@ -863,7 +863,7 @@ export function WaveformViewer() {
             }}
           />
           {filter && (
-            <button onClick={() => setFilter("")} style={{ background: "transparent", border: "none", cursor: "pointer", color: theme.textMuted, padding: 0 }}>
+            <button aria-label="Clear signal filter" onClick={() => setFilter("")} style={{ background: "transparent", border: "none", cursor: "pointer", color: theme.textMuted, padding: 0 }}>
               <X size={10} />
             </button>
           )}
@@ -889,16 +889,16 @@ export function WaveformViewer() {
         <button onClick={handleOpenVcd} style={iconBtn(theme)} title="Open .vcd file (File ▸ Open VCD)">
           Open VCD
         </button>
-        <button onClick={() => setZoom(z => Math.min(60, z * 1.3))} style={iconBtn(theme)}>
+        <button aria-label="Zoom waveform in"  onClick={() => setZoom(z => Math.min(60, z * 1.3))} style={iconBtn(theme)}>
           <ZoomIn size={12} />
         </button>
-        <button onClick={() => setZoom(z => Math.max(0.25, z / 1.3))} style={iconBtn(theme)}>
+        <button aria-label="Zoom waveform out" onClick={() => setZoom(z => Math.max(0.25, z / 1.3))} style={iconBtn(theme)}>
           <ZoomOut size={12} />
         </button>
-        <button onClick={() => { setZoom(6); setOffset(0); }} style={iconBtn(theme)}>
+        <button aria-label="Fit waveform to viewport" onClick={() => { setZoom(6); setOffset(0); }} style={iconBtn(theme)}>
           <Maximize2 size={12} />
         </button>
-        <button style={iconBtn(theme)}>
+        <button aria-label="Download VCD" style={iconBtn(theme)}>
           <Download size={12} /> VCD
         </button>
       </div>
@@ -945,7 +945,7 @@ export function WaveformViewer() {
               {b.tick.toLocaleString()}
             </button>
           ))}
-          <button onClick={jumpNextBookmark} title="Ctrl+B" style={{ ...iconBtn(theme), padding: "1px 7px", flexShrink: 0 }}>next ▸</button>
+          <button aria-label="Jump to next bookmark (Ctrl+B)" onClick={jumpNextBookmark} title="Ctrl+B" style={{ ...iconBtn(theme), padding: "1px 7px", flexShrink: 0 }}>next ▸</button>
         </div>
       )}
 
@@ -1014,7 +1014,7 @@ export function WaveformViewer() {
       >
         <canvas ref={canvasRef} className="absolute inset-0" />
       </div>
-    </div>
+    </main>
   );
 }
 
