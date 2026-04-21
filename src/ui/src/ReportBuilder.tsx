@@ -330,7 +330,6 @@ function PreviewSection({ section, data }: { section: Section; data: any }) {
 
 export function ReportBuilder() {
   const theme = useTheme();
-  const isDark = theme.mode === "dark";
   const [sections, setSections] = useState(DEFAULT_SECTIONS);
   const [generating, setGenerating] = useState(false);
   const [generated, setGenerated]   = useState(false);
@@ -485,7 +484,7 @@ export function ReportBuilder() {
           </div>
 
           {/* Sections */}
-          {enabledSections.map((sec, i) => (
+          {enabledSections.map(sec => (
             <div key={sec.id} style={{ marginBottom: 24, padding: 16, background: cardBg, border: `1px solid ${border}`, borderRadius: 8 }}>
               <PreviewSection section={sec} data={{ ...traceData, coreUtils }} />
             </div>

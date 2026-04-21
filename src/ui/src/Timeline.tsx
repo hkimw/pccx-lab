@@ -378,9 +378,8 @@ export function Timeline() {
               border: `1px solid ${theme.border}`, borderRadius: 2, 
               outline: "none" 
             }} 
-            onChange={(e) => {
-               // In a real implementation this would trigger an event filter 
-               // For this UI mockup we just show the box interacting properly.
+            onChange={() => {
+               // Placeholder: a real event filter would wire a setFilter here.
             }}
           />
         </div>

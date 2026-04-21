@@ -2,13 +2,6 @@ import { useRef, useEffect, useCallback } from "react";
 import * as THREE from "three";
 import { invoke } from "@tauri-apps/api/core";
 
-// Event type IDs must match core/src/trace.rs event_type_id module
-const TYPE_MAC_COMPUTE    = 1;
-const TYPE_DMA_READ       = 2;
-const TYPE_DMA_WRITE      = 3;
-const TYPE_SYSTOLIC_STALL = 4;
-const TYPE_BARRIER_SYNC   = 5;
-
 // MAC array dimensions — must match HardwareModel::pccx_reference()
 const ROWS = 32;
 const COLS = 32;
