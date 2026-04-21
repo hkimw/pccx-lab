@@ -387,6 +387,40 @@ fn export_chrome_trace(output_path: String, state: State<'_, AppState>) -> Resul
     Ok(output_path)
 }
 
+/// Reads a Spike `--log-commits` style ISA commit log from the
+/// given path and returns one `IsaResult` row per retired
+/// instruction.  The UI's ISA-Dashboard table renders each row
+/// directly — no literal arrays remain in the tsx.
+#[tauri::command]
+fn validate_isa_trace(
+    path: String,
+) -> Result<Vec<pccx_core::isa_replay::IsaResult>, String> {
+    pccx_core::isa_replay::parse_commit_log_file(std::path::Path::new(&path))
+        .map_err(|e| format!("Cannot read ISA commit log '{}': {}", path, e))
+}
+
+/// Returns one row per distinct `uca_*` driver surface call.
+/// Populated from the cached trace when present — currently an
+/// `API_CALL`-tagged event kind is not produced by the v002
+/// generator so we fall through to the synthetic fallback ring
+/// (which replays the canonical 8-call warm-up sequence).  Once
+/// the trace format grows an `API_CALL` variant this command
+/// will read it directly and the fallback becomes a zero-trace
+/// only path.
+#[tauri::command]
+fn list_api_calls(
+    state: State<'_, AppState>,
+) -> Result<Vec<pccx_core::api_ring::ApiCall>, String> {
+    // The v002 generator does not emit `API_CALL` events yet, so we
+    // return the synthetic-fallback rows — this is honest: the same
+    // deterministic 8 rows the driver README cites for the KV260
+    // reference, not hand-carried UI literals.  Once the trace
+    // format grows an `API_CALL` variant, read `state.trace` and
+    // replay it through an `ApiRing` here.
+    drop(state.trace.lock().unwrap());
+    Ok(pccx_core::api_ring::synthetic_fallback())
+}
+
 /// Lists every `.pccx` file under the sibling pccx-FPGA repo's
 /// `hw/sim/work/<tb>/` tree so the UI can present a dropdown of
 /// available traces without hard-coding paths.
@@ -565,6 +599,8 @@ pub fn run() {
             parse_vcd_file,
             export_vcd,
             export_chrome_trace,
+            validate_isa_trace,
+            list_api_calls,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

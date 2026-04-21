@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useTheme } from "./ThemeContext";
-import { CheckCircle, AlertOctagon, TerminalSquare, ShieldCheck, Bug, Activity, Cpu } from "lucide-react";
+import { TerminalSquare, ShieldCheck, Bug, Activity, Cpu } from "lucide-react";
 import { SynthStatusCard } from "./SynthStatusCard";
 import { VerificationRunner } from "./VerificationRunner";
 import { RooflineCard } from "./RooflineCard";
@@ -30,49 +30,55 @@ const DEFAULT_TIMING_PATH =
 const DEFAULT_REPO_PATH =
   "../../../../pccx-FPGA-NPU-LLM-kv260";
 
+// Matches pccx_core::isa_replay::IsaResult.  The Tauri command
+// `validate_isa_trace(path)` populates this from a real Spike-style
+// commit log (no more literal arrays).
 interface IsaResult {
-  inst: string;
-  opcode: string;
-  expectedCyc: number;
-  actualCyc: number;
-  status: "PASS" | "FAIL" | "WARN";
-  decode: string;
+  inst:            string;
+  opcode:          string;
+  expected_cycles: number;
+  actual_cycles:   number;
+  status:          "PASS" | "FAIL" | "WARN";
+  decode:          string;
 }
 
-const DUMMY_ISA_RESULTS: IsaResult[] = [
-  { inst: "ld.tile.l2 [r3], brm_0", opcode: "0x8F", expectedCyc: 128, actualCyc: 128, status: "PASS", decode: "Load Tile from L2 mapping" },
-  { inst: "mac.arr.32x32 m_a, m_b", opcode: "0x4A", expectedCyc: 1024, actualCyc: 1024, status: "PASS", decode: "32x32 MAC Array Multiply-Accumulate" },
-  { inst: "dma.axi.burst 64, req_1", opcode: "0x11", expectedCyc: 64, actualCyc: 256, status: "FAIL", decode: "AXI Burst Memory Access (Stalled)" },
-  { inst: "sync.barrier tile_mask", opcode: "0x20", expectedCyc: 16, actualCyc: 18, status: "WARN", decode: "Tile Synchronization Barrier" },
-  { inst: "st.wb.ddr [r9], acc_z", opcode: "0x91", expectedCyc: 48, actualCyc: 48, status: "PASS", decode: "Store Write-Back to DDR" },
-];
+// Matches pccx_core::api_ring::ApiCall.  The Tauri command
+// `list_api_calls` populates this from a ring populated by the
+// cached trace's API boundary crossings (synthetic fallback when
+// no trace is loaded).
+interface ApiCall {
+  api:            string;
+  kind:           string;
+  p99_latency_ns: number;
+  drops:          number;
+  status:         "OK" | "WARN" | "FAIL";
+}
+
+// Default log path — override via explicit user action in the UI.
+// For now we ship no default; the panel shows an empty "no trace"
+// state and the user opens a file to populate.
+const DEFAULT_ISA_LOG_PATH = "";
 
 export function VerificationSuite() {
   const theme = useTheme();
   const [activeTab, setActiveTab] = useState<VerifyTab>("isa");
-  const [running, setRunning] = useState(false);
-  const [log, setLog] = useState<string[]>([]);
-  const isDark = theme.mode === "dark";
+  const [log,         setLog]         = useState<string[]>([]);
+  const [isaRows,     setIsaRows]     = useState<IsaResult[] | null>(null);
+  const [isaErr,      setIsaErr]      = useState<string | null>(null);
+  const [isaLogPath,  setIsaLogPath]  = useState<string>(DEFAULT_ISA_LOG_PATH);
 
-  const executeRegression = () => {
-    setRunning(true);
-    setLog(["[VERIFY] Initializing Regression Suite..."]);
-    let iter = 0;
-    const t = setInterval(() => {
-      iter++;
-      if (iter === 1) setLog(p => [...p, "[ISA] Decoding 500k instruction streams... OK"]);
-      if (iter === 2) setLog(p => [...p, "[API] Dispatching gRPC ping-pong to simulator... OK"]);
-      if (iter === 3) setLog(p => [...p, "[UVM] Parsing coverage database (vdb)... OK"]);
-      if (iter === 4) {
-        setLog(p => [...p, "[VERIFY] 1 Constraint Violation Detected!"]);
-        setRunning(false);
-        clearInterval(t);
-      }
-    }, 600);
-  };
+  // Kick off an ISA-log replay when a path is present.  Empty path
+  // keeps `isaRows === null` which renders the honest "no trace
+  // loaded" state rather than silently synthesising rows.
+  useEffect(() => {
+    if (!isaLogPath) { setIsaRows(null); setIsaErr(null); return; }
+    invoke<IsaResult[]>("validate_isa_trace", { path: isaLogPath })
+      .then((rows) => { setIsaRows(rows); setIsaErr(null); })
+      .catch((e)   => { setIsaRows(null); setIsaErr(String(e)); });
+  }, [isaLogPath]);
 
   const getStatusColor = (s: string) => {
-    if (s === "PASS") return theme.success;
+    if (s === "PASS" || s === "OK") return theme.success;
     if (s === "FAIL") return theme.error;
     return theme.warning;
   };
@@ -106,14 +112,22 @@ export function VerificationSuite() {
         </div>
 
         <div className="flex-1" />
-        <button
-           onClick={executeRegression}
-           disabled={running}
-           className="flex items-center gap-2 px-4 py-1.5 rounded text-xs font-semibold hover:opacity-80 transition-all disabled:opacity-50"
-           style={{ background: theme.success, color: "#fff" }}
-        >
-          {running ? "Running..." : "Run Regression Suite"}
-        </button>
+        {activeTab === "isa" && (
+          <input
+            type="text"
+            placeholder="ISA commit log path (e.g. hw/sim/work/tb_X/commit.log)"
+            value={isaLogPath}
+            onChange={(e) => setIsaLogPath(e.target.value)}
+            aria-label="ISA commit log path"
+            className="px-3 py-1.5 rounded text-xs font-mono"
+            style={{
+              width: 360,
+              background: theme.bg,
+              color: theme.text,
+              border: `1px solid ${theme.border}`,
+            }}
+          />
+        )}
       </div>
 
       {/* Main Content Area */}
@@ -127,34 +141,53 @@ export function VerificationSuite() {
                 <TerminalSquare size={16} /> ISA Cycle-Accurate Validation Matrix
               </h3>
               <div className="flex-1 rounded border overflow-hidden flex flex-col" style={{ borderColor: theme.border, background: theme.bgPanel }}>
-                <table className="w-full text-left" style={{ fontSize: 11, borderCollapse: "collapse" }}>
-                  <thead>
-                    <tr style={{ background: theme.bgSurface, borderBottom: `1px solid ${theme.border}`, color: theme.textDim }}>
-                      <th className="p-2">MNEMONIC</th>
-                      <th className="p-2">OPCODE</th>
-                      <th className="p-2">DECODE</th>
-                      <th className="p-2 text-right">EXP CYCLES</th>
-                      <th className="p-2 text-right">ACT CYCLES</th>
-                      <th className="p-2 text-center">STATUS</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {DUMMY_ISA_RESULTS.map((row, i) => (
-                      <tr key={i} style={{ borderBottom: `1px solid ${theme.borderDim}` }} >
-                        <td className="p-2 font-mono" style={{ color: theme.accent }}>{row.inst}</td>
-                        <td className="p-2 font-mono" style={{ color: theme.textMuted }}>{row.opcode}</td>
-                        <td className="p-2">{row.decode}</td>
-                        <td className="p-2 text-right">{row.expectedCyc}</td>
-                        <td className="p-2 text-right font-bold" style={{ color: row.expectedCyc !== row.actualCyc ? theme.error : theme.text }}>{row.actualCyc}</td>
-                        <td className="p-2 text-center">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold" style={{ background: `${getStatusColor(row.status)}22`, color: getStatusColor(row.status), border: `1px solid ${getStatusColor(row.status)}44` }}>
-                             {row.status}
-                          </span>
-                        </td>
+                {isaErr && (
+                  <div className="p-3 text-xs" style={{ color: theme.error }}>
+                    validate_isa_trace failed: {isaErr}
+                  </div>
+                )}
+                {!isaErr && !isaRows && (
+                  <div className="p-4 text-xs" style={{ color: theme.textMuted }}>
+                    No ISA commit log loaded. Paste a path to a Spike
+                    <code className="mx-1" style={{ color: theme.accent }}>--log-commits</code>
+                    file in the toolbar above to populate this table.
+                  </div>
+                )}
+                {!isaErr && isaRows && isaRows.length === 0 && (
+                  <div className="p-4 text-xs" style={{ color: theme.textMuted }}>
+                    Loaded log contains no parsable commit lines.
+                  </div>
+                )}
+                {!isaErr && isaRows && isaRows.length > 0 && (
+                  <table className="w-full text-left" style={{ fontSize: 11, borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr style={{ background: theme.bgSurface, borderBottom: `1px solid ${theme.border}`, color: theme.textDim }}>
+                        <th className="p-2">MNEMONIC</th>
+                        <th className="p-2">OPCODE</th>
+                        <th className="p-2">DECODE</th>
+                        <th className="p-2 text-right">EXP CYCLES</th>
+                        <th className="p-2 text-right">ACT CYCLES</th>
+                        <th className="p-2 text-center">STATUS</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {isaRows.map((row, i) => (
+                        <tr key={i} style={{ borderBottom: `1px solid ${theme.borderDim}` }} >
+                          <td className="p-2 font-mono" style={{ color: theme.accent }}>{row.inst}</td>
+                          <td className="p-2 font-mono" style={{ color: theme.textMuted }}>{row.opcode}</td>
+                          <td className="p-2">{row.decode}</td>
+                          <td className="p-2 text-right">{row.expected_cycles}</td>
+                          <td className="p-2 text-right font-bold" style={{ color: row.expected_cycles !== row.actual_cycles ? theme.error : theme.text }}>{row.actual_cycles}</td>
+                          <td className="p-2 text-center">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold" style={{ background: `${getStatusColor(row.status)}22`, color: getStatusColor(row.status), border: `1px solid ${getStatusColor(row.status)}44` }}>
+                               {row.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
             </div>
           )}
@@ -183,14 +216,21 @@ export function VerificationSuite() {
           )}
         </div>
 
-        {/* Verification Run Log */}
+        {/* Verification Run Log — reserved for real IPC-emitted
+            events (no timer-based fake content).  Populated when
+            `run_verification` / `validate_isa_trace` wiring lands. */}
         <div className="w-[300px] border-l flex flex-col" style={{ borderColor: theme.border, background: theme.bgPanel }}>
            <div className="p-3 border-b text-xs font-bold flex justify-between" style={{ borderColor: theme.border }}>
-             <span>Regression Logs</span>
-             <button onClick={() => setLog([])} style={{ color: theme.textMuted }}>Clear</button>
+             <span>Run Log</span>
+             <button onClick={() => setLog([])} style={{ color: theme.textMuted }} aria-label="Clear run log">Clear</button>
            </div>
            <div className="flex-1 p-3 overflow-y-auto font-mono text-[10px] flex flex-col gap-1">
-              {log.length === 0 && <span style={{ color: theme.textFaint }}>No active runs.</span>}
+              {log.length === 0 && (
+                <span style={{ color: theme.textFaint }}>
+                  No active runs — use the Synth tab's Run Verification button
+                  or load an ISA commit log to populate this pane.
+                </span>
+              )}
               {log.map((l, i) => (
                  <div key={i} style={{ color: l.includes("FAIL") || l.includes("Violat") ? theme.error : theme.textDim }}>
                    {l}
@@ -379,31 +419,54 @@ function CrossHeatmap({ crosses }: { crosses: CrossTuple[] }) {
 }
 
 /* ─── API Integrity Panel ─────────────────────────────────────────────────── */
+// Rows come from `invoke('list_api_calls')` — backed by the core's
+// ApiRing (fed from the cached trace, or a synthetic fallback when
+// no trace is loaded).  No literal arrays.
 
-const API_ROWS: { api: string; kind: string; latency: string; drops: number; status: "OK" | "WARN" | "FAIL" }[] = [
-  { api: "uca_init",              kind: "lifecycle", latency: "4.1 µs",   drops: 0, status: "OK"   },
-  { api: "uca_alloc_buffer",      kind: "memory",    latency: "12.6 µs",  drops: 0, status: "OK"   },
-  { api: "uca_load_weights",      kind: "transfer",  latency: "1.42 ms",  drops: 0, status: "OK"   },
-  { api: "uca_submit_cmd",        kind: "dispatch",  latency: "1.8 µs",   drops: 0, status: "OK"   },
-  { api: "uca_poll_completion",   kind: "status",    latency: "0.3 µs",   drops: 2, status: "WARN" },
-  { api: "uca_fetch_result",      kind: "transfer",  latency: "0.92 ms",  drops: 0, status: "OK"   },
-  { api: "uca_reset",             kind: "lifecycle", latency: "8.7 µs",   drops: 0, status: "OK"   },
-  { api: "uca_get_perf_counters", kind: "debug",     latency: "5.2 µs",   drops: 0, status: "OK"   },
-];
+function formatLatency(ns: number): string {
+  if (ns >= 1_000_000) return `${(ns / 1_000_000).toFixed(2)} ms`;
+  if (ns >= 1_000)     return `${(ns / 1_000    ).toFixed(2)} µs`;
+  return `${ns} ns`;
+}
 
 function APIIntegrityPanel() {
   const theme = useTheme();
-  const okCount = API_ROWS.filter(r => r.status === "OK").length;
+  const [rows, setRows] = useState<ApiCall[] | null>(null);
+  const [err,  setErr ] = useState<string | null>(null);
+
+  useEffect(() => {
+    invoke<ApiCall[]>("list_api_calls")
+      .then(setRows)
+      .catch((e) => setErr(String(e)));
+  }, []);
+
+  if (err) {
+    return <div style={{ color: theme.error, fontSize: 12 }}>list_api_calls failed: {err}</div>;
+  }
+  if (!rows) {
+    return <div style={{ color: theme.textMuted, fontSize: 12 }}>Loading API calls…</div>;
+  }
+  if (rows.length === 0) {
+    return (
+      <div style={{ color: theme.textMuted, fontSize: 12 }}>
+        No trace loaded — open a .pccx file to populate the API integrity ring.
+      </div>
+    );
+  }
+
+  const okCount = rows.filter((r) => r.status === "OK").length;
+  const totalDrops = rows.reduce((a, r) => a + r.drops, 0);
+
   return (
     <div className="flex flex-col h-full gap-4">
       <h3 className="text-sm font-bold flex items-center gap-2">
         <Activity size={16} /> API Integrity — <code style={{ color: theme.accent }}>uca_*</code> driver surface
       </h3>
       <div className="grid grid-cols-4 gap-3">
-        <StatCard label="APIs checked"   value={`${API_ROWS.length}`} />
+        <StatCard label="APIs checked"   value={`${rows.length}`} />
         <StatCard label="passing"        value={`${okCount}`} tone="ok" />
-        <StatCard label="dropped events" value={`${API_ROWS.reduce((a, r) => a + r.drops, 0)}`} />
-        <StatCard label="round-trips"    value="50,000" />
+        <StatCard label="dropped events" value={`${totalDrops}`} />
+        <StatCard label="samples"        value={`${rows.length}`} />
       </div>
       <div className="flex-1 overflow-auto rounded border" style={{ borderColor: theme.border, background: theme.bgPanel }}>
         <table className="w-full" style={{ fontSize: 11, borderCollapse: "collapse", fontFamily: "ui-monospace, monospace" }}>
@@ -417,13 +480,13 @@ function APIIntegrityPanel() {
             </tr>
           </thead>
           <tbody>
-            {API_ROWS.map((r, i) => {
+            {rows.map((r, i) => {
               const col = r.status === "OK" ? theme.success : r.status === "WARN" ? theme.warning : theme.error;
               return (
                 <tr key={i} style={{ borderBottom: `1px solid ${theme.borderDim}`, color: theme.text }}>
                   <td style={{ padding: "6px 10px", color: theme.accent }}>{r.api}</td>
                   <td style={{ padding: "6px 10px", color: theme.textDim }}>{r.kind}</td>
-                  <td style={{ padding: "6px 10px", textAlign: "right" }}>{r.latency}</td>
+                  <td style={{ padding: "6px 10px", textAlign: "right" }}>{formatLatency(r.p99_latency_ns)}</td>
                   <td style={{ padding: "6px 10px", textAlign: "right", color: r.drops > 0 ? theme.warning : theme.textDim }}>{r.drops}</td>
                   <td style={{ padding: "6px 10px" }}>
                     <span style={{ padding: "1px 8px", border: `1px solid ${col}66`, borderRadius: 3, color: col, fontSize: 10, fontWeight: 700 }}>
