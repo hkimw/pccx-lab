@@ -362,6 +362,31 @@ fn parse_vcd_file(
         .map_err(|e| e.to_string())
 }
 
+/// Writes the currently-cached trace as an IEEE 1364-2005 §18 VCD
+/// file.  Returns the absolute path of the generated file so the UI
+/// can offer a "Reveal in Finder" action.
+#[tauri::command]
+fn export_vcd(output_path: String, state: State<'_, AppState>) -> Result<String, String> {
+    let trace_guard = state.trace.lock().unwrap();
+    let trace = trace_guard.as_ref().ok_or("No trace loaded — open a .pccx first")?;
+    let path = std::path::Path::new(&output_path);
+    pccx_core::vcd_writer::write_vcd(trace, path)
+        .map_err(|e| format!("vcd_writer failed: {}", e))?;
+    Ok(output_path)
+}
+
+/// Writes the currently-cached trace as a Google Trace Event Format
+/// JSON file (openable in chrome://tracing or ui.perfetto.dev).
+#[tauri::command]
+fn export_chrome_trace(output_path: String, state: State<'_, AppState>) -> Result<String, String> {
+    let trace_guard = state.trace.lock().unwrap();
+    let trace = trace_guard.as_ref().ok_or("No trace loaded — open a .pccx first")?;
+    let path = std::path::Path::new(&output_path);
+    pccx_core::chrome_trace::write_chrome_trace(trace, path)
+        .map_err(|e| format!("chrome_trace writer failed: {}", e))?;
+    Ok(output_path)
+}
+
 /// Lists every `.pccx` file under the sibling pccx-FPGA repo's
 /// `hw/sim/work/<tb>/` tree so the UI can present a dropdown of
 /// available traces without hard-coding paths.
@@ -538,6 +563,8 @@ pub fn run() {
             detect_bottlenecks,
             merge_coverage,
             parse_vcd_file,
+            export_vcd,
+            export_chrome_trace,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -19,6 +19,8 @@ pub mod coverage;
 pub mod vcd;
 pub mod vcd_writer;
 pub mod chrome_trace;
+pub mod isa_replay;
+pub mod api_ring;
 
 // ─── Convenience re-exports (public API surface) ──────────────────────────────
 pub use pccx_format::{PccxFile, PccxHeader, PccxError, ArchConfig, TraceConfig, PayloadConfig, fnv1a_64};
