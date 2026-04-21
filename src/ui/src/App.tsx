@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { emit } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { resolveResource } from "@tauri-apps/api/path";
 import { Group, Panel, Separator } from "react-resizable-panels";
 
 import { ThemeProvider, useTheme } from "./ThemeContext";
@@ -188,7 +189,13 @@ function AppInner() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await invoke("load_pccx", { path: "../../dummy_trace.pccx" });
+        // Resolve the bundled dummy trace via Tauri 2.0's path API so
+        // it works regardless of the binary's CWD (fixes Round-3 Gap 5:
+        // the prior relative path resolved three levels up from the
+        // dev binary and never hit the real file, so the UI silently
+        // fell back to the Gemma literal flame graph).
+        const bundled = await resolveResource("dummy_trace.pccx");
+        const res = await invoke("load_pccx", { path: bundled });
         setHeader(res); setTraceLoaded(true);
         const lic: string = await invoke("get_license_info");
         setLicense(lic);
@@ -230,7 +237,7 @@ function AppInner() {
           const path: string = await invoke("export_vcd", { outputPath: "pccx_trace.vcd" });
           addMsg("system", `Wrote ${path}. Ready for GTKWave / Surfer / Verdi.`);
         } catch (e) {
-          addMsg("system", `Export failed: ${e}. (vcd_writer may not be wired yet — see judge round-1 report.)`);
+          addMsg("system", `Export failed: ${e}. (Load a .pccx file first; vcd_writer needs a cached trace.)`);
         }
         break;
       case "tools.chromeTrace":

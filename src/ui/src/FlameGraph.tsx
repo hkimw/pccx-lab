@@ -27,6 +27,7 @@ const EVENT_TYPE_NAMES: Record<number, string> = {
   3: "dma_write",
   4: "systolic_stall",
   5: "barrier_sync",
+  6: "api_call",
 };
 
 const EVENT_TYPE_COLORS: Record<number, string> = {
@@ -35,6 +36,10 @@ const EVENT_TYPE_COLORS: Record<number, string> = {
   3: "#dcdcaa",
   4: "#c586c0",
   5: "#8b5cf6",
+  // API_CALL: warm amber — driver-surface crossings stand out from
+  // compute / DMA lanes.  Matches the "debug / instrumentation"
+  // palette convention used by Nsight and Perfetto.
+  6: "#f59e0b",
 };
 
 /**
