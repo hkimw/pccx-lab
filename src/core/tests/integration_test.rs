@@ -10,7 +10,7 @@ mod tests {
                       MAJOR_VERSION, MINOR_VERSION},
         simulator::{SimConfig, generate_realistic_trace, save_dummy_pccx},
         trace::{NpuTrace, NpuEvent, event_type_id},
-        license::{validate_token, issue_token, LicenseTier},
+        license::get_license_info,
     };
     use std::io::Cursor;
 
@@ -249,34 +249,11 @@ mod tests {
         assert!(trace.total_cycles > 0, "Total cycles must be positive");
     }
 
-    // ─── License ──────────────────────────────────────────────────────────────
+    // ─── License — reduced to a single Apache-2.0 sanity check ───────────────
 
     #[test]
-    fn test_license_token_roundtrip() {
-        let secret  = b"test-secret";
-        let token   = issue_token("test-licensee", "enterprise", 0, secret);
-        // Set env var so validate_token uses same key
-        std::env::set_var("PCCX_LICENSE_SECRET", "test-secret");
-        let lt = validate_token(&token).expect("token should validate");
-        assert_eq!(lt.licensee, "test-licensee");
-        assert_eq!(lt.tier, LicenseTier::Enterprise);
-        assert_eq!(lt.expires_at, 0);
-        std::env::remove_var("PCCX_LICENSE_SECRET");
-    }
-
-    #[test]
-    fn test_license_invalid_signature_rejected() {
-        let token = "fake-licensee.enterprise.0.deadbeefdeadbeef";
-        std::env::set_var("PCCX_LICENSE_SECRET", "some-secret");
-        let result = validate_token(token);
-        assert!(result.is_err(), "Tampered token should be rejected");
-        std::env::remove_var("PCCX_LICENSE_SECRET");
-    }
-
-    #[test]
-    fn test_license_malformed_rejected() {
-        let result = validate_token("not.a.valid.token.with.too.many.parts.blah");
-        assert!(result.is_err(), "Malformed token must be rejected");
+    fn test_license_info_is_apache_2() {
+        assert!(get_license_info().contains("Apache"));
     }
 
     // ─── Synthesis report parser ──────────────────────────────────────────────

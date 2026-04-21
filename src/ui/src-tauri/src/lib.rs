@@ -1,5 +1,5 @@
 use pccx_core::pccx_format::{PccxFile, PccxHeader};
-use pccx_core::license::{get_license_info as core_license_info, validate_token, LicenseToken};
+use pccx_core::license::get_license_info as core_license_info;
 use pccx_core::trace::NpuTrace;
 use pccx_core::hw_model::HardwareModel;
 use pccx_core::roofline::{analyze as analyze_roofline_fn, RooflinePoint};
@@ -17,8 +17,6 @@ use tauri::{AppHandle, Emitter, State};
 struct AppState {
     /// Flat binary buffer (24-byte struct array) ready for JS TypedArray mapping.
     pub trace_flat_buffer: Mutex<Vec<u8>>,
-    /// Validated license token, set after `validate_license` is called.
-    pub license_token: Mutex<Option<LicenseToken>>,
     /// Cached trace for analytics commands (deserialized from pccx payload).
     pub trace: Mutex<Option<NpuTrace>>,
     /// Second trace slot for FlameGraph Compare-run (Gregg IEEE SW 2018
@@ -62,28 +60,10 @@ fn get_extensions() -> Vec<Extension> {
     get_available_extensions()
 }
 
-/// Returns the compiled-in license tier string.
+/// Returns the static Apache-2.0 license string for the status bar.
 #[tauri::command]
 fn get_license_info() -> String {
     core_license_info().to_string()
-}
-
-/// Validates a license token string and caches the result in app state.
-/// Returns `{ tier, licensee, expires_at }` on success.
-#[tauri::command]
-fn validate_license(token: String, state: State<'_, AppState>) -> Result<serde_json::Value, String> {
-    match validate_token(&token) {
-        Ok(lt) => {
-            let resp = serde_json::json!({
-                "licensee":   lt.licensee,
-                "tier":       lt.tier.to_string(),
-                "expires_at": lt.expires_at,
-            });
-            *state.license_token.lock().unwrap() = Some(lt);
-            Ok(resp)
-        }
-        Err(e) => Err(e.to_string()),
-    }
 }
 
 /// Returns the cached flat binary trace payload for ultra-fast JS TypedArray mapping.
@@ -630,7 +610,7 @@ async fn generate_report(state: State<'_, AppState>) -> Result<String, String> {
     tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
 
     if has_trace {
-        Ok("Enterprise report generated and saved to output.pdf".to_string())
+        Ok("Report generated and saved to output.pdf".to_string())
     } else {
         Ok("Report generated (no trace loaded — showing template data)".to_string())
     }
@@ -645,7 +625,6 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(AppState {
             trace_flat_buffer: Mutex::new(Vec::new()),
-            license_token: Mutex::new(None),
             trace: Mutex::new(None),
             trace_b: Mutex::new(None),
         })
@@ -653,7 +632,6 @@ pub fn run() {
             load_pccx,
             get_extensions,
             get_license_info,
-            validate_license,
             fetch_trace_payload,
             load_pccx_alt,
             fetch_trace_payload_b,

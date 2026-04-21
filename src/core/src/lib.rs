@@ -28,10 +28,7 @@ pub mod vivado_timing;
 pub use pccx_format::{PccxFile, PccxHeader, PccxError, ArchConfig, TraceConfig, PayloadConfig, fnv1a_64};
 pub use trace::{NpuTrace, NpuEvent, event_type_id};
 pub use simulator::{SimConfig, generate_realistic_trace, save_dummy_pccx};
-pub use license::{
-    get_license_info, is_enterprise_enabled, run_high_speed_simulation,
-    validate_token, issue_token, LicenseToken, LicenseTier, LicenseError,
-};
+pub use license::{get_license_info, run_high_speed_simulation};
 pub use hw_model::{HardwareModel, AxiBusConfig, BramConfig, MacArrayConfig};
 pub use cycle_estimator::{CycleEstimator, TileOperation};
 pub use synth_report::{SynthReport, UtilSummary, TimingSummary, load_from_files};
