@@ -1,15 +1,15 @@
 [workspace]
 members = [
-    "src/core",
-    "src/reports",
-    "src/verification",
-    "src/authoring",
-    "src/evolve",
-    "src/remote",
-    "src/lsp",
-    "src/uvm_bridge",
-    "src/ai_copilot",
-    "src/ui/src-tauri"
+    "crates/core",
+    "crates/reports",
+    "crates/verification",
+    "crates/authoring",
+    "crates/evolve",
+    "crates/remote",
+    "crates/lsp",
+    "crates/uvm_bridge",
+    "crates/ai_copilot",
+    "ui/src-tauri"
 ]
 resolver = "2"
 

@@ -2,7 +2,7 @@
 # pccx-lab environment bootstrap.
 #
 # Brings a fresh Ubuntu / Debian machine to the point where `npm run tauri dev`
-# in src/ui/ launches the profiler.  Idempotent: re-running skips anything
+# in ui/ launches the profiler.  Idempotent: re-running skips anything
 # already installed.  Every step prints what it is doing so an AI agent
 # driving this script can see exactly where it stopped.
 #
@@ -18,7 +18,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-UI_DIR="$REPO_ROOT/src/ui"
+UI_DIR="$REPO_ROOT/ui"
 TAURI_DIR="$UI_DIR/src-tauri"
 
 log()  { printf "\033[1;34m[setup]\033[0m %s\n" "$*"; }
@@ -151,10 +151,10 @@ verify() {
         && log "  webkit2gtk-4.1  $(pkg-config --modversion webkit2gtk-4.1)" \
         || warn "  webkit2gtk-4.1 dev headers missing — 'bash setup_env.sh system' first"
 
-    log "Type-checking TypeScript (src/ui)"
+    log "Type-checking TypeScript (ui)"
     (cd "$UI_DIR" && npx --yes tsc --noEmit)
 
-    log "Cargo check (src/ui/src-tauri)"
+    log "Cargo check (ui/src-tauri)"
     (cd "$TAURI_DIR" && cargo check --locked 2>/dev/null || cargo check)
 
     log "All checks passed."

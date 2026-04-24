@@ -18,4 +18,4 @@ _No changes yet._
 ### Added
 
 - Initial release as part of the pccx-lab workspace.
-- Phase 3 backend-daemon scaffold. OpenAPI 3.0 draft at `src/remote/openapi.yaml`; `EndpointFamily` enum; `OPENAPI_SPEC` const (`include_str!`).
+- Phase 3 backend-daemon scaffold. OpenAPI 3.0 draft at `crates/remote/openapi.yaml`; `EndpointFamily` enum; `OPENAPI_SPEC` const (`include_str!`).

@@ -47,8 +47,8 @@ done
 
 echo
 echo "Workspace:"
-[[ -d "$REPO_ROOT/src/ui/node_modules" ]]      && ok "src/ui/node_modules"      "present" || { bad "src/ui/node_modules" "missing"; hint "bash scripts/setup_env.sh install"; }
-[[ -f "$REPO_ROOT/src/ui/src-tauri/Cargo.lock" ]] && ok "Cargo.lock (tauri)"    "present" || bad "Cargo.lock (tauri)" "missing"
+[[ -d "$REPO_ROOT/ui/node_modules" ]]      && ok "ui/node_modules"      "present" || { bad "ui/node_modules" "missing"; hint "bash scripts/setup_env.sh install"; }
+[[ -f "$REPO_ROOT/ui/src-tauri/Cargo.lock" ]] && ok "Cargo.lock (tauri)"    "present" || bad "Cargo.lock (tauri)" "missing"
 
 # Is the dev server already up?
 if curl -sf http://localhost:1420/ >/dev/null 2>&1; then
@@ -61,5 +61,5 @@ echo
 echo "Next steps:"
 echo "  Launch dev window:   bash scripts/run_dev.sh"
 echo "  Re-install deps:     bash scripts/setup_env.sh install"
-echo "  Full type-check:     (cd src/ui && npx tsc --noEmit)"
-echo "  Rust tests:          (cd src/core && cargo test)"
+echo "  Full type-check:     (cd ui && npx tsc --noEmit)"
+echo "  Rust tests:          (cd crates/core && cargo test)"

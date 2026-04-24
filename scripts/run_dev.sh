@@ -7,7 +7,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-UI_DIR="$REPO_ROOT/src/ui"
+UI_DIR="$REPO_ROOT/ui"
 
 # Cargo
 [[ -s "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
