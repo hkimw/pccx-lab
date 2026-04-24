@@ -71,10 +71,59 @@ function Field({ label, value, unit, type = "number", options, onChange, min, ma
   );
 }
 
-const handleStyle = (color: string, pos: "left" | "right" | "top" | "bottom") => ({
-  background: color, border: "2px solid #252526", width: 10, height: 10,
-  ...(pos === "left" ? { left: -5 } : pos === "right" ? { right: -5 } : pos === "top" ? { top: -5 } : { bottom: -5 }),
-});
+interface PortDef {
+  id: string;
+  label: string;
+  color: string;
+}
+
+function BlenderPorts({ inputs, outputs }: {
+  inputs: PortDef[];
+  outputs: PortDef[];
+}) {
+  const theme = useTheme();
+  const isDark = theme.mode === "dark";
+  const ROW_H = 22;
+  const maxRows = Math.max(inputs.length, outputs.length);
+
+  return (
+    <div style={{ position: "relative", borderTop: `1px solid ${isDark ? "#3e3e3e" : "rgba(0,0,0,0.06)"}` }}>
+      {Array.from({ length: maxRows }, (_, i) => {
+        const inp = inputs[i];
+        const out = outputs[i];
+        return (
+          <div key={i} style={{
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+            height: ROW_H, padding: "0 10px",
+          }}>
+            <span style={{ fontSize: 10, color: inp ? inp.color : "transparent" }}>
+              {inp ? inp.label : ""}
+            </span>
+            <span style={{ fontSize: 10, color: out ? out.color : "transparent", textAlign: "right" }}>
+              {out ? out.label : ""}
+            </span>
+          </div>
+        );
+      })}
+      {inputs.map((p, i) => (
+        <Handle key={`in-${p.id}`} type="target" id={p.id} position={Position.Left}
+          style={{
+            background: p.color, border: `2px solid ${isDark ? "#252526" : "#ffffff"}`,
+            width: 10, height: 10, left: -5,
+            top: `${((i + 0.5) / maxRows) * 100}%`,
+          }} />
+      ))}
+      {outputs.map((p, i) => (
+        <Handle key={`out-${p.id}`} type="source" id={p.id} position={Position.Right}
+          style={{
+            background: p.color, border: `2px solid ${isDark ? "#252526" : "#ffffff"}`,
+            width: 10, height: 10, right: -5,
+            top: `${((i + 0.5) / maxRows) * 100}%`,
+          }} />
+      ))}
+    </div>
+  );
+}
 
 // ─── Nodes ────────────────────────────────────────────────────────────────────
 
@@ -87,8 +136,13 @@ function HostNode(_: NodeProps) {
         <Field label="Interface" value="PCIe 4.0" type="select" options={["PCIe 3.0","PCIe 4.0","PCIe 5.0","CXL 3.0"]} />
         <Field label="Bandwidth" value="32" unit="GB/s" type="number" />
       </div>
-      <Handle type="source" id="cmd"  position={Position.Right} style={handleStyle(c, "right")} />
-      <Handle type="source" id="dma"  position={Position.Bottom} style={handleStyle(c, "bottom")} />
+      <BlenderPorts
+        inputs={[]}
+        outputs={[
+          { id: "cmd", label: "CMD", color: "#94a3b8" },
+          { id: "dma", label: "DMA", color: "#94a3b8" },
+        ]}
+      />
     </div>
   );
 }
@@ -104,9 +158,13 @@ function DramNode(_: NodeProps) {
         <Field label="Capacity" value={cap} unit="GB" onChange={setCap} />
         <Field label="Type" value="LPDDR5" type="select" options={["LPDDR5","HBM2E","DDR5","GDDR6X"]} />
       </div>
-      <Handle type="target" id="wb_in" position={Position.Left} style={handleStyle(c, "left")} />
-      <Handle type="source" id="read"  position={Position.Right} style={handleStyle(c, "right")} />
-      <Handle type="source" id="stat"  position={Position.Bottom} style={handleStyle(c, "bottom")} />
+      <BlenderPorts
+        inputs={[{ id: "wb_in", label: "Write-back", color: "#60a5fa" }]}
+        outputs={[
+          { id: "read", label: "Read Data", color: "#60a5fa" },
+          { id: "stat", label: "Status", color: "#60a5fa" },
+        ]}
+      />
     </div>
   );
 }
@@ -124,10 +182,16 @@ function AxiNode(_: NodeProps) {
         <Field label="Overhead" value="15" unit="cycles" />
         <Field label="Ports" value="4" type="select" options={["1","2","4","8"]} />
       </div>
-      <Handle type="target" id="in_host" position={Position.Top} style={handleStyle(c, "top")} />
-      <Handle type="target" id="in_dram" position={Position.Left} style={handleStyle(c, "left")} />
-      <Handle type="source" id="out_bram" position={Position.Right} style={handleStyle(c, "right")} />
-      <Handle type="source" id="out_ctrl" position={Position.Bottom} style={handleStyle(c, "bottom")} />
+      <BlenderPorts
+        inputs={[
+          { id: "in_host", label: "Host CMD", color: "#94a3b8" },
+          { id: "in_dram", label: "DRAM Data", color: "#60a5fa" },
+        ]}
+        outputs={[
+          { id: "out_bram", label: "To BRAM", color: "#818cf8" },
+          { id: "out_ctrl", label: "Control", color: "#818cf8" },
+        ]}
+      />
     </div>
   );
 }
@@ -145,9 +209,13 @@ function BramNode(_: NodeProps) {
         <Field label="Read Ports" value="2" type="select" options={["1","2","4"]} />
         <Field label="Banks" value="4" type="select" options={["1","2","4","8","16"]} />
       </div>
-      <Handle type="target" id="in" position={Position.Left} style={handleStyle(c, "left")} />
-      <Handle type="source" id="to_mac_a" position={Position.Right} style={handleStyle(c, "right")} />
-      <Handle type="source" id="to_mac_b" position={Position.Bottom} style={handleStyle("#22d3ee", "bottom")} />
+      <BlenderPorts
+        inputs={[{ id: "in", label: "AXI In", color: "#34d399" }]}
+        outputs={[
+          { id: "to_mac_a", label: "A Tile", color: "#34d399" },
+          { id: "to_mac_b", label: "B Tile", color: "#22d3ee" },
+        ]}
+      />
     </div>
   );
 }
@@ -169,10 +237,16 @@ function MacNode(_: NodeProps) {
           <span style={{ fontSize: 11, fontWeight: 700, color: c }}>{tops} TOPS</span>
         </div>
       </div>
-      <Handle type="target" id="tile_a" position={Position.Left} style={handleStyle(c, "left")} />
-      <Handle type="target" id="tile_b" position={Position.Top} style={handleStyle("#22d3ee", "top")} />
-      <Handle type="source" id="partial" position={Position.Right} style={handleStyle(c, "right")} />
-      <Handle type="source" id="stall" position={Position.Bottom} style={handleStyle("#6366f1", "bottom")} />
+      <BlenderPorts
+        inputs={[
+          { id: "tile_a", label: "A Tile", color: "#a78bfa" },
+          { id: "tile_b", label: "B Tile", color: "#22d3ee" },
+        ]}
+        outputs={[
+          { id: "partial", label: "Partial Sum", color: "#a78bfa" },
+          { id: "stall", label: "Stall", color: "#6366f1" },
+        ]}
+      />
     </div>
   );
 }
@@ -187,8 +261,10 @@ function AccumNode(_: NodeProps) {
         <Field label="Depth" value="64" unit="regs" />
         <Field label="Adder Tree" value="Yes" type="select" options={["No","Yes"]} />
       </div>
-      <Handle type="target" id="in" position={Position.Left} style={handleStyle(c, "left")} />
-      <Handle type="source" id="out" position={Position.Right} style={handleStyle(c, "right")} />
+      <BlenderPorts
+        inputs={[{ id: "in", label: "Partial Sum", color: "#f59e0b" }]}
+        outputs={[{ id: "out", label: "C Matrix", color: "#f59e0b" }]}
+      />
     </div>
   );
 }
@@ -204,9 +280,13 @@ function PostProcNode(_: NodeProps) {
         <Field label="Quantize" value="None" type="select" options={["None","INT8","FP8"]} />
         <Field label="Softmax" value="Yes" type="select" options={["No","Yes"]} />
       </div>
-      <Handle type="target" id="in" position={Position.Left} style={handleStyle(c, "left")} />
-      <Handle type="source" id="out" position={Position.Right} style={handleStyle(c, "right")} />
-      <Handle type="source" id="stats" position={Position.Bottom} style={handleStyle("#fb7185", "bottom")} />
+      <BlenderPorts
+        inputs={[{ id: "in", label: "Raw Data", color: "#fb923c" }]}
+        outputs={[
+          { id: "out", label: "Processed", color: "#fb923c" },
+          { id: "stats", label: "Stats", color: "#fb7185" },
+        ]}
+      />
     </div>
   );
 }
@@ -221,8 +301,10 @@ function WriteBackNode(_: NodeProps) {
         <Field label="Channels" value="4" type="select" options={["1","2","4","8"]} />
         <Field label="Buffer" value="16" unit="KB" />
       </div>
-      <Handle type="target" id="in" position={Position.Left} style={handleStyle(c, "left")} />
-      <Handle type="source" id="to_dram" position={Position.Right} style={handleStyle(c, "right")} />
+      <BlenderPorts
+        inputs={[{ id: "in", label: "Output Data", color: "#f472b6" }]}
+        outputs={[{ id: "to_dram", label: "DMA Write", color: "#f472b6" }]}
+      />
     </div>
   );
 }
@@ -241,10 +323,16 @@ function GemvNode(_: NodeProps) {
         <Field label="Stages"    value="5"     unit="cyc" />
         <Field label="Throughput" value={`${Number(lanes) * 32}/cyc`} />
       </div>
-      <Handle type="target" id="fmap"     position={Position.Left}   style={handleStyle(c,       "left")}   />
-      <Handle type="target" id="weight"   position={Position.Top}    style={handleStyle("#818cf8","top")}   />
-      <Handle type="source" id="partial"  position={Position.Right}  style={handleStyle(c,       "right")}  />
-      <Handle type="source" id="stall"    position={Position.Bottom} style={handleStyle("#f59e0b","bottom")}/>
+      <BlenderPorts
+        inputs={[
+          { id: "fmap", label: "Feature Map", color: "#22d3ee" },
+          { id: "weight", label: "Weights", color: "#818cf8" },
+        ]}
+        outputs={[
+          { id: "partial", label: "Partial", color: "#22d3ee" },
+          { id: "stall", label: "Stall", color: "#f59e0b" },
+        ]}
+      />
     </div>
   );
 }
@@ -260,8 +348,10 @@ function CvoNode(_: NodeProps) {
         <Field label="Throughput" value="1" unit="op/cyc" />
         <Field label="Latency"    value="16" unit="cyc" />
       </div>
-      <Handle type="target" id="in"  position={Position.Left}  style={handleStyle(c, "left")}  />
-      <Handle type="source" id="out" position={Position.Right} style={handleStyle(c, "right")} />
+      <BlenderPorts
+        inputs={[{ id: "in", label: "Operand", color: "#e879f9" }]}
+        outputs={[{ id: "out", label: "Result", color: "#e879f9" }]}
+      />
     </div>
   );
 }
@@ -276,9 +366,13 @@ function HpBufferNode(_: NodeProps) {
         <Field label="Width" value="128-bit" type="select" options={["64-bit","128-bit","256-bit"]} />
         <Field label="Depth" value="512"     unit="entries" />
       </div>
-      <Handle type="target" id="axi_in"    position={Position.Left}  style={handleStyle(c,        "left")}  />
-      <Handle type="source" id="upper_ch"  position={Position.Top}   style={handleStyle("#818cf8","top")}    />
-      <Handle type="source" id="lower_ch"  position={Position.Right} style={handleStyle("#22d3ee","right")}  />
+      <BlenderPorts
+        inputs={[{ id: "axi_in", label: "AXI In", color: "#f87171" }]}
+        outputs={[
+          { id: "upper_ch", label: "Upper Ch", color: "#818cf8" },
+          { id: "lower_ch", label: "Lower Ch", color: "#22d3ee" },
+        ]}
+      />
     </div>
   );
 }
@@ -294,9 +388,13 @@ function UramNode(_: NodeProps) {
         <Field label="Read Latency" value="2" unit="cyc" />
         <Field label="Ports"   value="2" type="select" options={["1","2"]} />
       </div>
-      <Handle type="target" id="wr"     position={Position.Left}  style={handleStyle(c, "left")}  />
-      <Handle type="source" id="rd_a"   position={Position.Right} style={handleStyle(c, "right")} />
-      <Handle type="source" id="rd_b"   position={Position.Bottom} style={handleStyle("#06b6d4","bottom")} />
+      <BlenderPorts
+        inputs={[{ id: "wr", label: "Write", color: "#14b8a6" }]}
+        outputs={[
+          { id: "rd_a", label: "Read A", color: "#14b8a6" },
+          { id: "rd_b", label: "Read B", color: "#06b6d4" },
+        ]}
+      />
     </div>
   );
 }
@@ -312,8 +410,10 @@ function FmapCacheNode(_: NodeProps) {
         <Field label="Write lanes" value="16" />
         <Field label="Broadcast"  value="32" unit="lanes" />
       </div>
-      <Handle type="target" id="wr_bf16" position={Position.Left}  style={handleStyle(c, "left")}  />
-      <Handle type="source" id="bcast"   position={Position.Right} style={handleStyle("#f59e0b","right")} />
+      <BlenderPorts
+        inputs={[{ id: "wr_bf16", label: "BF16 Write", color: "#eab308" }]}
+        outputs={[{ id: "bcast", label: "Broadcast", color: "#f59e0b" }]}
+      />
     </div>
   );
 }

@@ -33,8 +33,8 @@ import { matchKeybinding } from "./keybindings";
 import { Button, Flex, TextField } from "@radix-ui/themes";
 import {
   LayoutDashboard, BrainCircuit, Activity,
-  Settings2, Zap, Clock, FileText,
-  Code2, Box, Layers, Database, Cpu, ActivitySquare,
+  Settings2, Zap, Clock,
+  Code2, Box, Layers, Cpu, ActivitySquare,
   PanelLeftClose, PanelRightClose, PanelBottomClose, CheckCircle, PieChart,
   FolderTree, Search, Blocks
 } from "lucide-react";
@@ -46,21 +46,19 @@ type ActiveTab = "timeline" | "flamegraph" | "hardware" | "memory" | "waves" | "
 interface ChatMessage { role: "system" | "user" | "ai"; content: string; }
 
 const TABS: { id: ActiveTab; label: string; icon: React.ReactNode }[] = [
-  { id: "scenario",   label: "Scenario Flow",    icon: <Zap size={12} />             },
+  { id: "scenario",   label: "Scenario",         icon: <Zap size={12} />             },
   { id: "timeline",   label: "Timeline",         icon: <Clock size={12} />           },
   { id: "flamegraph", label: "Flame Graph",      icon: <Layers size={12} />          },
   { id: "waves",      label: "Waveform",         icon: <ActivitySquare size={12} />  },
-  { id: "hardware",   label: "System Simulator", icon: <Cpu size={12} />             },
-  { id: "memory",     label: "Memory Dump",      icon: <Database size={12} />        },
+  { id: "hardware",   label: "Simulator",        icon: <Cpu size={12} />             },
   { id: "nodes",      label: "Data Flow",        icon: <Activity size={12} />        },
-  { id: "code",       label: "SV Editor",        icon: <Code2 size={12} />           },
-  { id: "tb_author",  label: "TB Author",        icon: <LayoutDashboard size={12} /> },
-  { id: "report",     label: "Report",           icon: <FileText size={12} />        },
+  { id: "code",       label: "Editor",           icon: <Code2 size={12} />           },
+  { id: "tb_author",  label: "Testbench",        icon: <LayoutDashboard size={12} /> },
   { id: "canvas",     label: "3D View",          icon: <Box size={12} />             },
-  { id: "extensions", label: "Extensions",       icon: <Settings2 size={12} />       },
-  { id: "verify",     label: "Verification",     icon: <CheckCircle size={12} />     },
   { id: "roofline",   label: "Roofline",         icon: <PieChart size={12} />        },
 ];
+
+// Report, Extensions, Verification, Memory are accessed via the left sidebar Activity Bar
 
 // ─── Resize Handle ────────────────────────────────────────────────────────────
 
@@ -108,7 +106,7 @@ function AppInner() {
   const [bottomDock, setBottomDock]         = useState<"left" | "right" | "bottom">(() => (localStorage.getItem("pccx-bottom-dock") as any) || "bottom");
   const [cmdPaletteOpen, setCmdPaletteOpen] = useState(false);
   const [sidebarVisible, setSidebarVisible] = useState(true);
-  const [sidebarTab, setSidebarTab] = useState<"files" | "search" | "modules">("files");
+  const [sidebarTab, setSidebarTab] = useState<"files" | "search" | "modules" | "extensions" | "verify" | "report" | "memory">("files");
   const shortcutHelp = useShortcutHelp();
 
   useEffect(() => {
@@ -454,6 +452,8 @@ function AppInner() {
             { id: "files" as const, icon: <FolderTree size={17} />, label: "Explorer" },
             { id: "search" as const, icon: <Search size={17} />, label: "Search" },
             { id: "modules" as const, icon: <Blocks size={17} />, label: "Modules" },
+            { id: "verify" as const, icon: <CheckCircle size={17} />, label: "Verification" },
+            { id: "extensions" as const, icon: <Settings2 size={17} />, label: "Extensions" },
           ]).map(item => {
             const isActive = sidebarVisible && sidebarTab === item.id;
             return (
@@ -486,7 +486,7 @@ function AppInner() {
               borderBottom: `0.5px solid ${isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.08)"}`,
             }}>
               <span style={{ fontSize: 11, fontWeight: 600, color: theme.textDim, textTransform: "uppercase", letterSpacing: 0.5 }}>
-                {sidebarTab === "files" ? "Explorer" : sidebarTab === "search" ? "Search" : "Modules"}
+                {{ files: "Explorer", search: "Search", modules: "Modules", verify: "Verification", extensions: "Extensions", report: "Report", memory: "Memory" }[sidebarTab]}
               </span>
             </div>
             <div className="flex-1 overflow-y-auto min-h-0">
@@ -506,6 +506,10 @@ function AppInner() {
                   <p style={{ fontSize: 10, color: theme.textFaint, marginTop: 4 }}>Open a project to see modules</p>
                 </div>
               )}
+              {sidebarTab === "verify" && <VerificationSuite />}
+              {sidebarTab === "extensions" && <ExtensionManager />}
+              {sidebarTab === "report" && <ReportBuilder />}
+              {sidebarTab === "memory" && <MemoryDump />}
             </div>
           </div>
         )}
