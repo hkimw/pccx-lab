@@ -8,8 +8,8 @@ clean, every acceptance-bullet count verifies, `cargo test --lib` runs
 4 vivado_timing, 3 flat_buffer_v2) at `src/core/src/` and
 `src/ui/src-tauri/src/lib.rs:665,678` registers `load_timing_report` +
 `fetch_live_window`. `rg "Math.random|Math.sin" src/ui/src` = **9**
-(R4 cap ≤ 11, ✅); `rg "N_LAYERS" src/ui/src/FlameGraph.tsx` = **0**
-(✅); the `(synthetic)` badge appears at `FlameGraph.tsx:549` gated
+(R4 cap ≤ 11, ); `rg "N_LAYERS" src/ui/src/FlameGraph.tsx` = **0**
+(); the `(synthetic)` badge appears at `FlameGraph.tsx:549` gated
 by `synthetic && !loading && spans.length === 0` (`:629`); v1 flat
 buffers still decode via `trace.rs:351 flat_buffer_v2_decodes_v1_payload`
 (passing). `npx vite build` succeeds in 17.78 s (3.87 MB bundle,

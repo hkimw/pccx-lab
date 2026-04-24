@@ -199,9 +199,9 @@ function AppInner() {
         const lic: string = await invoke("get_license_info");
         setLicense(lic);
         const ctx: string = await invoke("compress_trace_context");
-        addMsg("system", `✓ ${t("copilot.traceLoaded")} ${ctx}`);
+        addMsg("system", `[OK] ${t("copilot.traceLoaded")} ${ctx}`);
       } catch (e) {
-        addMsg("system", `⚠ ${t("copilot.traceFailed")}: ${e}`);
+        addMsg("system", `[WARN] ${t("copilot.traceFailed")}: ${e}`);
       }
     })();
   }, []);
@@ -271,7 +271,7 @@ function AppInner() {
       const payload: Uint8Array = await invoke("fetch_trace_payload");
       const dt = performance.now() - t0;
       const count = payload.byteLength / 24;
-      addMsg("system", `⚡ IPC: ${(payload.byteLength / 1024 / 1024).toFixed(2)} MB (${count.toLocaleString()} events) — ${dt.toFixed(1)} ms`);
+      addMsg("system", `[FAST] IPC: ${(payload.byteLength / 1024 / 1024).toFixed(2)} MB (${count.toLocaleString()} events) — ${dt.toFixed(1)} ms`);
     } catch (e) { addMsg("system", `${t("copilot.ipcError")}: ${e}`); }
   };
 

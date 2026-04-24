@@ -72,7 +72,7 @@ export function StatusBar({ traceLoaded, totalCycles, numCores, license, activeT
           cursor: "pointer", lineHeight: "14px",
         }}
       >
-        {theme.mode === "dark" ? "☾ Dark" : "☀ Light"}
+        {theme.mode === "dark" ? "Dark" : "Light"}
       </button>
       <div style={{ display: "inline-flex" }}>
         {pill("EN", lang === "en", () => setLang("en"))}

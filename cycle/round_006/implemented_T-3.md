@@ -79,7 +79,7 @@ test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 ### `cd src/ui && npm run build`
 ```
 dist/assets/index-CVmAnIb0.js             7,241.27 kB │ gzip: 2,059.55 kB
-✓ built in 46.54s
+ built in 46.54s
 ```
 No new chunks, main bundle gzip unchanged vs baseline.
 

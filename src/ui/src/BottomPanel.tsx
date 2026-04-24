@@ -66,7 +66,7 @@ export function BottomPanel({ dock = "bottom", onDockChange, onClose }: BottomPa
       { time: fmt(-90),  level: "warn",  source: "synth",       msg: "Vivado timing: WNS -9.792 ns on core_clk · 4194 failing endpoints" },
       { time: fmt(-89),  level: "info",  source: "synth",       msg: "  → retiming suggested for u_gemv_top / u_mem_dispatcher" },
       { time: fmt(-60),  level: "info",  source: "trace",       msg: "Loaded tb_packer.pccx: 1024 MAC_COMPUTE events on core 0" },
-      { time: fmt(-58),  level: "info",  source: "roofline",    msg: "AI=∞ (no DMA) · achieved 65536 GOPS · compute-bound ✓" },
+      { time: fmt(-58),  level: "info",  source: "roofline",    msg: "AI=∞ (no DMA) · achieved 65536 GOPS · compute-bound" },
       { time: fmt(-40),  level: "ok",    source: "ipc",         msg: "detect_bottlenecks({window: 256, threshold: 0.5}) → 0 hotspots" },
       { time: fmt(-20),  level: "info",  source: "ai_copilot",  msg: "Gemini bridge online · model=gemini-pro" },
       { time: fmt(-5),   level: "info",  source: "ui",          msg: "Rendered FlameGraph with 121 spans (Gemma 3N decode step)" },
@@ -334,7 +334,7 @@ export function BottomPanel({ dock = "bottom", onDockChange, onClose }: BottomPa
       return [
         "AI = ∞ (no DMA)",
         "achieved  = 65 536 GOPS",
-        "verdict   = compute-bound ✓",
+        "verdict   = compute-bound",
       ];
     }
     if (cmd.startsWith("detect_bottlenecks")) {

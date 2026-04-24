@@ -54,7 +54,7 @@ fn main() -> anyhow::Result<()> {
     pccx_file.write(&mut file)?;
 
     let wall_us = hw.cycles_to_us(trace.total_cycles);
-    println!("✓ Written {output_path}");
+    println!("Written {output_path}");
     println!("  Total events  : {}", trace.events.len());
     println!("  Total cycles  : {}", trace.total_cycles);
     println!("  Wall-time est.: {wall_us:.2} µs @ {} MHz", hw.clock_mhz);

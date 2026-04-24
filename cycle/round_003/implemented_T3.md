@@ -36,15 +36,15 @@
 - Total diff: **109 lines** (≤ 220 budget).
 
 ### Acceptance self-check
-1. `rg "Math\.random" src/ui/src/FlameGraph.tsx` → **0 matches** ✓
+1. `rg "Math\.random" src/ui/src/FlameGraph.tsx` → **0 matches**
 2. `rg "load_pccx_alt|fetch_trace_payload_b" src/ui/src-tauri/src/lib.rs`
    → **8 matches** (≥ 2 required; declarations + handler register + doc
-   comments) ✓
-3. `cargo test --lib` in `src/core` → **39 passed, 0 failed, 0 ignored** ✓
+   comments)
+3. `cargo test --lib` in `src/core` → **39 passed, 0 failed, 0 ignored**
    (T-1 agent's in-flight `simulator.rs` landed cleanly before this
    build; our changes touch no core code, so regression-free by
    construction.)
-4. `npx vite build` in `src/ui` → **exits 0**, built in 19.47 s. ✓
+4. `npx vite build` in `src/ui` → **exits 0**, built in 19.47 s.
    - `npx tsc --noEmit` has pre-existing unrelated errors in
      `CanvasView.tsx`, `CodeEditor.tsx`, `HardwareVisualizer.tsx`
      (T-2 in-flight), `PerfChart.tsx`, `ReportBuilder.tsx`,
@@ -53,7 +53,7 @@
 5. Compare-run button opens a real native file picker (Tauri 2.0
    dialog plugin); cancelling (`open()` returns `null`) hits the
    `if (!picked) return;` guard, leaving `runB` / `diffMode` /
-   `compareLabel` / `compareErr` at their prior values. ✓
+   `compareLabel` / `compareErr` at their prior values.
    - Empty-state after an explicitly-failed load mirrors the
      `VerificationSuite.tsx:149-155` placeholder pattern
      (inline error span with the actual message, no synthetic

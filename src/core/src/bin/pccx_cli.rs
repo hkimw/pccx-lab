@@ -160,7 +160,7 @@ fn main() -> anyhow::Result<()> {
                 let pct = util * 100.0;
                 let bar_len = (pct / 2.0).round() as usize;
                 let bar = "█".repeat(bar_len) + &"░".repeat(50 - bar_len.min(50));
-                let flag = if pct >= 70.0 { "✓" } else if pct >= 40.0 { "~" } else { "!" };
+                let flag = if pct >= 70.0 { "+" } else if pct >= 40.0 { "~" } else { "!" };
                 println!("  Core {:02} [{flag}]: {bar} {pct:.1}%", core_id);
             }
             let avg = utils.iter().map(|(_, u)| u).sum::<f64>() / utils.len() as f64;
@@ -202,7 +202,7 @@ fn main() -> anyhow::Result<()> {
         println!("  MAC cycles           : {}", point.mac_cycles);
         println!("  DMA bytes (est.)     : {}", point.dma_bytes_estimate);
         println!("  Verdict              : {}",
-            if point.compute_bound { "✓ compute-bound" } else { "⚠ memory-bound" });
+            if point.compute_bound { "compute-bound" } else { "memory-bound" });
     }
 
     // New windowed bottleneck detector (more precise than the ratio filter).

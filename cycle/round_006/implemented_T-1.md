@@ -25,7 +25,7 @@ Commit landed on `main` as `c675880`.
  8 files changed, 886 insertions(+), 22 deletions(-)
 ```
 
-Budget: ≤ 1000 LoC. Actual: 886 / 1000. ✓
+Budget: ≤ 1000 LoC. Actual: 886 / 1000.
 
 ## Acceptance checklist (user-directive criteria)
 
@@ -83,12 +83,12 @@ EXIT=0
 
 | Key            | Timeline | Waveform | HardwareVisualizer | FlameGraph | Action                                   |
 |----------------|:--------:|:--------:|:------------------:|:----------:|------------------------------------------|
-| ArrowRight     | ✓        | ✓        | ✓                  | ✓          | stepEdge(+1) on focused signal / +1 cyc  |
-| ArrowLeft      | ✓        | ✓        | ✓                  | ✓          | stepEdge(-1) on focused signal / -1 cyc  |
-| Shift+Arrow    | ✓        | ✓        | ✓                  | ✓          | ±1 cycle (honest single-clock)           |
-| Ctrl+G / g     | ✓        | ✓        | ✓                  | ✓          | prompt "Go to cycle N"                   |
-| . / ,          | ✓        | ✓        | ✓                  | ✓          | mouse-free alternates (Verdi convention) |
-| Numeric input  | ✓        | ✓        | ✓                  | ✓          | Enter to commit, blur also commits       |
+| ArrowRight     | yes      |         | yes                | yes        | stepEdge(+1) on focused signal / +1 cyc  |
+| ArrowLeft      | yes      |         | yes                | yes        | stepEdge(-1) on focused signal / -1 cyc  |
+| Shift+Arrow    | yes      |         | yes                | yes        | ±1 cycle (honest single-clock)           |
+| Ctrl+G / g     | yes      |         | yes                | yes        | prompt "Go to cycle N"                   |
+| . / ,          | yes      |         | yes                | yes        | mouse-free alternates (Verdi convention) |
+| Numeric input  | yes      |         | yes                | yes        | Enter to commit, blur also commits       |
 
 ## Architecture notes
 

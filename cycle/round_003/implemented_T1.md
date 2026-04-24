@@ -136,7 +136,7 @@ cd src/core && cargo test  # includes integration_test.rs
 → test result: ok. 0 passed  (doc)
 
 cd src/ui && npx vite build
-→ ✓ built in 17.93s
+→  built in 17.93s
 → dist/index.html 0.47 kB; dist/assets/index-CacRCJbN.js 3.87 MB
 
 cd src/ui/src-tauri && cargo build --release
@@ -150,12 +150,12 @@ cargo run --bin pccx_cli -- dummy_trace.pccx
 
 | # | Criterion | Result |
 |---|---|---|
-| 1 | `rg "synthetic_fallback" src/core/src/api_ring.rs` → 0 | **0 matches** ✓ |
-| 2 | `rg '"../../dummy_trace.pccx"' src/ui/src/App.tsx` → 0 | **0 matches** ✓ |
-| 3 | `cargo test api_ring` green (real events) | **9/9 ok** (was 6) ✓ |
-| 4 | `cargo test --lib` ≥ 36 green | **39/39 ok** ✓ |
-| 5 | `cargo test` (integration) green | **27/27 ok** ✓ |
-| 6 | `rg "judge round-1 report" src/ui/src/App.tsx` → 0 | **0 matches** ✓ |
+| 1 | `rg "synthetic_fallback" src/core/src/api_ring.rs` → 0 | **0 matches**  |
+| 2 | `rg '"../../dummy_trace.pccx"' src/ui/src/App.tsx` → 0 | **0 matches**  |
+| 3 | `cargo test api_ring` green (real events) | **9/9 ok** (was 6)  |
+| 4 | `cargo test --lib` ≥ 36 green | **39/39 ok**  |
+| 5 | `cargo test` (integration) green | **27/27 ok**  |
+| 6 | `rg "judge round-1 report" src/ui/src/App.tsx` → 0 | **0 matches**  |
 | 7 | `list_api_calls` → real rows (not literal) | **Yes** — `list_from_trace(trace)` only; no literal remains |
 | 8 | FlameGraph renders API_CALL | **Yes** — name + amber colour registered |
 

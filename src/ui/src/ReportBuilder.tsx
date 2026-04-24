@@ -138,7 +138,7 @@ function PreviewSection({ section, data }: { section: Section; data: any }) {
         <div>
           <h3 style={{ fontSize: 14, fontWeight: 700, color: headColor, marginBottom: 8 }}>5. Bottleneck Analysis</h3>
           <div style={{ padding: 12, background: isDark ? "#1c1917" : "#fef9c3", border: `1px solid ${isDark ? "#854d0e" : "#fbbf24"}`, borderRadius: 6, marginBottom: 8 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: isDark ? "#fbbf24" : "#92400e" }}>⚠ AXI Bus Contention Detected</div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: isDark ? "#fbbf24" : "#92400e" }}>Warning: AXI Bus Contention Detected</div>
             <div style={{ fontSize: 10, color: isDark ? "#fde68a" : "#78350f", marginTop: 4 }}>
               32 cores issuing simultaneous DMA reads cause bus bandwidth to drop to 0.5 B/cycle per core.
               Estimated performance loss: 23% from contention overhead.
@@ -161,7 +161,7 @@ function PreviewSection({ section, data }: { section: Section; data: any }) {
               <div>Compute Roof: <strong>1,024 MAC/cycle</strong> (32×32 array)</div>
               <div>Ridge Point: <strong>16.0 MAC/byte</strong></div>
               <div style={{ marginTop: 8, fontWeight: 600, color: "#22c55e" }}>
-                ✓ Current configuration is <strong>COMPUTE-BOUND</strong> — optimal for this tile size.
+                OK: Current configuration is <strong>COMPUTE-BOUND</strong> — optimal for this tile size.
               </div>
             </div>
           </div>
@@ -449,7 +449,7 @@ export function ReportBuilder() {
           </button>
           {generated && (
             <div style={{ fontSize: 9, color: "#22c55e", marginTop: 6, textAlign: "center" }}>
-              ✓ Report saved to output.pdf
+              Report saved to output.pdf
             </div>
           )}
         </div>

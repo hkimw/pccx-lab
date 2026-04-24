@@ -6,8 +6,8 @@ set -u
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-ok()  { printf "  \033[1;32m✓\033[0m %-22s %s\n" "$1" "$2"; }
-bad() { printf "  \033[1;31m✗\033[0m %-22s %s\n" "$1" "$2"; }
+ok()  { printf "  \033[1;32m[OK]\033[0m   %-22s %s\n" "$1" "$2"; }
+bad() { printf "  \033[1;31m[FAIL]\033[0m %-22s %s\n" "$1" "$2"; }
 hint(){ printf "     \033[0;36m→\033[0m %s\n" "$1"; }
 
 check() {

@@ -86,9 +86,9 @@ fn render_roofline_section(trace: &NpuTrace, out: &mut String) {
         point.achieved_gops, point.peak_gops, point.peak_bw_gbps
     ));
     let verdict = if point.compute_bound {
-        "✅ compute-bound"
+        "compute-bound"
     } else {
-        "⚠️ memory-bound"
+        "memory-bound"
     };
     out.push_str(&format!("- **Verdict:** {verdict}\n\n"));
 }
@@ -110,9 +110,9 @@ fn render_synth_section(synth: &SynthReport, out: &mut String) {
 
     out.push_str("\n### Timing\n\n");
     let verdict = if synth.timing.is_timing_met {
-        "✅ Timing met"
+        "Timing met"
     } else {
-        "❌ Timing NOT met"
+        "Timing NOT met"
     };
     out.push_str(&format!("- {verdict}\n"));
     out.push_str(&format!(
@@ -189,7 +189,7 @@ mod tests {
         assert!(md.contains("NPU_top"));
         assert!(md.contains("xck26-sfvc784"));
         assert!(md.contains("| DSP    | 4 |"));
-        assert!(md.contains("❌ Timing NOT met"));
+        assert!(md.contains("Timing NOT met"));
         assert!(md.contains("-9.792"));
         assert!(md.contains("core_clk"));
     }

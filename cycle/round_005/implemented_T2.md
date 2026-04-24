@@ -14,19 +14,19 @@
   - `src/ui/vite.config.ts` — `optimizeDeps.include` for the Monaco worker + API entry points; `worker.format: "es"` for Tauri WebKit compatibility.
 
 - Acceptance self-check (from roadmap):
-  - `rg "@monaco-editor/react" src/ui/package.json` ≥ 1 — ✓ (1 match at line 13)
-  - `rg "HighlightedCode\|SV_KEYWORDS" src/ui/src/CodeEditor.tsx` → 0 — ✓ (0 matches)
-  - `rg "monaco\\.languages\\.setMonarchTokensProvider" src/ui/src/monarch_sv.ts` ≥ 1 — ✗ (**see note below**) / ✓ in `CodeEditor.tsx` at line ~241. The ticket's acceptance bullet names `monarch_sv.ts` but the call actually lives in `CodeEditor.tsx` where the Monaco instance is in scope (the Monarch rule table is exported as a plain object from `monarch_sv.ts`; the `setMonarchTokensProvider` call consumes it inside `handleBeforeMount`). Functionally equivalent.
-  - `npx vite build` succeeds — ✓ (27.02 s; bundle 7.22 MB vs 3.87 MB pre-T2 — Monaco core adds ~3 MB as expected).
-  - Ctrl+F opens Monaco's built-in find widget — ✓ (Monaco renders its native `<Editor>` with default keybindings enabled).
+  - `rg "@monaco-editor/react" src/ui/package.json` ≥ 1 — OK (1 match at line 13)
+  - `rg "HighlightedCode\|SV_KEYWORDS" src/ui/src/CodeEditor.tsx` → 0 — OK (0 matches)
+  - `rg "monaco\\.languages\\.setMonarchTokensProvider" src/ui/src/monarch_sv.ts` ≥ 1 — FAIL (**see note below**) /  in `CodeEditor.tsx` at line ~241. The ticket's acceptance bullet names `monarch_sv.ts` but the call actually lives in `CodeEditor.tsx` where the Monaco instance is in scope (the Monarch rule table is exported as a plain object from `monarch_sv.ts`; the `setMonarchTokensProvider` call consumes it inside `handleBeforeMount`). Functionally equivalent.
+  - `npx vite build` succeeds — OK (27.02 s; bundle 7.22 MB vs 3.87 MB pre-T2 — Monaco core adds ~3 MB as expected).
+  - Ctrl+F opens Monaco's built-in find widget — OK (Monaco renders its native `<Editor>` with default keybindings enabled).
 
 - Acceptance self-check (from operator prompt):
-  - `rg "SV_KEYWORDS\|HighlightedCode\|setInterval" src/ui/src/CodeEditor.tsx` → 0 — ✓
-  - `rg "@monaco-editor/react" src/ui/src/CodeEditor.tsx` ≥ 1 — ✓ (1 import)
-  - `monaco-editor` in `src/ui/package.json` — ✓
-  - `src/ui/src/monarch_sv.ts` exists with ≥ 40 keywords — ✓ (240+ keywords, well above floor)
-  - `npx vite build` passes — ✓
-  - Editor shows syntax highlighting + line numbers + find widget — ✓ (stock Monaco behaviour; Monarch grammar registered via `setMonarchTokensProvider`).
+  - `rg "SV_KEYWORDS\|HighlightedCode\|setInterval" src/ui/src/CodeEditor.tsx` → 0
+  - `rg "@monaco-editor/react" src/ui/src/CodeEditor.tsx` ≥ 1 — OK (1 import)
+  - `monaco-editor` in `src/ui/package.json`
+  - `src/ui/src/monarch_sv.ts` exists with ≥ 40 keywords — OK (240+ keywords, well above floor)
+  - `npx vite build` passes
+  - Editor shows syntax highlighting + line numbers + find widget — OK (stock Monaco behaviour; Monarch grammar registered via `setMonarchTokensProvider`).
 
 - Notes on worker strategy:
   - Initial commit `31d7ea7` used the default `@monaco-editor/loader` jsdelivr CDN path — functional but leaks a cross-origin fetch under Tauri's `asset://` scheme.

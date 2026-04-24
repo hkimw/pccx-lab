@@ -358,7 +358,7 @@ export function MemoryDump() {
                   <button aria-label={`Remove watch ${w.label}`} onClick={() => removeWatch(w.id)} style={{
                     fontSize: 9, background: "transparent", border: "none",
                     color: theme.textFaint, cursor: "pointer", padding: 0,
-                  }}>✕</button>
+                  }}>X</button>
                 </div>
                 <div style={{ fontSize: 10, color: theme.textMuted, fontFamily: "ui-monospace, monospace" }}>
                   {renderAddr(w.addr)} · {w.width} B
