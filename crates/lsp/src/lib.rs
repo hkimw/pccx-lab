@@ -1,14 +1,23 @@
 // Module Boundary: lsp/
 // pccx-lsp: Phase 2 IntelliSense façade.
 //
-// Scaffold-only crate.  The real implementation (tower-lsp adapter,
-// external-LSP multiplexer, AI completion cache keyed by AST hash)
-// lands during Phase 2 proper.  Landing the crate now keeps the
-// dependency graph stable while implementation follows.
+// Evolves in slices.  Landed so far:
+//   A-slice — sync provider traits (CompletionProvider, HoverProvider,
+//     LocationProvider), `LspMultiplexer`, `NoopBackend`.
+//   B-slice — async trait companions, `BlockingBridge` (sync -> async
+//     adapter via spawn_blocking), `SpawnConfig` + `LspSubprocess`
+//     (process lifecycle only, no JSON-RPC yet).
+// What remains for Phase 2 proper: JSON-RPC codec over
+// `LspSubprocess` stdio, an async multiplexer, a concrete verible
+// backend, and the tower-lsp adapter that serves the stack to Monaco.
 
 use std::collections::HashMap;
+use std::ffi::OsString;
+use std::path::PathBuf;
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
+use tokio::process::{Child, Command};
 
 pub const LSP_FAÇADE_API_VERSION: u32 = 1;
 
@@ -351,6 +360,289 @@ impl LocationProvider for NoopBackend {
     }
 }
 
+// ─── Async provider traits (Phase 2 M2.1, B-slice) ───────────────────
+//
+// Async companions to the sync provider trio above.  Concrete backends
+// that fan out to an external LSP subprocess (verible, rust-analyzer,
+// clangd) must await IO; the sync surface stays for in-process /
+// AI-cache providers that never await.  Object-safety is preserved
+// via `#[async_trait]`, which boxes the returned future so a future
+// async multiplexer can hold `Box<dyn AsyncCompletionProvider>` etc.
+
+#[async_trait::async_trait]
+pub trait AsyncCompletionProvider: Send + Sync {
+    async fn complete(
+        &self,
+        language: Language,
+        file: &str,
+        pos: SourcePos,
+        source: &str,
+    ) -> Result<Vec<Completion>, LspError>;
+
+    fn name(&self) -> &'static str;
+}
+
+#[async_trait::async_trait]
+pub trait AsyncHoverProvider: Send + Sync {
+    async fn hover(
+        &self,
+        language: Language,
+        file: &str,
+        pos: SourcePos,
+        source: &str,
+    ) -> Result<Option<Hover>, LspError>;
+
+    fn name(&self) -> &'static str;
+}
+
+#[async_trait::async_trait]
+pub trait AsyncLocationProvider: Send + Sync {
+    async fn definitions(
+        &self,
+        language: Language,
+        file: &str,
+        pos: SourcePos,
+        source: &str,
+    ) -> Result<Vec<SourceRange>, LspError>;
+
+    async fn references(
+        &self,
+        language: Language,
+        file: &str,
+        pos: SourcePos,
+        source: &str,
+    ) -> Result<Vec<SourceRange>, LspError>;
+
+    fn name(&self) -> &'static str;
+}
+
+// ─── BlockingBridge — sync -> async adapter (B-slice) ────────────────
+//
+// Lifts a sync provider into the async world via
+// `tokio::task::spawn_blocking`.  Lets in-process providers
+// (`NoopBackend`, a future AST-hash cache) live inside a
+// tokio-scheduled pipeline next to real LSP subprocesses without
+// forcing callers to juggle two shapes.
+
+/// Sync-to-async adapter over any `P` that implements one or more of
+/// the sync provider traits.  Holds `P` inside `Arc` so the bridge
+/// is cheaply cloneable across tasks.
+pub struct BlockingBridge<P> {
+    inner: Arc<P>,
+}
+
+impl<P> BlockingBridge<P> {
+    /// Wraps `inner` for async use.
+    pub fn new(inner: P) -> Self {
+        Self {
+            inner: Arc::new(inner),
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl<P> AsyncCompletionProvider for BlockingBridge<P>
+where
+    P: CompletionProvider + Send + Sync + 'static,
+{
+    async fn complete(
+        &self,
+        language: Language,
+        file: &str,
+        pos: SourcePos,
+        source: &str,
+    ) -> Result<Vec<Completion>, LspError> {
+        let inner = self.inner.clone();
+        let file = file.to_owned();
+        let source = source.to_owned();
+        tokio::task::spawn_blocking(move || inner.complete(language, &file, pos, &source))
+            .await
+            .map_err(|e| LspError::Internal(format!("spawn_blocking join: {e}")))?
+    }
+
+    fn name(&self) -> &'static str {
+        "blocking-bridge"
+    }
+}
+
+#[async_trait::async_trait]
+impl<P> AsyncHoverProvider for BlockingBridge<P>
+where
+    P: HoverProvider + Send + Sync + 'static,
+{
+    async fn hover(
+        &self,
+        language: Language,
+        file: &str,
+        pos: SourcePos,
+        source: &str,
+    ) -> Result<Option<Hover>, LspError> {
+        let inner = self.inner.clone();
+        let file = file.to_owned();
+        let source = source.to_owned();
+        tokio::task::spawn_blocking(move || inner.hover(language, &file, pos, &source))
+            .await
+            .map_err(|e| LspError::Internal(format!("spawn_blocking join: {e}")))?
+    }
+
+    fn name(&self) -> &'static str {
+        "blocking-bridge"
+    }
+}
+
+#[async_trait::async_trait]
+impl<P> AsyncLocationProvider for BlockingBridge<P>
+where
+    P: LocationProvider + Send + Sync + 'static,
+{
+    async fn definitions(
+        &self,
+        language: Language,
+        file: &str,
+        pos: SourcePos,
+        source: &str,
+    ) -> Result<Vec<SourceRange>, LspError> {
+        let inner = self.inner.clone();
+        let file = file.to_owned();
+        let source = source.to_owned();
+        tokio::task::spawn_blocking(move || inner.definitions(language, &file, pos, &source))
+            .await
+            .map_err(|e| LspError::Internal(format!("spawn_blocking join: {e}")))?
+    }
+
+    async fn references(
+        &self,
+        language: Language,
+        file: &str,
+        pos: SourcePos,
+        source: &str,
+    ) -> Result<Vec<SourceRange>, LspError> {
+        let inner = self.inner.clone();
+        let file = file.to_owned();
+        let source = source.to_owned();
+        tokio::task::spawn_blocking(move || inner.references(language, &file, pos, &source))
+            .await
+            .map_err(|e| LspError::Internal(format!("spawn_blocking join: {e}")))?
+    }
+
+    fn name(&self) -> &'static str {
+        "blocking-bridge"
+    }
+}
+
+// ─── Subprocess spawner (Phase 2 M2.1, B-slice) ──────────────────────
+//
+// Declarative spec + handle for launching an LSP server as a child
+// process.  JSON-RPC-over-stdio plumbing does NOT land in this slice;
+// it arrives alongside the first concrete backend (verible) when the
+// smoke test "type GEMM_ in a .sv file, receive verible completions"
+// is wired up.  Shipping the lifecycle primitives first lets the
+// future JSON-RPC pump bolt on without relitigating spawn / env /
+// working_dir / kill semantics.
+
+/// Declarative spec for how to spawn an LSP server.  Fluent helpers
+/// keep construction readable for servers with many args.
+#[derive(Debug, Clone)]
+pub struct SpawnConfig {
+    pub program: OsString,
+    pub args: Vec<OsString>,
+    pub working_dir: Option<PathBuf>,
+    pub env: Vec<(OsString, OsString)>,
+}
+
+impl SpawnConfig {
+    pub fn new(program: impl Into<OsString>) -> Self {
+        Self {
+            program: program.into(),
+            args: Vec::new(),
+            working_dir: None,
+            env: Vec::new(),
+        }
+    }
+
+    pub fn arg(mut self, arg: impl Into<OsString>) -> Self {
+        self.args.push(arg.into());
+        self
+    }
+
+    pub fn args<I, S>(mut self, args: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<OsString>,
+    {
+        self.args.extend(args.into_iter().map(Into::into));
+        self
+    }
+
+    pub fn working_dir(mut self, dir: impl Into<PathBuf>) -> Self {
+        self.working_dir = Some(dir.into());
+        self
+    }
+
+    pub fn env(mut self, key: impl Into<OsString>, value: impl Into<OsString>) -> Self {
+        self.env.push((key.into(), value.into()));
+        self
+    }
+}
+
+/// Running LSP child.  Wraps `tokio::process::Child` and owns its
+/// stdio pipes.  The JSON-RPC codec attaches to those pipes in a
+/// follow-on slice.
+///
+/// `kill_on_drop` is enabled so a panic inside the owning task will
+/// not leave orphan LSP servers running on the user's box.
+pub struct LspSubprocess {
+    config: SpawnConfig,
+    child: Child,
+}
+
+impl LspSubprocess {
+    /// Spawn the server described by `config` with piped stdio.
+    pub fn spawn(config: SpawnConfig) -> Result<Self, LspError> {
+        let mut cmd = Command::new(&config.program);
+        cmd.args(&config.args);
+        if let Some(dir) = &config.working_dir {
+            cmd.current_dir(dir);
+        }
+        for (k, v) in &config.env {
+            cmd.env(k, v);
+        }
+        cmd.stdin(std::process::Stdio::piped());
+        cmd.stdout(std::process::Stdio::piped());
+        cmd.stderr(std::process::Stdio::piped());
+        cmd.kill_on_drop(true);
+        let child = cmd.spawn().map_err(|e| LspError::BackendUnavailable {
+            backend: config.program.to_string_lossy().into_owned(),
+            reason: format!("spawn failed: {e}"),
+        })?;
+        Ok(Self { config, child })
+    }
+
+    pub fn config(&self) -> &SpawnConfig {
+        &self.config
+    }
+
+    pub fn id(&self) -> Option<u32> {
+        self.child.id()
+    }
+
+    /// Terminates the child (SIGKILL on Unix) and awaits exit.
+    pub async fn kill(&mut self) -> Result<(), LspError> {
+        self.child
+            .kill()
+            .await
+            .map_err(|e| LspError::Internal(format!("kill: {e}")))
+    }
+
+    /// Waits for the child to exit on its own.
+    pub async fn wait(&mut self) -> Result<std::process::ExitStatus, LspError> {
+        self.child
+            .wait()
+            .await
+            .map_err(|e| LspError::Internal(format!("wait: {e}")))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -521,5 +813,95 @@ mod tests {
         let out = m.complete(Language::Rust, "x.rs", origin(), "").unwrap();
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].label, "second");
+    }
+
+    // ─── SpawnConfig / LspSubprocess / BlockingBridge (B-slice) ───
+
+    #[test]
+    fn spawn_config_fluent_builds_correctly() {
+        let cfg = SpawnConfig::new("verible-verilog-lsp")
+            .arg("--rules_config_search")
+            .arg("--rules=")
+            .env("RUST_LOG", "off")
+            .working_dir("/tmp");
+        assert_eq!(cfg.program, OsString::from("verible-verilog-lsp"));
+        assert_eq!(cfg.args.len(), 2);
+        assert_eq!(cfg.args[0], OsString::from("--rules_config_search"));
+        assert_eq!(cfg.args[1], OsString::from("--rules="));
+        assert_eq!(
+            cfg.env,
+            vec![(OsString::from("RUST_LOG"), OsString::from("off"))]
+        );
+        assert_eq!(
+            cfg.working_dir.as_deref(),
+            Some(std::path::Path::new("/tmp"))
+        );
+    }
+
+    #[test]
+    fn spawn_config_args_extends_via_iter() {
+        let cfg = SpawnConfig::new("rust-analyzer").args(["--version", "--verbose"]);
+        assert_eq!(cfg.args.len(), 2);
+        assert_eq!(cfg.args[0], OsString::from("--version"));
+        assert_eq!(cfg.args[1], OsString::from("--verbose"));
+    }
+
+    #[tokio::test]
+    async fn lsp_subprocess_spawns_and_waits_for_trivial_command() {
+        // `true` is in PATH on every supported host and exits 0
+        // immediately.  Proves spawn + wait end-to-end.
+        let mut sp = LspSubprocess::spawn(SpawnConfig::new("true")).expect("spawn true");
+        assert!(sp.id().is_some());
+        let status = sp.wait().await.expect("wait succeeds");
+        assert!(status.success(), "`true` must exit 0");
+    }
+
+    #[tokio::test]
+    async fn lsp_subprocess_kill_terminates_long_running_child() {
+        // `sleep 30` would outlive any sane test run; kill() must
+        // terminate it and wait() must then report non-success.
+        let mut sp =
+            LspSubprocess::spawn(SpawnConfig::new("sleep").arg("30")).expect("spawn sleep");
+        sp.kill().await.expect("kill succeeds");
+        let status = sp.wait().await.expect("wait after kill");
+        assert!(
+            !status.success(),
+            "killed process must not report success"
+        );
+    }
+
+    #[tokio::test]
+    async fn blocking_bridge_completion_delegates_to_sync_noop() {
+        let bridge = BlockingBridge::new(NoopBackend);
+        let out = bridge
+            .complete(Language::SystemVerilog, "f.sv", origin(), "")
+            .await
+            .expect("async completion via bridge");
+        assert!(out.is_empty());
+    }
+
+    #[tokio::test]
+    async fn blocking_bridge_hover_delegates_to_sync_noop() {
+        let bridge = BlockingBridge::new(NoopBackend);
+        let out = bridge
+            .hover(Language::Rust, "f.rs", origin(), "")
+            .await
+            .expect("async hover via bridge");
+        assert!(out.is_none());
+    }
+
+    #[tokio::test]
+    async fn blocking_bridge_location_delegates_to_sync_noop() {
+        let bridge = BlockingBridge::new(NoopBackend);
+        let defs = bridge
+            .definitions(Language::Python, "f.py", origin(), "")
+            .await
+            .expect("async defs via bridge");
+        let refs = bridge
+            .references(Language::Python, "f.py", origin(), "")
+            .await
+            .expect("async refs via bridge");
+        assert!(defs.is_empty());
+        assert!(refs.is_empty());
     }
 }

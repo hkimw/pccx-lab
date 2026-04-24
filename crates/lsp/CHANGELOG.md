@@ -34,6 +34,39 @@ may carry breaking public-API changes.
   during Phase 2 proper (Weeks 6-9) so the scaffold stays free of
   runtime dependencies it does not yet exercise.
 
+### Added (B-slice)
+
+- Async provider trait companions: `AsyncCompletionProvider`,
+  `AsyncHoverProvider`, `AsyncLocationProvider` — all object-safe via
+  `#[async_trait]`.  Phase 2 M2.1 B-slice.
+- `BlockingBridge<P>` — lifts any sync provider `P` into all the
+  async traits it has a sync counterpart for, via
+  `tokio::task::spawn_blocking`.  Lets in-process providers
+  (`NoopBackend`, a future AST-hash cache) coexist with real LSP
+  subprocesses inside a tokio-scheduled pipeline.
+- `SpawnConfig` — declarative spec for launching an LSP server
+  (program, args, working_dir, env) with a fluent builder API.
+- `LspSubprocess` — owns a `tokio::process::Child` with piped stdio
+  and `kill_on_drop(true)`.  `spawn` / `kill` / `wait` / `id` /
+  `config` are the public lifecycle surface.  JSON-RPC pumping over
+  stdio is intentionally deferred to the first concrete backend
+  slice (verible) so spawn semantics can stabilise first.
+- Workspace dependencies: `tokio` (with `process` / `io-util` /
+  `rt-multi-thread` / `macros` / `time` features) and `async-trait`
+  added to `[workspace.dependencies]`; `pccx-lsp` inherits both.
+- Seven new tests: `SpawnConfig` fluent-builder semantics, trivial
+  spawn/wait over `true`, kill-terminates `sleep 30`, and
+  `BlockingBridge` delegates completion / hover / location correctly
+  through `NoopBackend`.
+
+### Deferred (to next slice)
+
+- JSON-RPC codec over `LspSubprocess` stdio.
+- `AsyncLspMultiplexer` — async counterpart to `LspMultiplexer`.
+- Concrete verible backend and the M2.1 smoke test ("type `GEMM_` in
+  a .sv file, receive verible completions").
+- `tower-lsp` adapter for serving the stack to Monaco.
+
 ## [0.1.0] - 2026-04-24
 
 ### Added
