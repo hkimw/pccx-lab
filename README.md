@@ -16,10 +16,21 @@ Documentation is available in both English and Korean:
 Read our [design rationale](https://hwkim-dev.github.io/pccx/en/lab/design/rationale.html) on why we use a single monorepo to maintain strong module boundaries.
 
 ## Module layout
-- `core/`: Pure Rust simulation and cycle estimation engine.
-- `ui/`: Tauri and React-based frontend shell.
-- `uvm_bridge/`: SystemVerilog/UVM boundary via DPI-C.
-- `ai_copilot/`: LLM integration wrapper.
+Phase 1 split the original monolithic `core` into nine focused crates under `crates/` plus a top-level `ui/`.  `pccx-core` is the single sink of the dependency graph; no crate depends on `pccx-ide` or `pccx-remote` (both are terminal binaries).
+
+- `crates/core/` (`pccx-core`) — pure Rust core: `.pccx` format, trace parsing, hardware model, roofline, bottleneck, VCD / chrome-trace, Vivado timing.
+- `crates/reports/` — Markdown / HTML / PDF rendering.
+- `crates/verification/` — golden-diff + robust-reader gates for CI.
+- `crates/authoring/` — ISA / API TOML compilers.
+- `crates/evolve/` — EAGLE-family speculative-decoding primitives; future home of the Phase 5 DSE loop.
+- `crates/lsp/` — Phase 2 IntelliSense façade (sync + async provider traits, multiplexers, subprocess spawner).
+- `crates/remote/` — Phase 3 backend-daemon scaffold.
+- `crates/uvm_bridge/` — SystemVerilog/UVM DPI-C boundary.
+- `crates/ai_copilot/` — LLM invocation wrapper.
+- `ui/src-tauri/` (`pccx-ide`) — Tauri shell consuming the core / reports / ai-copilot crates.
+- `ui/` — React + Vite frontend; talks to `pccx-ide` via Tauri IPC.
+
+See [docs/design/phase1_crate_split.md](docs/design/phase1_crate_split.md) for the full dependency graph and per-crate rationale.
 
 ## .pccx file format
 Read the open specification for our [`.pccx` binary session format](https://hwkim-dev.github.io/pccx/en/lab/pccx-format.html).
