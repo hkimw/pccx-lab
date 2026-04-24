@@ -643,6 +643,137 @@ impl LspSubprocess {
     }
 }
 
+// ─── Async multiplexer (Phase 2 M2.1, C-slice fragment) ──────────────
+//
+// Async counterpart to `LspMultiplexer`.  Holds one triple of async
+// trait objects per `Language` and forwards async queries.  The shape
+// mirrors the sync multiplexer exactly so callers that migrate from
+// the sync surface rewrite only their `.await` call sites.
+//
+// Independent from the JSON-RPC codec and the concrete verible
+// backend — those land in later slices.  Shipping the async
+// multiplexer now lets pccx-ide prototype the async call graph
+// against `BlockingBridge<NoopBackend>` triples before any real LSP
+// server is attached.
+
+/// Provider triple the async multiplexer stores per registered
+/// language.  The `AsyncCompletionProvider` / `AsyncHoverProvider` /
+/// `AsyncLocationProvider` supertraits carry `Send + Sync`, so the
+/// `Box<dyn …>` types below are `Send + Sync` even without explicit
+/// markers; the markers stay for symmetry with `LanguageBackends`
+/// and to keep the declaration readable.
+struct AsyncLanguageBackends {
+    completion: Box<dyn AsyncCompletionProvider + Send + Sync>,
+    hover: Box<dyn AsyncHoverProvider + Send + Sync>,
+    location: Box<dyn AsyncLocationProvider + Send + Sync>,
+}
+
+/// Routes an async query to the registered backend triple for its
+/// language.  Returns `LspError::NoBackend` for unregistered
+/// languages.
+#[derive(Default)]
+pub struct AsyncLspMultiplexer {
+    backends: HashMap<Language, AsyncLanguageBackends>,
+}
+
+impl AsyncLspMultiplexer {
+    /// Empty multiplexer with no languages registered.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Registers (or replaces) the async provider triple for a
+    /// language.
+    pub fn register(
+        &mut self,
+        language: Language,
+        completion: Box<dyn AsyncCompletionProvider + Send + Sync>,
+        hover: Box<dyn AsyncHoverProvider + Send + Sync>,
+        location: Box<dyn AsyncLocationProvider + Send + Sync>,
+    ) {
+        self.backends.insert(
+            language,
+            AsyncLanguageBackends {
+                completion,
+                hover,
+                location,
+            },
+        );
+    }
+
+    /// True iff `language` has a registered async provider triple.
+    pub fn has(&self, language: Language) -> bool {
+        self.backends.contains_key(&language)
+    }
+
+    /// Languages currently registered, in unspecified order.
+    pub fn registered_languages(&self) -> Vec<Language> {
+        self.backends.keys().copied().collect()
+    }
+
+    fn dispatch(&self, language: Language) -> Result<&AsyncLanguageBackends, LspError> {
+        self.backends
+            .get(&language)
+            .ok_or(LspError::NoBackend { lang: language })
+    }
+
+    /// Forwards a completion query to the registered backend.
+    pub async fn complete(
+        &self,
+        language: Language,
+        file: &str,
+        pos: SourcePos,
+        source: &str,
+    ) -> Result<Vec<Completion>, LspError> {
+        self.dispatch(language)?
+            .completion
+            .complete(language, file, pos, source)
+            .await
+    }
+
+    /// Forwards a hover query to the registered backend.
+    pub async fn hover(
+        &self,
+        language: Language,
+        file: &str,
+        pos: SourcePos,
+        source: &str,
+    ) -> Result<Option<Hover>, LspError> {
+        self.dispatch(language)?
+            .hover
+            .hover(language, file, pos, source)
+            .await
+    }
+
+    /// Forwards a go-to-definition query to the registered backend.
+    pub async fn definitions(
+        &self,
+        language: Language,
+        file: &str,
+        pos: SourcePos,
+        source: &str,
+    ) -> Result<Vec<SourceRange>, LspError> {
+        self.dispatch(language)?
+            .location
+            .definitions(language, file, pos, source)
+            .await
+    }
+
+    /// Forwards a references query to the registered backend.
+    pub async fn references(
+        &self,
+        language: Language,
+        file: &str,
+        pos: SourcePos,
+        source: &str,
+    ) -> Result<Vec<SourceRange>, LspError> {
+        self.dispatch(language)?
+            .location
+            .references(language, file, pos, source)
+            .await
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -903,5 +1034,112 @@ mod tests {
             .expect("async refs via bridge");
         assert!(defs.is_empty());
         assert!(refs.is_empty());
+    }
+
+    // ─── AsyncLspMultiplexer (C-slice fragment) ───
+
+    #[test]
+    fn async_multiplexer_starts_empty() {
+        let m = AsyncLspMultiplexer::new();
+        assert!(!m.has(Language::SystemVerilog));
+        assert!(m.registered_languages().is_empty());
+    }
+
+    #[tokio::test]
+    async fn async_multiplexer_rejects_unregistered_language_with_no_backend() {
+        let m = AsyncLspMultiplexer::new();
+        let err = m
+            .complete(Language::Rust, "x.rs", origin(), "")
+            .await
+            .expect_err("unregistered must error");
+        match err {
+            LspError::NoBackend { lang } => assert_eq!(lang, Language::Rust),
+            other => panic!("expected NoBackend, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn async_multiplexer_dispatches_through_blocking_bridge_noop() {
+        let mut m = AsyncLspMultiplexer::new();
+        m.register(
+            Language::SystemVerilog,
+            Box::new(BlockingBridge::new(NoopBackend)),
+            Box::new(BlockingBridge::new(NoopBackend)),
+            Box::new(BlockingBridge::new(NoopBackend)),
+        );
+
+        assert!(m.has(Language::SystemVerilog));
+        assert_eq!(m.registered_languages(), vec![Language::SystemVerilog]);
+
+        assert!(m
+            .complete(Language::SystemVerilog, "t.sv", origin(), "")
+            .await
+            .unwrap()
+            .is_empty());
+        assert!(m
+            .hover(Language::SystemVerilog, "t.sv", origin(), "")
+            .await
+            .unwrap()
+            .is_none());
+        assert!(m
+            .definitions(Language::SystemVerilog, "t.sv", origin(), "")
+            .await
+            .unwrap()
+            .is_empty());
+        assert!(m
+            .references(Language::SystemVerilog, "t.sv", origin(), "")
+            .await
+            .unwrap()
+            .is_empty());
+    }
+
+    #[tokio::test]
+    async fn async_multiplexer_register_replaces_existing_triple() {
+        // Tagged async provider — second register() wins.
+        struct TaggedAsync {
+            id: &'static str,
+        }
+        #[async_trait::async_trait]
+        impl AsyncCompletionProvider for TaggedAsync {
+            async fn complete(
+                &self,
+                _: Language,
+                _: &str,
+                _: SourcePos,
+                _: &str,
+            ) -> Result<Vec<Completion>, LspError> {
+                Ok(vec![Completion {
+                    label: self.id.into(),
+                    detail: None,
+                    documentation: None,
+                    insert_text: self.id.into(),
+                    source: CompletionSource::Lsp,
+                }])
+            }
+            fn name(&self) -> &'static str {
+                "tagged-async"
+            }
+        }
+
+        let mut m = AsyncLspMultiplexer::new();
+        m.register(
+            Language::Rust,
+            Box::new(TaggedAsync { id: "first" }),
+            Box::new(BlockingBridge::new(NoopBackend)),
+            Box::new(BlockingBridge::new(NoopBackend)),
+        );
+        m.register(
+            Language::Rust,
+            Box::new(TaggedAsync { id: "second" }),
+            Box::new(BlockingBridge::new(NoopBackend)),
+            Box::new(BlockingBridge::new(NoopBackend)),
+        );
+
+        let out = m
+            .complete(Language::Rust, "x.rs", origin(), "")
+            .await
+            .unwrap();
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].label, "second");
     }
 }

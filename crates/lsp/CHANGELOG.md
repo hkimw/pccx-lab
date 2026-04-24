@@ -59,10 +59,23 @@ may carry breaking public-API changes.
   `BlockingBridge` delegates completion / hover / location correctly
   through `NoopBackend`.
 
+### Added (C-slice fragment)
+
+- `AsyncLspMultiplexer` — async counterpart to `LspMultiplexer`.
+  Stores one `(AsyncCompletionProvider, AsyncHoverProvider,
+  AsyncLocationProvider)` trait-object triple per `Language` and
+  forwards async queries; unregistered languages return
+  `LspError::NoBackend`.  Shape mirrors the sync multiplexer so
+  callers migrating from sync to async rewrite only `.await` call
+  sites.  Phase 2 M2.1 C-slice fragment.
+- Four new tests: empty-init, unregistered-language rejection,
+  dispatch through `BlockingBridge<NoopBackend>` triples for all
+  four query kinds, and register-replaces-existing via a tagged
+  local `AsyncCompletionProvider` impl.
+
 ### Deferred (to next slice)
 
 - JSON-RPC codec over `LspSubprocess` stdio.
-- `AsyncLspMultiplexer` — async counterpart to `LspMultiplexer`.
 - Concrete verible backend and the M2.1 smoke test ("type `GEMM_` in
   a .sv file, receive verible completions").
 - `tower-lsp` adapter for serving the stack to Monaco.
