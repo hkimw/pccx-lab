@@ -59,6 +59,24 @@ may carry breaking public-API changes.
   `BlockingBridge` delegates completion / hover / location correctly
   through `NoopBackend`.
 
+### Added (C-slice proper — JSON-RPC wire framing)
+
+- `encode_frame(body)` / `decode_frame(buf)` — pure byte-layer LSP
+  JSON-RPC framing (HTTP-style `Content-Length: N\r\n\r\n<body>`
+  envelope per the LSP spec).  No `tokio-util` / `framing` dep
+  taken; incremental decode returns `(body, consumed)` so the caller
+  drives its own read buffer.
+- `FrameError` — `HeaderNotUtf8`, `MissingContentLength`,
+  `BadContentLength(String)`, `ContentLengthTooLarge`.  Distinct from
+  `LspError` because framing errors are recoverable at the transport
+  level.
+- `MAX_FRAME_BODY_BYTES` (64 MiB) hard cap against adversarial
+  servers that claim huge `Content-Length`.
+- 10 new tests: header shape, UTF-8 multi-byte body round-trip,
+  partial-header / partial-body / two-frame-in-one-buffer slicing,
+  missing / bad / oversized `Content-Length`, case-insensitive
+  header keys, `Content-Type` coexistence.
+
 ### Added (C-slice fragment)
 
 - `AsyncLspMultiplexer` — async counterpart to `LspMultiplexer`.
@@ -75,7 +93,11 @@ may carry breaking public-API changes.
 
 ### Deferred (to next slice)
 
-- JSON-RPC codec over `LspSubprocess` stdio.
+- Typed `lsp-types` envelope over the framing layer (typed
+  `Request<Params>` / `Response<R>` / `Notification<N>`).
+- JSON-RPC pump that attaches the framing codec to `LspSubprocess`
+  stdio (`AsyncRead` / `AsyncWrite` drivers + request/response
+  correlation).
 - Concrete verible backend and the M2.1 smoke test ("type `GEMM_` in
   a .sv file, receive verible completions").
 - `tower-lsp` adapter for serving the stack to Monaco.

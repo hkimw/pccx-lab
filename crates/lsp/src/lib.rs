@@ -7,9 +7,15 @@
 //   B-slice — async trait companions, `BlockingBridge` (sync -> async
 //     adapter via spawn_blocking), `SpawnConfig` + `LspSubprocess`
 //     (process lifecycle only, no JSON-RPC yet).
-// What remains for Phase 2 proper: JSON-RPC codec over
-// `LspSubprocess` stdio, an async multiplexer, a concrete verible
-// backend, and the tower-lsp adapter that serves the stack to Monaco.
+//   C-slice fragment — `AsyncLspMultiplexer`.
+//   C-slice proper — JSON-RPC wire framing (`encode_frame` /
+//     `decode_frame` over `Content-Length: N\r\n\r\n<body>`) with
+//     a `FrameError` taxonomy.  Pure byte layer; the typed
+//     `lsp-types` message envelope + the pump that connects the
+//     codec to `LspSubprocess` stdio land in the next slice.
+// What remains for Phase 2 proper: typed `lsp-types` envelope +
+// JSON-RPC pump, a concrete verible backend, and the tower-lsp
+// adapter that serves the stack to Monaco.
 
 use std::collections::HashMap;
 use std::ffi::OsString;
@@ -643,6 +649,104 @@ impl LspSubprocess {
     }
 }
 
+// ─── JSON-RPC wire framing (Phase 2 M2.1, C-slice proper) ────────────
+//
+// The Language Server Protocol ships every JSON-RPC message framed
+// with HTTP-style headers:
+//
+//     Content-Length: <N>\r\n
+//     [Content-Type: application/vscode-jsonrpc; charset=utf-8\r\n]
+//     \r\n
+//     <N-byte JSON body>
+//
+// Content-Length is mandatory; Content-Type is optional and we ignore
+// it on the decode side.  This slice lands the pure byte layer —
+// `encode_frame` prepends the header, `decode_frame` parses the header
+// + extracts one body from a byte buffer, returning the consumed-byte
+// count so the caller can drain its read buffer incrementally.  The
+// typed `lsp-types` envelope and the pump that attaches this codec
+// to `LspSubprocess` stdio arrive in the next slice.
+
+/// Parse errors specific to the JSON-RPC LSP frame layer.  Distinct
+/// from `LspError` because framing errors are recoverable at the
+/// transport level: the caller can drop the frame, log, and resume.
+#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
+pub enum FrameError {
+    #[error("frame header is not valid UTF-8")]
+    HeaderNotUtf8,
+
+    #[error("Content-Length header is missing")]
+    MissingContentLength,
+
+    #[error("Content-Length header value '{0}' is not a valid non-negative integer")]
+    BadContentLength(String),
+
+    #[error("Content-Length {claimed} exceeds the 64 MiB hard cap — refusing to allocate")]
+    ContentLengthTooLarge { claimed: usize },
+}
+
+/// Hard cap on a single LSP message body.  LSP does not specify one,
+/// but 64 MiB is 200x the largest real-world LSP payload observed
+/// (rust-analyzer's full workspace completion response on a 20k-file
+/// tree) and protects us from an adversarial server claiming
+/// `Content-Length: 9e18`.
+pub const MAX_FRAME_BODY_BYTES: usize = 64 * 1024 * 1024;
+
+/// Frames a JSON body with the LSP header and returns the complete
+/// bytes to write to the transport.
+pub fn encode_frame(body: &[u8]) -> Vec<u8> {
+    let header = format!("Content-Length: {}\r\n\r\n", body.len());
+    let mut out = Vec::with_capacity(header.len() + body.len());
+    out.extend_from_slice(header.as_bytes());
+    out.extend_from_slice(body);
+    out
+}
+
+/// Attempts to decode one complete frame from the front of `buf`.
+///
+/// Returns:
+/// - `Ok(Some((body, consumed)))` — `consumed` bytes from the start
+///   of `buf` form one complete frame whose JSON body is `body`.
+///   Caller drains `buf[..consumed]`.
+/// - `Ok(None)` — not enough bytes yet (header incomplete OR body
+///   short).  Caller reads more and retries.
+/// - `Err(FrameError::…)` — header malformed; caller should drop the
+///   bytes up to the next potential frame or abort the session.
+pub fn decode_frame(buf: &[u8]) -> Result<Option<(Vec<u8>, usize)>, FrameError> {
+    let Some(sep_pos) = buf.windows(4).position(|w| w == b"\r\n\r\n") else {
+        return Ok(None);
+    };
+    let header_bytes = &buf[..sep_pos];
+    let header_str = std::str::from_utf8(header_bytes).map_err(|_| FrameError::HeaderNotUtf8)?;
+
+    let mut content_length: Option<usize> = None;
+    for line in header_str.split("\r\n") {
+        if let Some((key, val)) = line.split_once(':') {
+            if key.eq_ignore_ascii_case("content-length") {
+                let raw = val.trim();
+                content_length = Some(
+                    raw.parse::<usize>()
+                        .map_err(|_| FrameError::BadContentLength(raw.to_string()))?,
+                );
+            }
+            // Other headers (Content-Type in particular) are ignored;
+            // the spec allows them but we never branch on them.
+        }
+    }
+
+    let n = content_length.ok_or(FrameError::MissingContentLength)?;
+    if n > MAX_FRAME_BODY_BYTES {
+        return Err(FrameError::ContentLengthTooLarge { claimed: n });
+    }
+
+    let body_start = sep_pos + 4;
+    let body_end = body_start + n;
+    if buf.len() < body_end {
+        return Ok(None);
+    }
+    Ok(Some((buf[body_start..body_end].to_vec(), body_end)))
+}
+
 // ─── Async multiplexer (Phase 2 M2.1, C-slice fragment) ──────────────
 //
 // Async counterpart to `LspMultiplexer`.  Holds one triple of async
@@ -1141,5 +1245,114 @@ mod tests {
             .unwrap();
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].label, "second");
+    }
+
+    // ─── JSON-RPC wire framing (C-slice proper) ───
+
+    #[test]
+    fn encode_frame_prepends_content_length_header() {
+        let body = br#"{"jsonrpc":"2.0","id":1,"method":"initialize"}"#;
+        let framed = encode_frame(body);
+        let expected = format!("Content-Length: {}\r\n\r\n", body.len());
+        assert!(framed.starts_with(expected.as_bytes()));
+        assert_eq!(&framed[expected.len()..], body);
+    }
+
+    #[test]
+    fn encode_frame_empty_body_has_content_length_zero() {
+        let framed = encode_frame(b"");
+        assert_eq!(framed, b"Content-Length: 0\r\n\r\n");
+    }
+
+    #[test]
+    fn decode_roundtrips_a_typical_lsp_request() {
+        let body = br#"{"jsonrpc":"2.0","id":7,"method":"textDocument/completion"}"#;
+        let framed = encode_frame(body);
+        let (parsed, consumed) = decode_frame(&framed)
+            .expect("decode ok")
+            .expect("one complete frame");
+        assert_eq!(parsed, body);
+        assert_eq!(consumed, framed.len());
+    }
+
+    #[test]
+    fn decode_roundtrips_utf8_body_with_multibyte_chars() {
+        // Mixed 2-byte (ü), 3-byte (안녕 / 漢字) codepoints to catch
+        // any accidental byte / character confusion in the decoder.
+        let body = "ü 안녕 漢字 {\"a\":1}".as_bytes();
+        let framed = encode_frame(body);
+        let (parsed, consumed) = decode_frame(&framed).unwrap().unwrap();
+        assert_eq!(parsed, body);
+        assert_eq!(consumed, framed.len());
+    }
+
+    #[test]
+    fn decode_returns_none_on_partial_header() {
+        // Separator "\r\n\r\n" is not yet present.
+        let partial = b"Content-Length: 42\r";
+        assert!(decode_frame(partial).unwrap().is_none());
+    }
+
+    #[test]
+    fn decode_returns_none_on_partial_body() {
+        let body = br#"{"ok":true}"#;
+        let mut framed = encode_frame(body);
+        let short_by = 3;
+        framed.truncate(framed.len() - short_by);
+        assert!(decode_frame(&framed).unwrap().is_none());
+    }
+
+    #[test]
+    fn decode_consumes_exactly_one_frame_when_buffer_has_a_second() {
+        let b1 = br#"{"id":1}"#;
+        let b2 = br#"{"id":2}"#;
+        let mut concat = encode_frame(b1);
+        concat.extend_from_slice(&encode_frame(b2));
+        let (parsed, consumed) = decode_frame(&concat).unwrap().unwrap();
+        assert_eq!(parsed, b1);
+        assert_eq!(&concat[consumed..consumed + encode_frame(b2).len()], &encode_frame(b2)[..]);
+    }
+
+    #[test]
+    fn decode_rejects_header_missing_content_length() {
+        let malformed = b"Content-Type: application/vscode-jsonrpc\r\n\r\n{}";
+        let err = decode_frame(malformed).unwrap_err();
+        assert!(matches!(err, FrameError::MissingContentLength));
+    }
+
+    #[test]
+    fn decode_rejects_non_numeric_content_length() {
+        let malformed = b"Content-Length: abc\r\n\r\n{}";
+        let err = decode_frame(malformed).unwrap_err();
+        assert!(matches!(err, FrameError::BadContentLength(ref s) if s == "abc"));
+    }
+
+    #[test]
+    fn decode_accepts_content_type_alongside_content_length() {
+        let body = br#"{}"#;
+        let mut framed = Vec::new();
+        framed.extend_from_slice(b"Content-Type: application/vscode-jsonrpc; charset=utf-8\r\n");
+        framed.extend_from_slice(format!("Content-Length: {}\r\n\r\n", body.len()).as_bytes());
+        framed.extend_from_slice(body);
+        let (parsed, _) = decode_frame(&framed).unwrap().unwrap();
+        assert_eq!(parsed, body);
+    }
+
+    #[test]
+    fn decode_header_lookup_is_case_insensitive() {
+        let body = br#"{}"#;
+        let mut framed = Vec::new();
+        framed.extend_from_slice(format!("content-LENGTH: {}\r\n\r\n", body.len()).as_bytes());
+        framed.extend_from_slice(body);
+        let (parsed, _) = decode_frame(&framed).unwrap().unwrap();
+        assert_eq!(parsed, body);
+    }
+
+    #[test]
+    fn decode_rejects_oversized_content_length() {
+        let claim = MAX_FRAME_BODY_BYTES + 1;
+        let header = format!("Content-Length: {claim}\r\n\r\n");
+        let err = decode_frame(header.as_bytes()).unwrap_err();
+        assert!(matches!(err, FrameError::ContentLengthTooLarge { claimed } if claimed == claim));
     }
 }
