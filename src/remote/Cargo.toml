@@ -1,8 +1,11 @@
 [package]
 name = "pccx-remote"
-version = "0.1.0"
-edition = "2021"
-
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version.workspace = true
 # Secure remote backend daemon — Phase 3 scaffold.
 #
 # Target feature set (roadmap §Phase 3):

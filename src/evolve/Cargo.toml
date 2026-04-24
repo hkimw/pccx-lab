@@ -1,8 +1,11 @@
 [package]
 name = "pccx-evolve"
-version = "0.1.0"
-edition = "2021"
-
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version.workspace = true
 # DSE / speculative-decoding / PRM-gated evolutionary loop primitives.
 # Roadmap home for Phase 5A (chip DSE) + 5D/5E (Model->ISA-API->RTL).
 # Current scope: speculative decoding data primitives (longest matching

@@ -1,8 +1,11 @@
 [package]
 name = "pccx-core"
-version = "0.1.0"
-edition = "2021"
-
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version.workspace = true
 [features]
 default = []
 
@@ -21,4 +24,3 @@ toml = "1.1.2"
 # pccx-core itself (via path) is used in integration tests
 # No extra test-only deps needed — the workspace provides everything
 tempfile = "3"
-
