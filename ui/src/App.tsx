@@ -36,7 +36,7 @@ import {
   Settings2, Zap, Clock,
   Code2, Box, Layers, Cpu, ActivitySquare,
   PanelLeftClose, PanelRightClose, PanelBottomClose, CheckCircle, PieChart,
-  FolderTree, Search, Blocks
+  FolderTree, Search, Blocks, GitBranch
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -106,7 +106,7 @@ function AppInner() {
   const [bottomDock, setBottomDock]         = useState<"left" | "right" | "bottom">(() => (localStorage.getItem("pccx-bottom-dock") as any) || "bottom");
   const [cmdPaletteOpen, setCmdPaletteOpen] = useState(false);
   const [sidebarVisible, setSidebarVisible] = useState(true);
-  const [sidebarTab, setSidebarTab] = useState<"files" | "search" | "modules" | "extensions" | "verify" | "report" | "memory">("files");
+  const [sidebarTab, setSidebarTab] = useState<"files" | "search" | "modules" | "extensions" | "verify" | "report" | "memory" | "git">("files");
   const shortcutHelp = useShortcutHelp();
 
   useEffect(() => {
@@ -452,6 +452,7 @@ function AppInner() {
             { id: "files" as const, icon: <FolderTree size={17} />, label: "Explorer" },
             { id: "search" as const, icon: <Search size={17} />, label: "Search" },
             { id: "modules" as const, icon: <Blocks size={17} />, label: "Modules" },
+            { id: "git" as const, icon: <GitBranch size={17} />, label: "Source Control" },
             { id: "verify" as const, icon: <CheckCircle size={17} />, label: "Verification" },
             { id: "extensions" as const, icon: <Settings2 size={17} />, label: "Extensions" },
           ]).map(item => {
@@ -486,7 +487,7 @@ function AppInner() {
               borderBottom: `0.5px solid ${isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.08)"}`,
             }}>
               <span style={{ fontSize: 11, fontWeight: 600, color: theme.textDim, textTransform: "uppercase", letterSpacing: 0.5 }}>
-                {{ files: "Explorer", search: "Search", modules: "Modules", verify: "Verification", extensions: "Extensions", report: "Report", memory: "Memory" }[sidebarTab]}
+                {{ files: "Explorer", search: "Search", modules: "Modules", git: "Source Control", verify: "Verification", extensions: "Extensions", report: "Report", memory: "Memory" }[sidebarTab]}
               </span>
             </div>
             <div className="flex-1 overflow-y-auto min-h-0">
@@ -504,6 +505,24 @@ function AppInner() {
                 <div className="p-3">
                   <p style={{ fontSize: 11, color: theme.textMuted }}>NPU module hierarchy</p>
                   <p style={{ fontSize: 10, color: theme.textFaint, marginTop: 4 }}>Open a project to see modules</p>
+                </div>
+              )}
+              {sidebarTab === "git" && (
+                <div className="flex flex-col h-full">
+                  <div className="flex items-center gap-2 px-3 py-2" style={{ borderBottom: `0.5px solid ${isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.08)"}` }}>
+                    <GitBranch size={13} color={theme.accent} />
+                    <span style={{ fontSize: 11, fontWeight: 600, color: theme.text }}>main</span>
+                  </div>
+                  <div className="px-3 py-2">
+                    <textarea placeholder="Commit message..." rows={3} className="w-full rounded px-2 py-1 text-xs outline-none resize-none"
+                      style={{ background: theme.bgInput, color: theme.text, border: `0.5px solid ${theme.border}`, fontFamily: theme.fontMono }} />
+                    <button className="w-full mt-2 py-1.5 rounded text-xs font-medium" style={{ background: theme.accent, color: "#fff", border: "none", cursor: "pointer" }}>
+                      Commit
+                    </button>
+                  </div>
+                  <div className="px-3 py-2">
+                    <p style={{ fontSize: 10, color: theme.textFaint }}>Open a project folder to see changes</p>
+                  </div>
                 </div>
               )}
               {sidebarTab === "verify" && <VerificationSuite />}

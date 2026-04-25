@@ -694,6 +694,14 @@ fn generate_sv_docs(path: String) -> Result<String, String> {
     Ok(pccx_authoring::sv_parser::generate_module_docs(&result))
 }
 
+#[tauri::command]
+fn eval_cx(source: String) -> Result<serde_json::Value, String> {
+    match pccx_cx::run_detailed(&source) {
+        Ok(result) => serde_json::to_value(&result).map_err(|e| e.to_string()),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
 // ─── App Entry Point ──────────────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -737,6 +745,7 @@ pub fn run() {
             sv_completions,
             parse_sv_file,
             generate_sv_docs,
+            eval_cx,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

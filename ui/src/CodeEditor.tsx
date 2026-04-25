@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { Play, Sparkles, TerminalSquare, X, Activity } from "lucide-react";
 import { useTheme } from "./ThemeContext";
 import { monarchSv, systemverilogLanguageConfig } from "./monarch_sv";
+import { monarchCx, cxLanguageConfig } from "./monarch_cx";
 import { ensureMonacoReady } from "./monacoSetup";
 
 // ─── Templates ────────────────────────────────────────────────────────────────
@@ -310,10 +311,12 @@ export function CodeEditor() {
       });
     }
     monaco.languages.setMonarchTokensProvider("systemverilog", monarchSv);
-    monaco.languages.setLanguageConfiguration(
-      "systemverilog",
-      systemverilogLanguageConfig,
-    );
+    monaco.languages.setLanguageConfiguration("systemverilog", systemverilogLanguageConfig);
+    if (!langs.some((l: { id: string }) => l.id === "cx")) {
+      monaco.languages.register({ id: "cx", extensions: [".cx"], aliases: ["CX", "cx", "Compute Extensions"] });
+    }
+    monaco.languages.setMonarchTokensProvider("cx", monarchCx);
+    monaco.languages.setLanguageConfiguration("cx", cxLanguageConfig);
   }, []);
 
   const handleAiGenerate = async () => {
