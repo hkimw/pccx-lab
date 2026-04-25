@@ -11,6 +11,7 @@ import { TitleBar }          from "./TitleBar";
 import { MenuBar }           from "./MenuBar";
 import { StatusBar }         from "./StatusBar";
 import FileTree              from "./FileTree";
+import { CxPlayground }     from "./CxPlayground";
 import { CanvasView }        from "./CanvasView";
 import { NodeEditor }        from "./NodeEditor";
 import { Timeline }          from "./Timeline";
@@ -36,12 +37,12 @@ import {
   Settings2, Zap, Clock,
   Code2, Box, Layers, Cpu, ActivitySquare,
   PanelLeftClose, PanelRightClose, PanelBottomClose, CheckCircle, PieChart,
-  FolderTree, Search, Blocks, GitBranch
+  FolderTree, Search, Blocks, GitBranch, Terminal
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type ActiveTab = "timeline" | "flamegraph" | "hardware" | "memory" | "waves" | "nodes" | "canvas" | "code" | "report" | "extensions" | "verify" | "roofline" | "scenario" | "tb_author";
+type ActiveTab = "timeline" | "flamegraph" | "hardware" | "memory" | "waves" | "nodes" | "canvas" | "code" | "cx" | "report" | "extensions" | "verify" | "roofline" | "scenario" | "tb_author";
 
 interface ChatMessage { role: "system" | "user" | "ai"; content: string; }
 
@@ -53,6 +54,7 @@ const TABS: { id: ActiveTab; label: string; icon: React.ReactNode }[] = [
   { id: "hardware",   label: "Simulator",        icon: <Cpu size={12} />             },
   { id: "nodes",      label: "Data Flow",        icon: <Activity size={12} />        },
   { id: "code",       label: "Editor",           icon: <Code2 size={12} />           },
+  { id: "cx",         label: "CX",              icon: <Terminal size={12} />        },
   { id: "tb_author",  label: "Testbench",        icon: <LayoutDashboard size={12} /> },
   { id: "canvas",     label: "3D View",          icon: <Box size={12} />             },
   { id: "roofline",   label: "Roofline",         icon: <PieChart size={12} />        },
@@ -414,6 +416,7 @@ function AppInner() {
       case "nodes":      return <NodeEditor />;
       case "canvas":     return <CanvasView />;
       case "code":       return <CodeEditor />;
+      case "cx":         return <CxPlayground />;
       case "report":     return <ReportBuilder />;
       case "extensions": return <ExtensionManager />;
       case "verify":     return <VerificationSuite />;
