@@ -24,6 +24,9 @@
 // request/response correlation, a concrete verible backend, and the
 // tower-lsp adapter that serves the stack to Monaco.
 
+pub mod isa_provider;
+pub mod monaco_bridge;
+pub mod sv_diagnostics;
 pub mod sv_hover;
 pub mod sv_provider;
 
@@ -112,6 +115,24 @@ pub struct Hover {
     pub range: Option<SourceRange>,
 }
 
+/// LSP diagnostic severity levels (values match LSP spec 1..=4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum DiagnosticSeverity {
+    Error = 1,
+    Warning = 2,
+    Information = 3,
+    Hint = 4,
+}
+
+/// A single diagnostic message attached to a source range.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Diagnostic {
+    pub range: SourceRange,
+    pub severity: DiagnosticSeverity,
+    pub message: String,
+    pub source: Option<String>,
+}
+
 // ─── Unstable plugin API (Phase 2 M2.1) ──────────────────────────────
 //
 // Backends land behind three trait objects so the IntelliSense pipeline
@@ -163,6 +184,18 @@ pub trait LocationProvider {
         pos: SourcePos,
         source: &str,
     ) -> Result<Vec<SourceRange>, LspError>;
+
+    fn name(&self) -> &'static str;
+}
+
+/// Returns diagnostics for an entire file.  Called on open / save.
+pub trait DiagnosticsProvider {
+    fn diagnostics(
+        &self,
+        language: Language,
+        file: &str,
+        source: &str,
+    ) -> Result<Vec<Diagnostic>, LspError>;
 
     fn name(&self) -> &'static str;
 }
