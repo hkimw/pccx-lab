@@ -18,6 +18,7 @@ rust-version.workspace = true
 [dependencies]
 pccx-core = { path = "../core" }
 pccx-authoring = { path = "../authoring" }
+pccx-cx = { path = "../cx" }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

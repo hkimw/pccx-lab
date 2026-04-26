@@ -32,3 +32,4 @@ pccx-ai-copilot = { path = "../../crates/ai_copilot" }
 pccx-lsp = { path = "../../crates/lsp" }
 pccx-authoring = { path = "../../crates/authoring" }
 pccx-cx = { path = "../../crates/cx" }
+pccx-verification = { path = "../../crates/verification" }

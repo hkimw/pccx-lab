@@ -24,6 +24,7 @@
 // request/response correlation, a concrete verible backend, and the
 // tower-lsp adapter that serves the stack to Monaco.
 
+pub mod cx_provider;
 pub mod isa_provider;
 pub mod monaco_bridge;
 pub mod sv_diagnostics;

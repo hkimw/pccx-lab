@@ -710,22 +710,81 @@ All user specified timing constraints are met.
     }
 }
 
+/// Builds a report from the currently-cached trace and renders it to
+/// the requested format.  `format` must be `"markdown"` or `"html"`.
+/// Returns an error when no trace is loaded or the format string is
+/// unrecognised.
 #[tauri::command]
-async fn generate_report(state: State<'_, AppState>) -> Result<String, String> {
-    // MutexGuard must not be held across an await point (not Send).
-    // Block scope ensures the guard is dropped before the sleep.
-    let has_trace = {
-        state.trace.lock().unwrap().is_some()
+fn generate_report(format: String, state: State<'_, AppState>) -> Result<String, String> {
+    let fmt = match format.to_lowercase().as_str() {
+        "markdown" | "md" => pccx_reports::ReportFormat::Markdown,
+        "html"             => pccx_reports::ReportFormat::Html,
+        other => return Err(format!(
+            "Unknown report format '{}' — use 'markdown' or 'html'", other
+        )),
     };
 
-    // Simulate long-running PDF generation
-    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+    let trace_guard = state.trace.lock().unwrap();
+    let trace = trace_guard
+        .as_ref()
+        .ok_or_else(|| "No trace loaded — open a .pccx file first".to_string())?;
 
-    if has_trace {
-        Ok("Report generated and saved to output.pdf".to_string())
-    } else {
-        Ok("Report generated (no trace loaded — showing template data)".to_string())
+    let report = pccx_reports::Report::from_trace(trace, None);
+    Ok(report.render(fmt))
+}
+
+/// Input shape for a single report section delivered over IPC.
+/// The `type` tag must match the lowercase variant name.
+///
+/// Only `Summary` and `Custom` are exposed here because the remaining
+/// `Section` variants (`TraceStats`, `Roofline`, `Bottleneck`,
+/// `SynthUtil`) derive their content from numeric trace data and are
+/// not user-authored. They are constructed automatically by
+/// `generate_report` / `Report::from_trace`. Callers who need
+/// user-annotated sections (narrative text, custom tables) should
+/// supply them as `Summary` or `Custom` items and then combine with a
+/// trace-derived report on the application side.
+#[derive(serde::Deserialize, Debug)]
+#[serde(tag = "type", rename_all = "snake_case")]
+enum SectionInput {
+    Summary { title: String, body: String },
+    Custom  { title: String, content: String },
+}
+
+impl From<SectionInput> for pccx_reports::Section {
+    fn from(si: SectionInput) -> Self {
+        match si {
+            SectionInput::Summary { title, body } =>
+                pccx_reports::Section::Summary { title, body },
+            SectionInput::Custom { title, content } =>
+                pccx_reports::Section::Custom { title, content },
+        }
     }
+}
+
+/// Builds a report from caller-supplied sections and renders it to the
+/// requested format.  Sections with unsupported types are ignored.
+/// `format` must be `"markdown"` or `"html"`.
+#[tauri::command]
+fn generate_report_custom(
+    title: String,
+    sections: Vec<SectionInput>,
+    format: String,
+) -> Result<String, String> {
+    let fmt = match format.to_lowercase().as_str() {
+        "markdown" | "md" => pccx_reports::ReportFormat::Markdown,
+        "html"             => pccx_reports::ReportFormat::Html,
+        other => return Err(format!(
+            "Unknown report format '{}' — use 'markdown' or 'html'", other
+        )),
+    };
+
+    let mut builder = pccx_reports::Report::builder(&title);
+    for s in sections {
+        builder = builder.section(s.into());
+    }
+    let report = builder.build();
+    Ok(report.render(fmt))
 }
 
 // ─── LSP: SV keyword completions (Phase 2 M2.2) ─────────────────────────────
@@ -871,6 +930,52 @@ fn parse_sv_file(path: String) -> Result<serde_json::Value, String> {
     serde_json::to_value(&result).map_err(|e| e.to_string())
 }
 
+/// Parses SV source and returns a Mermaid flowchart of all modules
+/// with inferred port-name connections.
+#[tauri::command]
+fn generate_block_diagram(sv_source: String, file_path: String) -> Result<String, String> {
+    let result = pccx_authoring::sv_parser::parse_sv(&sv_source, &file_path);
+    Ok(pccx_authoring::block_diagram::generate_mermaid(&result.modules))
+}
+
+/// Metadata for one extracted FSM, sent back over IPC.
+#[derive(serde::Serialize)]
+struct FsmDiagramResult {
+    name: String,
+    mermaid: String,
+    states_count: u32,
+    transitions_count: u32,
+    dead_states: Vec<String>,
+}
+
+/// Parses SV source and returns one FsmDiagramResult per extracted FSM.
+#[tauri::command]
+fn generate_fsm_diagram(sv_source: String, file_path: String) -> Result<Vec<FsmDiagramResult>, String> {
+    let result = pccx_authoring::sv_parser::parse_sv(&sv_source, &file_path);
+    let diagrams = result.fsms.iter().map(|fsm| {
+        let mermaid = pccx_authoring::fsm_diagram::generate_mermaid_fsm(fsm);
+        FsmDiagramResult {
+            name: fsm.name.clone(),
+            mermaid,
+            states_count: fsm.states.len() as u32,
+            transitions_count: fsm.transitions.len() as u32,
+            dead_states: fsm.dead_states.clone(),
+        }
+    }).collect();
+    Ok(diagrams)
+}
+
+/// Parses SV source and returns a detailed Mermaid subgraph diagram for
+/// the named module. Returns an error if the module is not found.
+#[tauri::command]
+fn generate_module_detail(sv_source: String, module_name: String) -> Result<String, String> {
+    let result = pccx_authoring::sv_parser::parse_sv(&sv_source, "");
+    let module = result.modules.iter()
+        .find(|m| m.name == module_name)
+        .ok_or_else(|| format!("Module '{}' not found in source", module_name))?;
+    Ok(pccx_authoring::block_diagram::generate_module_detail(module))
+}
+
 #[tauri::command]
 fn generate_sv_docs(path: String) -> Result<String, String> {
     let source = std::fs::read_to_string(&path)
@@ -885,6 +990,174 @@ fn eval_cx(source: String) -> Result<serde_json::Value, String> {
         Ok(result) => serde_json::to_value(&result).map_err(|e| e.to_string()),
         Err(e) => Err(e.to_string()),
     }
+}
+
+// ─── CX LSP Commands ──────────────────────────────────────────────────────────
+
+/// Returns hover Markdown for the CX token at (line, col) in source.
+/// Returns None when the cursor is on whitespace or an unrecognised token.
+#[tauri::command]
+fn cx_hover(
+    source: String,
+    line: u32,
+    col: u32,
+) -> Result<Option<String>, String> {
+    Ok(pccx_lsp::cx_provider::cx_hover(
+        &source,
+        line as usize,
+        col as usize,
+    )
+    .map(|h| h.contents))
+}
+
+/// Returns a JSON array of completion items for the given CX source position.
+#[tauri::command]
+fn cx_complete(
+    source: String,
+    line: u32,
+    col: u32,
+) -> Result<String, String> {
+    let items = pccx_lsp::cx_provider::cx_completions(&source, line as usize, col as usize);
+    let json_items: Vec<serde_json::Value> = items
+        .into_iter()
+        .map(|c| serde_json::json!({
+            "label":      c.label,
+            "detail":     c.detail,
+            "insertText": c.insert_text,
+        }))
+        .collect();
+    serde_json::to_string(&json_items).map_err(|e| e.to_string())
+}
+
+/// Returns a JSON array of LSP diagnostics for the given CX source.
+/// Monaco uses these as model markers (squiggles).
+#[tauri::command]
+fn cx_diagnostics_cmd(source: String) -> Result<String, String> {
+    let diags = pccx_lsp::cx_provider::cx_diagnostics(&source);
+    let items: Vec<serde_json::Value> = diags
+        .iter()
+        .map(|d| {
+            let monaco_severity = match d.severity {
+                pccx_lsp::DiagnosticSeverity::Error       => 8,
+                pccx_lsp::DiagnosticSeverity::Warning     => 4,
+                pccx_lsp::DiagnosticSeverity::Information => 2,
+                pccx_lsp::DiagnosticSeverity::Hint        => 1,
+            };
+            serde_json::json!({
+                "startLineNumber": d.range.start.line + 1,
+                "startColumn":     d.range.start.character + 1,
+                "endLineNumber":   d.range.end.line + 1,
+                "endColumn":       d.range.end.character + 1,
+                "severity":        monaco_severity,
+                "message":         d.message,
+                "source":          d.source,
+            })
+        })
+        .collect();
+    serde_json::to_string(&items).map_err(|e| e.to_string())
+}
+
+// ─── Verification Commands ────────────────────────────────────────────────────
+
+/// Return type for `verify_sanitize` — named so the JSON keys are stable.
+#[derive(serde::Serialize)]
+struct SanitizeResult {
+    /// The cleaned source string after the full sanitisation pipeline.
+    cleaned: String,
+    /// Human-readable list of fixups that were applied (may be empty).
+    fixups: Vec<String>,
+}
+
+/// Runs the robust-reader sanitisation pipeline on `content`:
+/// NUL-byte removal, BOM + CRLF normalisation, and trailing-comma
+/// forgiveness. Returns the cleaned string and a list of fixups applied.
+/// Safe to call with any UTF-8 string; never fails.
+#[tauri::command]
+fn verify_sanitize(content: String) -> SanitizeResult {
+    let (cleaned, fixups) = pccx_verification::robust_reader::sanitize_full(&content);
+    SanitizeResult { cleaned, fixups }
+}
+
+/// Runs the golden-diff gate between a `.ref.jsonl` reference profile
+/// and a `.pccx` trace file.
+///
+/// - `expected_path` — path to a JSONL file of `RefProfileRow` objects
+///   (one per decode step). Generated by `profile_to_jsonl` or by the
+///   PyTorch reference pipeline.
+/// - `actual_path` — path to a `.pccx` binary trace produced by the
+///   xsim testbench suite.
+///
+/// Returns a `GoldenDiffReport` carrying per-step metric comparisons,
+/// aggregate pass/fail counts, and a one-line summary.
+#[tauri::command]
+fn verify_golden_diff(
+    expected_path: String,
+    actual_path: String,
+) -> Result<pccx_verification::golden_diff::GoldenDiffReport, String> {
+    use pccx_core::pccx_format::PccxFile;
+    use pccx_core::trace::NpuTrace;
+    use pccx_verification::golden_diff::{parse_reference_jsonl_at_path, diff};
+    use std::path::Path;
+
+    // Load and parse the reference profile.
+    let reference = parse_reference_jsonl_at_path(Path::new(&expected_path))
+        .map_err(|e| e.to_string())?;
+
+    // Load and decode the actual trace from the .pccx file.
+    let mut file = std::fs::File::open(&actual_path)
+        .map_err(|e| format!("Cannot open '{}': {}", actual_path, e))?;
+    let pccx = PccxFile::read(&mut file).map_err(|e| e.to_string())?;
+    let trace = NpuTrace::from_payload(&pccx.payload)
+        .map_err(|e| format!("Payload decode error: {}", e))?;
+
+    Ok(diff(&trace, &reference))
+}
+
+/// Renders a Markdown summary of a `GoldenDiffReport` produced by
+/// `verify_golden_diff`. Includes the top-level verdict, metric
+/// statistics, and a per-step failures table for any steps that did
+/// not pass. Passing the report across IPC a second time (rather than
+/// re-running the diff) avoids a redundant file-read round-trip.
+#[tauri::command]
+fn verify_report(
+    report: pccx_verification::golden_diff::GoldenDiffReport,
+) -> String {
+    use pccx_verification::golden_diff::GoldenDiffReport;
+
+    fn render(r: &GoldenDiffReport) -> String {
+        let mut out = String::new();
+        out.push_str("# golden-diff report\n\n");
+        out.push_str(&format!("**{}**\n\n", r.summary));
+        out.push_str("## Metric statistics\n\n");
+        out.push_str(&format!(
+            "| metric | count |\n|---|---:|\n\
+             | total comparisons | {} |\n\
+             | exact matches     | {} |\n\
+             | tolerance passes  | {} |\n\
+             | mismatches        | {} |\n\n",
+            r.total_metrics, r.exact_matches, r.tolerance_passes, r.metric_mismatches,
+        ));
+        let failed: Vec<_> = r.steps.iter().filter(|s| !s.is_pass).collect();
+        if failed.is_empty() {
+            out.push_str("All steps within tolerance.\n");
+        } else {
+            out.push_str("## Failing steps\n\n");
+            out.push_str("| step | metric | observed | expected | tol % | pass |\n\
+                          |---:|---|---:|---:|---:|:---:|\n");
+            for step in &failed {
+                for m in step.metrics.iter().filter(|m| !m.pass) {
+                    out.push_str(&format!(
+                        "| {} | `{}` | {} | {} | {:.1} | FAIL |\n",
+                        step.step, m.name, m.observed, m.expected, m.tolerance_pct,
+                    ));
+                }
+            }
+        }
+        out.push_str("\n---\n_generated by pccx-verification._\n");
+        out
+    }
+
+    render(&report)
 }
 
 // ─── MMAP Trace Commands (large-file viewport streaming) ─────────────────────
@@ -993,6 +1266,7 @@ pub fn run() {
             compress_trace_context,
             generate_uvm_sequence_cmd,
             generate_report,
+            generate_report_custom,
             load_synth_report,
             load_timing_report,
             run_verification,
@@ -1016,7 +1290,16 @@ pub fn run() {
             lsp_diagnostics,
             parse_sv_file,
             generate_sv_docs,
+            generate_block_diagram,
+            generate_fsm_diagram,
+            generate_module_detail,
             eval_cx,
+            cx_hover,
+            cx_complete,
+            cx_diagnostics_cmd,
+            verify_sanitize,
+            verify_golden_diff,
+            verify_report,
             read_file_tree,
             read_text_file,
             write_text_file,
