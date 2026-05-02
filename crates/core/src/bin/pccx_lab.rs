@@ -15,6 +15,9 @@
 ///   workflows [--format json]
 ///       Emit descriptor-only workflow metadata used by CLI and GUI consumers.
 ///
+///   workflow-proposals [--format json]
+///       Emit proposal-only workflow previews; never executes workflows.
+///
 ///   diagnostics-handoff validate --file <path> [--format json]
 ///       Validate a launcher diagnostics handoff JSON file and emit a
 ///       read-only summary. Does not execute launcher or pccx-lab flows.
@@ -140,6 +143,7 @@ fn usage() -> ! {
     eprintln!("  status [--format json]            emit lab-status contract");
     eprintln!("  theme [--format json]             emit theme-token contract");
     eprintln!("  workflows [--format json]         emit workflow descriptors");
+    eprintln!("  workflow-proposals [--format json] emit workflow proposals");
     eprintln!("  diagnostics-handoff validate --file <path> [--format json]");
     process::exit(2);
 }
@@ -276,6 +280,13 @@ fn main() {
             println!("{json}");
             process::exit(0);
         }
+        "workflow-proposals" => {
+            validate_json_format(&args[1..]);
+            let json =
+                pccx_core::workflow_proposals_json_pretty().unwrap_or_else(|_| "{}".to_string());
+            println!("{json}");
+            process::exit(0);
+        }
         "diagnostics-handoff" => handle_diagnostics_handoff(&args[1..]),
         "--help" | "-h" | "help" => {
             eprintln!("pccx-lab — NPU profiler CLI boundary");
@@ -285,6 +296,7 @@ fn main() {
             eprintln!("  status [--format json]            emit lab-status contract");
             eprintln!("  theme [--format json]             emit theme-token contract");
             eprintln!("  workflows [--format json]         emit workflow descriptors");
+            eprintln!("  workflow-proposals [--format json] emit workflow proposals");
             eprintln!("  diagnostics-handoff validate --file <path> [--format json]");
             eprintln!();
             eprintln!("exit codes: 0 clean  1 diagnostics found  2 I/O error");

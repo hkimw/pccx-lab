@@ -4,7 +4,12 @@ import { invoke } from "@tauri-apps/api/core";
 import { AlertTriangle, RefreshCw, ShieldCheck } from "lucide-react";
 
 import { useTheme } from "./ThemeContext";
-import type { LabStatus, ThemeTokenContract, WorkflowDescriptorSet } from "./labStatus";
+import type {
+  LabStatus,
+  ThemeTokenContract,
+  WorkflowDescriptorSet,
+  WorkflowProposalSet,
+} from "./labStatus";
 
 type LoadState =
   | { kind: "loading" }
@@ -14,6 +19,7 @@ type LoadState =
       status: LabStatus;
       themeContract: ThemeTokenContract;
       workflowDescriptors: WorkflowDescriptorSet;
+      workflowProposals: WorkflowProposalSet;
     };
 
 function StatusBadge({ value }: { value: string }) {
@@ -100,12 +106,13 @@ export function LabStatusPanel() {
   const load = useCallback(async () => {
     setState({ kind: "loading" });
     try {
-      const [status, themeContract, workflowDescriptors] = await Promise.all([
+      const [status, themeContract, workflowDescriptors, workflowProposals] = await Promise.all([
         invoke<LabStatus>("lab_status"),
         invoke<ThemeTokenContract>("theme_contract"),
         invoke<WorkflowDescriptorSet>("workflow_descriptors"),
+        invoke<WorkflowProposalSet>("workflow_proposals"),
       ]);
-      setState({ kind: "ready", status, themeContract, workflowDescriptors });
+      setState({ kind: "ready", status, themeContract, workflowDescriptors, workflowProposals });
     } catch (err) {
       setState({ kind: "error", message: String(err) });
     }
@@ -132,7 +139,7 @@ export function LabStatusPanel() {
       );
     }
 
-    const { status, themeContract, workflowDescriptors } = state;
+    const { status, themeContract, workflowDescriptors, workflowProposals } = state;
 
     return (
       <>
@@ -244,6 +251,66 @@ export function LabStatusPanel() {
             {workflowDescriptors.descriptors.length > 5 && (
               <span style={{ color: theme.textFaint, fontFamily: theme.fontMono, fontSize: 10 }}>
                 +{workflowDescriptors.descriptors.length - 5} descriptors
+              </span>
+            )}
+          </div>
+        </Section>
+
+        <Section title="Workflow Proposals">
+          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+            {workflowProposals.proposals.slice(0, 5).map((proposal) => (
+              <div
+                key={proposal.proposalId}
+                style={{
+                  borderBottom: `0.5px solid ${theme.borderSubtle}`,
+                  display: "grid",
+                  gap: 4,
+                  paddingBottom: 7,
+                }}
+              >
+                <div
+                  style={{
+                    alignItems: "center",
+                    display: "grid",
+                    gap: 8,
+                    gridTemplateColumns: "minmax(0, 1fr) auto",
+                  }}
+                >
+                  <span
+                    title={proposal.proposalId}
+                    style={{
+                      color: theme.text,
+                      minWidth: 0,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {proposal.label}
+                  </span>
+                  <StatusBadge value={proposal.proposalState} />
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                  <StatusBadge value={proposal.approvalRequired ? "approval required" : "no input"} />
+                  <span
+                    style={{
+                      color: theme.textFaint,
+                      fontFamily: theme.fontMono,
+                      fontSize: 10,
+                      lineHeight: "16px",
+                    }}
+                  >
+                    {proposal.commandKind}
+                  </span>
+                </div>
+                <span style={{ color: theme.textMuted, lineHeight: 1.45 }}>
+                  {proposal.inputSummary}
+                </span>
+              </div>
+            ))}
+            {workflowProposals.proposals.length > 5 && (
+              <span style={{ color: theme.textFaint, fontFamily: theme.fontMono, fontSize: 10 }}>
+                +{workflowProposals.proposals.length - 5} proposals
               </span>
             )}
           </div>

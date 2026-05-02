@@ -66,6 +66,8 @@ boundary. There is no private back channel into lab internals. See
   for a theme-neutral presentation layer.
 - `pccx-lab workflows --format json` returns descriptor-only workflow
   metadata for GUI, CI/headless, and future tool consumers.
+- `pccx-lab workflow-proposals --format json` returns proposal-only
+  previews for future approved workflow runs.
 - `pccx-lab analyze <file> --format json` returns file-shape diagnostics
   through the reusable CLI/core boundary.
 - `pccx-lab diagnostics-handoff validate --file <path> --format json`
@@ -73,10 +75,10 @@ boundary. There is no private back channel into lab internals. See
   future-consumer boundary.
 
 The GUI is a CLI-backed GUI surface, not a separate logic island. Theme
-work is experimental. Workflow descriptors do not execute anything. No
-stable plugin ABI is promised. No MCP runtime, provider runtime,
-launcher runtime, or editor runtime integration is implemented by this
-foundation.
+work is experimental. Workflow descriptors and proposals do not execute
+anything. No stable plugin ABI is promised. No MCP runtime, provider
+runtime, launcher runtime, or editor runtime integration is implemented
+by this foundation.
 
 The diagnostics handoff validator does not execute pccx-llm-launcher,
 load plugins, call providers, touch hardware, upload telemetry, write

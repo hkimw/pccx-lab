@@ -131,6 +131,13 @@ pub fn lab_status() -> LabStatus {
                 "Descriptor-only workflow metadata emitted from pccx-core.",
             ),
             workflow(
+                "workflow-proposals",
+                "Workflow proposal catalog",
+                "available",
+                "pccx-lab workflow-proposals --format json",
+                "Proposal-only workflow previews emitted from pccx-core.",
+            ),
+            workflow(
                 "gui-status",
                 "Compact verification dashboard",
                 "foundation",

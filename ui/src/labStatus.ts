@@ -102,3 +102,25 @@ export interface WorkflowDescriptorSet {
   descriptors: WorkflowDescriptor[];
   limitations: string[];
 }
+
+export interface WorkflowProposal {
+  proposalId: string;
+  workflowId: string;
+  label: string;
+  proposalState: string;
+  approvalRequired: boolean;
+  commandKind: string;
+  fixedArgsPreview: string[];
+  inputSummary: string;
+  outputPolicy: string;
+  safetyFlags: string[];
+  expectedArtifacts: string[];
+  limitations: string[];
+}
+
+export interface WorkflowProposalSet {
+  schemaVersion: string;
+  tool: string;
+  proposals: WorkflowProposal[];
+  limitations: string[];
+}

@@ -23,6 +23,7 @@ fn public_boundary_text() -> String {
         "docs/examples/run-status.example.json",
         "docs/examples/theme-tokens.example.json",
         "docs/examples/workflow-descriptors.example.json",
+        "docs/examples/workflow-proposals.example.json",
     ]
     .into_iter()
     .map(read_repo_file)
@@ -95,6 +96,7 @@ fn gui_status_panel_consumes_core_status_without_runtime_side_effects() {
     assert!(panel.contains("invoke<LabStatus>(\"lab_status\")"));
     assert!(panel.contains("invoke<ThemeTokenContract>(\"theme_contract\")"));
     assert!(panel.contains("invoke<WorkflowDescriptorSet>(\"workflow_descriptors\")"));
+    assert!(panel.contains("invoke<WorkflowProposalSet>(\"workflow_proposals\")"));
 
     for phrase in [
         "run_verification",
@@ -135,6 +137,29 @@ fn gui_workflow_descriptors_are_display_only_core_data() {
 }
 
 #[test]
+fn gui_workflow_proposals_are_display_only_core_data() {
+    let panel = read_repo_file("ui/src/LabStatusPanel.tsx");
+    assert!(panel.contains("workflowProposals.proposals"));
+    assert!(panel.contains("proposal.label"));
+    assert!(panel.contains("proposal.proposalState"));
+    assert!(panel.contains("proposal.approvalRequired"));
+    assert!(panel.contains("proposal.commandKind"));
+    assert!(panel.contains("proposal.inputSummary"));
+
+    for phrase in [
+        "pccx-lab workflow-proposals --format json",
+        "workflow-proposals",
+        "Preview SystemVerilog shape diagnostics",
+        "analyze <approved-file>",
+    ] {
+        assert!(
+            !panel.contains(phrase),
+            "GUI must render workflow proposals from IPC, not hardcode proposal text: {phrase}"
+        );
+    }
+}
+
+#[test]
 fn gui_status_types_include_contract_fields() {
     let types = read_repo_file("ui/src/labStatus.ts");
     for field in [
@@ -149,6 +174,8 @@ fn gui_status_types_include_contract_fields() {
         "ThemeTokenContract",
         "WorkflowDescriptorSet",
         "WorkflowDescriptor",
+        "WorkflowProposalSet",
+        "WorkflowProposal",
     ] {
         assert!(
             types.contains(field),

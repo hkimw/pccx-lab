@@ -18,6 +18,7 @@ pub mod live_window;
 pub mod mmap_reader;
 pub mod pccx_format;
 pub mod plugin;
+pub mod proposals;
 pub mod roofline;
 pub mod simulator;
 pub mod status;
@@ -53,6 +54,9 @@ pub use live_window::{LiveSample, LiveWindow};
 pub use mmap_reader::MmapTrace;
 pub use pccx_format::{
     fnv1a_64, ArchConfig, PayloadConfig, PccxError, PccxFile, PccxHeader, TraceConfig,
+};
+pub use proposals::{
+    workflow_proposals, workflow_proposals_json_pretty, WorkflowProposal, WorkflowProposalSet,
 };
 pub use roofline::{
     analyze as analyze_roofline, analyze_hierarchical, RooflineBand, RooflinePoint,
