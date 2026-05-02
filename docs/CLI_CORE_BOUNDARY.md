@@ -34,6 +34,8 @@ separate workflow logic island.
 
 No stable plugin ABI is promised. No MCP runtime is implemented. No
 IDE or launcher runtime integration is implemented by this foundation.
+For command snippets and consumer handoff notes, see
+[`docs/CLI_BOUNDARY_EXAMPLES.md`](CLI_BOUNDARY_EXAMPLES.md).
 
 ## status command
 
