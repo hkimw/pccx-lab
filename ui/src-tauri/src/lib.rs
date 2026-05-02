@@ -88,6 +88,12 @@ fn workflow_descriptors() -> pccx_core::workflows::WorkflowDescriptorSet {
     pccx_core::workflow_descriptors()
 }
 
+/// Returns proposal-only workflow previews for GUI rendering.
+#[tauri::command]
+fn workflow_proposals() -> pccx_core::proposals::WorkflowProposalSet {
+    pccx_core::workflow_proposals()
+}
+
 /// Returns the cached flat binary trace payload for ultra-fast JS TypedArray mapping.
 #[tauri::command]
 async fn fetch_trace_payload(state: State<'_, AppState>) -> Result<Vec<u8>, String> {
@@ -1243,6 +1249,7 @@ pub fn run() {
             lab_status,
             theme_contract,
             workflow_descriptors,
+            workflow_proposals,
             fetch_trace_payload,
             load_pccx_alt,
             fetch_trace_payload_b,

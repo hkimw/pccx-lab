@@ -39,6 +39,13 @@
       "note": "Descriptor-only workflow metadata emitted from pccx-core."
     },
     {
+      "id": "workflow-proposals",
+      "label": "Workflow proposal catalog",
+      "status": "available",
+      "boundary": "pccx-lab workflow-proposals --format json",
+      "note": "Proposal-only workflow previews emitted from pccx-core."
+    },
+    {
       "id": "gui-status",
       "label": "Compact verification dashboard",
       "status": "foundation",

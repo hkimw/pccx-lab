@@ -20,10 +20,12 @@ separate workflow logic island.
 | `pccx-lab status --format json` | available | Deterministic lab-status JSON from `pccx-core`. |
 | `pccx-lab theme --format json` | experimental | Minimal semantic theme-token contract. |
 | `pccx-lab workflows --format json` | available | Descriptor-only workflow catalog from `pccx-core`. |
+| `pccx-lab workflow-proposals --format json` | available | Proposal-only workflow previews from `pccx-core`. |
 | `pccx-lab analyze <file> --format json` | early scaffold | File-shape diagnostics only. |
 | `lab_status` Tauri command | available | GUI reads the same core status struct. |
 | `theme_contract` Tauri command | experimental | GUI reads the same core theme-token struct. |
 | `workflow_descriptors` Tauri command | available | GUI reads descriptor-only workflow metadata. |
+| `workflow_proposals` Tauri command | available | GUI reads proposal-only workflow previews. |
 
 No stable plugin ABI is promised. No MCP runtime is implemented. No
 IDE or launcher runtime integration is implemented by this foundation.
@@ -118,6 +120,42 @@ Descriptor fields:
 | `futureConsumers` | Intended future consumers such as GUI, CI/headless worker, future IDE/launcher consumer, or future MCP/tool consumer. |
 | `limitations` | Explicit constraints carried with the descriptor. |
 
+## workflow-proposals command
+
+```
+pccx-lab workflow-proposals [--format json]
+```
+
+`workflow-proposals` emits deterministic proposal-only previews matching
+[`docs/examples/workflow-proposals.example.json`](examples/workflow-proposals.example.json).
+These objects explain what a later approved run would do, without doing
+it now.
+
+The preview keeps command information structured. `fixedArgsPreview` is
+a bounded token array, not a raw shell command string. Some proposals
+require no runtime input; others mark `approvalRequired: true` because a
+future boundary would need an approved local input before any execution
+could be considered.
+
+Proposal fields:
+
+| Field | Meaning |
+|---|---|
+| `proposalId` | Stable preview identifier for this early proposal catalog. |
+| `workflowId` | Descriptor id that the proposal is derived from. |
+| `proposalState` | Always `proposal_only` in this boundary. |
+| `approvalRequired` | Whether a later run would require explicit approval. |
+| `commandKind` | Structured command category, not a shell string. |
+| `fixedArgsPreview` | Bounded argument-token preview for fixed CLI boundaries. |
+| `inputSummary` | Human-readable summary of required future input. |
+| `outputPolicy` | Bounded output shape expected from a future approved run. |
+| `expectedArtifacts` | Empty for the proposal listing boundary. |
+| `limitations` | Explicit non-execution constraints. |
+
+The proposal command does not execute workflows, read user paths, create
+artifacts, run verification, start MCP runtimes, call providers, or
+touch the FPGA repo.
+
 ## analyze command
 
 ```
@@ -160,6 +198,8 @@ for status and theme metadata. It reads:
 - `pccx_core::theme::theme_contract` through the `theme_contract` Tauri command.
 - `pccx_core::workflows::workflow_descriptors` through the
   `workflow_descriptors` Tauri command.
+- `pccx_core::proposals::workflow_proposals` through the
+  `workflow_proposals` Tauri command.
 
 The panel does not run FPGA flows, provider calls, MCP flows, IDE
 bridges, launcher bridges, or arbitrary shell commands.

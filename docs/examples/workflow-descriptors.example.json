@@ -63,6 +63,68 @@
       ]
     },
     {
+      "workflowId": "workflow-descriptor-catalog",
+      "label": "Workflow descriptor catalog",
+      "category": "status",
+      "description": "Descriptor-only workflow metadata for shared consumers.",
+      "availabilityState": "available",
+      "executionState": "descriptor_only",
+      "inputPolicy": "No user input is read by this descriptor.",
+      "outputPolicy": "Pretty JSON with descriptor-only workflow metadata.",
+      "safetyFlags": [
+        "no-execution",
+        "no-shell",
+        "no-hardware",
+        "no-fpga-repo",
+        "no-network",
+        "no-provider-call",
+        "no-private-paths",
+        "no-secrets"
+      ],
+      "evidenceState": "metadata-only",
+      "futureConsumers": [
+        "GUI",
+        "CI/headless worker",
+        "future IDE/launcher consumer",
+        "future MCP/tool consumer"
+      ],
+      "limitations": [
+        "Descriptor catalog listing does not execute workflows.",
+        "Descriptors are not plugin loading or runtime integration."
+      ]
+    },
+    {
+      "workflowId": "workflow-proposal-catalog",
+      "label": "Workflow proposal catalog",
+      "category": "status",
+      "description": "Proposal-only workflow previews for future approval boundaries.",
+      "availabilityState": "available",
+      "executionState": "descriptor_only",
+      "inputPolicy": "No user input is read by this descriptor.",
+      "outputPolicy": "Pretty JSON with proposal-only workflow previews.",
+      "safetyFlags": [
+        "no-execution",
+        "no-shell",
+        "no-hardware",
+        "no-fpga-repo",
+        "no-network",
+        "no-provider-call",
+        "no-private-paths",
+        "no-secrets"
+      ],
+      "evidenceState": "metadata-only",
+      "futureConsumers": [
+        "GUI",
+        "CI/headless worker",
+        "future IDE/launcher consumer",
+        "future MCP/tool consumer"
+      ],
+      "limitations": [
+        "Proposal catalog listing does not execute workflows.",
+        "A separate approval boundary is required before any future run."
+      ]
+    },
+    {
       "workflowId": "systemverilog-shape-diagnostics",
       "label": "SystemVerilog shape diagnostics",
       "category": "diagnostics",
