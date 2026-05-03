@@ -26,6 +26,7 @@ separate workflow logic island.
 | `pccx-lab analyze <file> --format json` | early scaffold | File-shape diagnostics only. |
 | `pccx-lab diagnostics-handoff validate --file <path> --format json` | read-only validator | Launcher diagnostics handoff schema reader. |
 | `pccx-lab device-session-status validate --file <path> --format json` | read-only validator | Launcher device/session status schema reader. |
+| `docs/examples/mcp-read-only-tool-plan.example.json` | planned boundary map | Checked future MCP/tool adapter plan over fixed CLI/core commands; no runtime is implemented. |
 | `lab_status` Tauri command | available | GUI reads the same core status struct. |
 | `theme_contract` Tauri command | experimental | GUI reads the same core theme-token struct. |
 | `workflow_descriptors` Tauri command | available | GUI reads descriptor-only workflow metadata. |
@@ -56,6 +57,7 @@ aligned.
 | `workflow-runner-result` | `docs/examples/workflow-runner-blocked.example.json` | `pccx-lab run-approved-workflow <proposal-id> --format json`; `pccx_core::runner::blocked_workflow_result` | Shape validator, inventory test, Rust deserialize test |
 | `launcher-diagnostics-handoff` | `docs/examples/launcher-diagnostics-handoff.example.json` | Reader only; `pccx_core::diagnostics_handoff::validate_diagnostics_handoff_json` | Shape validator, inventory test, Rust reader validation test |
 | `launcher-device-session-status` | `docs/examples/launcher-device-session-status.example.json` | Reader only; `pccx_core::device_session_status::validate_device_session_status_json` | Shape validator, inventory test, Rust reader validation test |
+| `mcp-read-only-tool-plan` | `docs/examples/mcp-read-only-tool-plan.example.json` | Reader only; planned future MCP/tool adapter boundary over existing CLI/core commands | Shape validator, inventory test, Rust JSON-shape test |
 
 ## Current cross-repo direction
 
@@ -388,6 +390,37 @@ probe KV260 hardware, load model assets, start runtime code, stream
 logs, upload telemetry, or write artifacts. Future GUI, launcher, or
 evidence workflows may render the summary as status data, but validation
 logic should remain in pccx-core or an explicit CLI/core boundary.
+
+## MCP read-only tool plan
+
+The checked fixture
+[`docs/examples/mcp-read-only-tool-plan.example.json`](examples/mcp-read-only-tool-plan.example.json)
+maps a future MCP/tool adapter onto existing CLI/core contracts. It is a
+planning boundary only: no MCP server, MCP client, runtime bridge,
+provider call, network call, hardware access, repository mutation, or
+GUI-only automation is implemented.
+
+The initial read-only tool list is limited to fixed CLI/core boundaries:
+
+- `status --format json`
+- `workflows --format json`
+- `workflow-proposals --format json`
+- `workflow-results --format json`
+- `diagnostics-handoff validate --file <approved-json-file> --format json`
+- `device-session-status validate --file <approved-json-file> --format json`
+- `analyze <approved-source-file> --format json`
+
+The fixture also records the permission model and audit-log plan for a
+future reviewed adapter. Default mode is read-only. File inputs require
+explicit approval, command arguments stay structured, and blocked actions
+include public push, release/tag control, hidden background changes,
+arbitrary shell commands, provider calls, network calls, hardware probes,
+runtime launch, model load, and telemetry upload.
+
+Deferred tools such as trace open, report generation, verification
+comparison, and pull-request summary preparation require separate
+reviewed boundaries before they can read additional inputs, write
+artifacts, or prepare public repository text.
 
 ## GUI foundation
 

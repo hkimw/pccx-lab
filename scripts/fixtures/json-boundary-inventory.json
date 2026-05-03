@@ -153,6 +153,23 @@
         "testName": "launcher_device_session_status_example_validates_through_core_reader"
       },
       "docsAnchor": "docs/CLI_CORE_BOUNDARY.md#device-session-status-command"
+    },
+    {
+      "boundaryKind": "mcp-read-only-tool-plan",
+      "examplePath": "docs/examples/mcp-read-only-tool-plan.example.json",
+      "producingCommand": null,
+      "coreGeneratorOrReader": "docs/CLI_CORE_BOUNDARY.md#mcp-read-only-tool-plan",
+      "readerOnly": true,
+      "shapeValidation": {
+        "kind": "mcp-read-only-tool-plan",
+        "validator": "scripts/json_boundary_shape_validator.py",
+        "fixtureTest": "scripts/test-json-boundary-shapes.sh"
+      },
+      "rustValidation": {
+        "testPath": "crates/core/tests/json_boundary_examples.rs",
+        "testName": "mcp_read_only_tool_plan_example_keeps_descriptor_only_safety_boundary"
+      },
+      "docsAnchor": "docs/CLI_CORE_BOUNDARY.md#mcp-read-only-tool-plan"
     }
   ]
 }

@@ -559,6 +559,130 @@ def validate_launcher_device_session_status(value: Any) -> None:
     require_string_array(require_field(root, "$", "issueRefs"), "$.issueRefs")
 
 
+def validate_mcp_read_only_tool_plan(value: Any) -> None:
+    root = expect_object(value, "$")
+    require_schema(root, "$", "pccx.lab.mcp-read-only-tool-plan.v0")
+    require_string_fields(
+        root,
+        "$",
+        ["tool", "planId", "planState", "adapterState", "automationPath", "defaultMode"],
+    )
+    if root["planState"] != "descriptor_only":
+        raise ShapeError("unexpected value at $.planState: expected descriptor_only")
+    if root["adapterState"] != "not_implemented":
+        raise ShapeError("unexpected value at $.adapterState: expected not_implemented")
+    if root["defaultMode"] != "read_only_first":
+        raise ShapeError("unexpected value at $.defaultMode: expected read_only_first")
+
+    tools = require_object_array(require_field(root, "$", "toolList"), "$.toolList", min_items=1)
+    for tool in tools:
+        path = "$.toolList[]"
+        require_string_fields(
+            tool,
+            path,
+            [
+                "toolId",
+                "label",
+                "category",
+                "availabilityState",
+                "commandKind",
+                "inputPolicy",
+                "outputPolicy",
+                "auditEvent",
+            ],
+        )
+        if expect_bool(require_field(tool, path, "readOnly"), child(path, "readOnly")) is not True:
+            raise ShapeError("unexpected value at $.toolList[].readOnly: expected true")
+        expect_bool(require_field(tool, path, "approvalRequired"), child(path, "approvalRequired"))
+        require_string_array(
+            require_field(tool, path, "fixedArgsPreview"),
+            child(path, "fixedArgsPreview"),
+            min_items=1,
+        )
+
+    deferred_tools = require_object_array(
+        require_field(root, "$", "deferredTools"), "$.deferredTools", min_items=1
+    )
+    for tool in deferred_tools:
+        require_string_fields(tool, "$.deferredTools[]", ["toolId", "availabilityState", "reason"])
+
+    permission = expect_object(require_field(root, "$", "permissionModel"), "$.permissionModel")
+    require_string_fields(permission, "$.permissionModel", ["defaultMode", "allowedCommandKind"])
+    require_bool_fields(
+        permission,
+        "$.permissionModel",
+        [
+            "readOnlyByDefault",
+            "writeActionsRequireApproval",
+            "pathInputRequiresApproval",
+            "rawShellCommandsAllowed",
+        ],
+    )
+    for field in ["readOnlyByDefault", "writeActionsRequireApproval", "pathInputRequiresApproval"]:
+        if permission[field] is not True:
+            raise ShapeError(f"unexpected value at $.permissionModel.{field}: expected true")
+    if permission["rawShellCommandsAllowed"] is not False:
+        raise ShapeError("unexpected value at $.permissionModel.rawShellCommandsAllowed: expected false")
+    require_string_array(require_field(permission, "$.permissionModel", "blockedActions"), "$.permissionModel.blockedActions", min_items=1)
+
+    audit = expect_object(require_field(root, "$", "auditLogPlan"), "$.auditLogPlan")
+    require_string_fields(audit, "$.auditLogPlan", ["state", "eventSchema", "storagePolicy"])
+    require_string_array(require_field(audit, "$.auditLogPlan", "recordedFields"), "$.auditLogPlan.recordedFields", min_items=1)
+    require_string_array(require_field(audit, "$.auditLogPlan", "redactedFields"), "$.auditLogPlan.redactedFields", min_items=1)
+
+    commands = require_object_array(
+        require_field(root, "$", "commandMap"), "$.commandMap", min_items=1
+    )
+    for command in commands:
+        path = "$.commandMap[]"
+        require_string_fields(
+            command,
+            path,
+            ["toolId", "coreBoundary", "inputKind", "sideEffectPolicy"],
+        )
+        require_string_array(
+            require_field(command, path, "fixedArgsPreview"),
+            child(path, "fixedArgsPreview"),
+            min_items=1,
+        )
+
+    safety = expect_object(require_field(root, "$", "safetyFlags"), "$.safetyFlags")
+    true_flags = ["dataOnly", "descriptorOnly", "readOnly"]
+    false_flags = [
+        "mcpRuntimeImplemented",
+        "mcpServerImplemented",
+        "shellExecution",
+        "runtimeExecution",
+        "networkCalls",
+        "providerCalls",
+        "launcherExecution",
+        "editorExecution",
+        "hardwareAccess",
+        "kv260Access",
+        "fpgaRepoAccess",
+        "modelExecution",
+        "modelWeightsIncluded",
+        "privatePathsIncluded",
+        "secretsIncluded",
+        "telemetry",
+        "writeBack",
+        "writesArtifacts",
+        "publicPush",
+        "releaseOrTag",
+        "stableApiAbiClaim",
+    ]
+    require_bool_fields(safety, "$.safetyFlags", true_flags + false_flags)
+    for flag in true_flags:
+        if safety[flag] is not True:
+            raise ShapeError(f"unexpected value at $.safetyFlags.{flag}: expected true")
+    for flag in false_flags:
+        if safety[flag] is not False:
+            raise ShapeError(f"unexpected value at $.safetyFlags.{flag}: expected false")
+
+    require_string_array(require_field(root, "$", "limitations"), "$.limitations", min_items=1)
+    require_string_array(require_field(root, "$", "issueRefs"), "$.issueRefs", min_items=1)
+
+
 SPECS = [
     BoundarySpec("diagnostics-envelope", "docs/examples/diagnostics-envelope.example.json", validate_diagnostics_envelope),
     BoundarySpec("lab-status", "docs/examples/run-status.example.json", validate_lab_status),
@@ -569,6 +693,7 @@ SPECS = [
     BoundarySpec("workflow-runner-result", "docs/examples/workflow-runner-blocked.example.json", validate_workflow_runner_result),
     BoundarySpec("launcher-diagnostics-handoff", "docs/examples/launcher-diagnostics-handoff.example.json", validate_launcher_handoff),
     BoundarySpec("launcher-device-session-status", "docs/examples/launcher-device-session-status.example.json", validate_launcher_device_session_status),
+    BoundarySpec("mcp-read-only-tool-plan", "docs/examples/mcp-read-only-tool-plan.example.json", validate_mcp_read_only_tool_plan),
 ]
 
 

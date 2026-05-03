@@ -19,7 +19,7 @@ wrappers backed by `pccx-core`.
 | CI or headless worker | `pccx-lab ... --format json` | Parse deterministic JSON and keep logs bounded. |
 | Future editor consumer | CLI JSON, then reviewed IPC if needed | Do not bypass pccx-lab or read private GUI state. |
 | Future launcher consumer | Status, diagnostics handoff, proposals, summaries | Treat runtime bridges as separate reviewed work. |
-| Future MCP/tool consumer | Descriptor and proposal JSON | Consume descriptor-only contracts until a controlled adapter exists. |
+| Future MCP/tool consumer | Descriptor, proposal, and read-only tool-plan JSON | Consume descriptor-only contracts until a controlled adapter exists. |
 
 No stable plugin ABI is promised. No provider, launcher, editor, or MCP
 runtime is implemented by these examples.
@@ -139,6 +139,44 @@ Full fixture:
 Use proposals to show what a later approved run would do. The preview
 is structured tokens, not a raw shell string.
 
+## MCP Read-Only Tool Plan
+
+Full fixture:
+[`mcp-read-only-tool-plan.example.json`](examples/mcp-read-only-tool-plan.example.json)
+
+```json
+{
+  "schemaVersion": "pccx.lab.mcp-read-only-tool-plan.v0",
+  "planState": "descriptor_only",
+  "adapterState": "not_implemented",
+  "defaultMode": "read_only_first",
+  "toolList": [
+    {
+      "toolId": "lab.status.read",
+      "readOnly": true,
+      "approvalRequired": false,
+      "fixedArgsPreview": [
+        "status",
+        "--format",
+        "json"
+      ]
+    }
+  ],
+  "safetyFlags": {
+    "descriptorOnly": true,
+    "readOnly": true,
+    "mcpRuntimeImplemented": false,
+    "shellExecution": false,
+    "writeBack": false
+  }
+}
+```
+
+Use this fixture as the reviewed shape for future MCP/tool adapter
+planning. It does not implement an MCP runtime and does not grant
+approval to execute writes, shell commands, provider calls, hardware
+access, launcher/editor bridges, release/tag control, or public pushes.
+
 ## Workflow Results
 
 ```bash
@@ -174,6 +212,8 @@ this summary contract.
   proof that the target, runtime, model load, or log stream exists.
 - Keep future tool adapters descriptor-only until their safety boundary
   is reviewed.
+- Use the MCP read-only tool-plan fixture for tool-list, permission, and
+  audit-plan alignment before implementing any adapter.
 
 ## Launcher Device/Session Status
 

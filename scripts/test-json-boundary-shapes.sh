@@ -116,7 +116,8 @@ run_case \
     pass \
     "shape validation: all checks passed" \
     "[lab-status] shape ok" \
-    "[launcher-diagnostics-handoff] shape ok"
+    "[launcher-diagnostics-handoff] shape ok" \
+    "[mcp-read-only-tool-plan] shape ok"
 
 run_case \
     "missing status schema version" \
