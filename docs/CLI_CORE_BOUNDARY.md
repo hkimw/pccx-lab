@@ -27,6 +27,7 @@ separate workflow logic island.
 | `pccx-lab diagnostics-handoff validate --file <path> --format json` | read-only validator | Launcher diagnostics handoff schema reader. |
 | `pccx-lab device-session-status validate --file <path> --format json` | read-only validator | Launcher device/session status schema reader. |
 | `docs/examples/mcp-read-only-tool-plan.example.json` | planned boundary map | Checked future MCP/tool adapter plan over fixed CLI/core commands; no runtime is implemented. |
+| `docs/examples/mcp-audit-event.example.json` | planned audit event shape | Checked redacted audit-event shape for a future read-only MCP/tool adapter; no logger or runtime is implemented. |
 | `docs/examples/plugin-boundary-plan.example.json` | planned boundary map | Checked plugin manifest and host API plan; no plugin runtime is implemented. |
 | `lab_status` Tauri command | available | GUI reads the same core status struct. |
 | `theme_contract` Tauri command | experimental | GUI reads the same core theme-token struct. |
@@ -59,6 +60,7 @@ aligned.
 | `launcher-diagnostics-handoff` | `docs/examples/launcher-diagnostics-handoff.example.json` | Reader only; `pccx_core::diagnostics_handoff::validate_diagnostics_handoff_json` | Shape validator, inventory test, Rust reader validation test |
 | `launcher-device-session-status` | `docs/examples/launcher-device-session-status.example.json` | Reader only; `pccx_core::device_session_status::validate_device_session_status_json` | Shape validator, inventory test, Rust reader validation test |
 | `mcp-read-only-tool-plan` | `docs/examples/mcp-read-only-tool-plan.example.json` | Reader only; planned future MCP/tool adapter boundary over existing CLI/core commands | Shape validator, inventory test, Rust JSON-shape test |
+| `mcp-audit-event` | `docs/examples/mcp-audit-event.example.json` | Reader only; planned redacted audit-event shape for future read-only tool requests | Shape validator, inventory test, Rust JSON-shape test |
 | `plugin-boundary-plan` | `docs/examples/plugin-boundary-plan.example.json` | Reader only; planned plugin manifest and host API boundary over existing CLI/core commands | Shape validator, inventory test, Rust JSON-shape test |
 
 ## Current cross-repo direction
@@ -418,6 +420,20 @@ explicit approval, command arguments stay structured, and blocked actions
 include public push, release/tag control, hidden background changes,
 arbitrary shell commands, provider calls, network calls, hardware probes,
 runtime launch, model load, and telemetry upload.
+
+## MCP audit event boundary
+
+[`docs/examples/mcp-audit-event.example.json`](examples/mcp-audit-event.example.json)
+defines the checked event shape for the future read-only MCP/tool audit
+log. It is an example-only, redacted metadata boundary. It records the
+request id, tool id, fixed argument preview, approved input reference
+kind, outcome state, validation summary, and redaction state that a
+future adapter would need to preserve.
+
+The fixture does not create an audit log file, execute a command, start
+an MCP server or client, call a provider, use the network, touch
+hardware, mutate a repository, or write artifacts. It also excludes
+private paths, secrets, tokens, model weight paths, stdout, and stderr.
 
 Deferred tools such as trace open, report generation, verification
 comparison, and pull-request summary preparation require separate

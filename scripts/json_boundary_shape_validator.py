@@ -683,6 +683,108 @@ def validate_mcp_read_only_tool_plan(value: Any) -> None:
     require_string_array(require_field(root, "$", "issueRefs"), "$.issueRefs", min_items=1)
 
 
+def validate_mcp_audit_event(value: Any) -> None:
+    root = expect_object(value, "$")
+    require_schema(root, "$", "pccx.lab.mcp-audit-event.v0")
+    require_string_fields(
+        root,
+        "$",
+        [
+            "tool",
+            "eventId",
+            "requestId",
+            "eventState",
+            "adapterState",
+            "timestamp",
+            "toolId",
+            "auditEvent",
+            "commandKind",
+            "approvedInputReferenceKind",
+            "outcomeState",
+            "sideEffectPolicy",
+        ],
+    )
+    if root["eventState"] != "example_only":
+        raise ShapeError("unexpected value at $.eventState: expected example_only")
+    if root["adapterState"] != "not_implemented":
+        raise ShapeError("unexpected value at $.adapterState: expected not_implemented")
+    if root["outcomeState"] != "not_executed":
+        raise ShapeError("unexpected value at $.outcomeState: expected not_executed")
+
+    require_string_array(
+        require_field(root, "$", "fixedArgsPreview"),
+        "$.fixedArgsPreview",
+        min_items=1,
+    )
+
+    validation = expect_object(
+        require_field(root, "$", "validationSummary"),
+        "$.validationSummary",
+    )
+    require_string_fields(validation, "$.validationSummary", ["state", "summary"])
+    require_bool_fields(
+        validation,
+        "$.validationSummary",
+        ["summaryOnly", "pathEchoed", "stdoutCaptured", "stderrCaptured", "artifactWritten"],
+    )
+    if validation["summaryOnly"] is not True:
+        raise ShapeError("unexpected value at $.validationSummary.summaryOnly: expected true")
+    for field in ["pathEchoed", "stdoutCaptured", "stderrCaptured", "artifactWritten"]:
+        if validation[field] is not False:
+            raise ShapeError(f"unexpected value at $.validationSummary.{field}: expected false")
+
+    redaction = expect_object(require_field(root, "$", "redactionState"), "$.redactionState")
+    require_string_field(redaction, "$.redactionState", "state")
+    redaction_false_flags = [
+        "privatePathsIncluded",
+        "secretsIncluded",
+        "tokensIncluded",
+        "modelWeightPathsIncluded",
+        "stdoutIncluded",
+        "stderrIncluded",
+    ]
+    require_bool_fields(redaction, "$.redactionState", redaction_false_flags)
+    for flag in redaction_false_flags:
+        if redaction[flag] is not False:
+            raise ShapeError(f"unexpected value at $.redactionState.{flag}: expected false")
+
+    safety = expect_object(require_field(root, "$", "safetyFlags"), "$.safetyFlags")
+    true_flags = ["dataOnly", "descriptorOnly", "readOnly"]
+    false_flags = [
+        "mcpRuntimeImplemented",
+        "mcpServerImplemented",
+        "shellExecution",
+        "runtimeExecution",
+        "networkCalls",
+        "providerCalls",
+        "hardwareAccess",
+        "kv260Access",
+        "fpgaRepoAccess",
+        "modelExecution",
+        "privatePathsIncluded",
+        "secretsIncluded",
+        "tokensIncluded",
+        "stdoutIncluded",
+        "stderrIncluded",
+        "telemetry",
+        "writeBack",
+        "writesArtifacts",
+        "publicPush",
+        "releaseOrTag",
+        "stableApiAbiClaim",
+    ]
+    require_bool_fields(safety, "$.safetyFlags", true_flags + false_flags)
+    for flag in true_flags:
+        if safety[flag] is not True:
+            raise ShapeError(f"unexpected value at $.safetyFlags.{flag}: expected true")
+    for flag in false_flags:
+        if safety[flag] is not False:
+            raise ShapeError(f"unexpected value at $.safetyFlags.{flag}: expected false")
+
+    require_string_array(require_field(root, "$", "limitations"), "$.limitations", min_items=1)
+    require_string_array(require_field(root, "$", "issueRefs"), "$.issueRefs", min_items=1)
+
+
 def validate_plugin_boundary_plan(value: Any) -> None:
     root = expect_object(value, "$")
     require_schema(root, "$", "pccx.lab.plugin-boundary-plan.v0")
@@ -894,6 +996,7 @@ SPECS = [
     BoundarySpec("launcher-diagnostics-handoff", "docs/examples/launcher-diagnostics-handoff.example.json", validate_launcher_handoff),
     BoundarySpec("launcher-device-session-status", "docs/examples/launcher-device-session-status.example.json", validate_launcher_device_session_status),
     BoundarySpec("mcp-read-only-tool-plan", "docs/examples/mcp-read-only-tool-plan.example.json", validate_mcp_read_only_tool_plan),
+    BoundarySpec("mcp-audit-event", "docs/examples/mcp-audit-event.example.json", validate_mcp_audit_event),
     BoundarySpec("plugin-boundary-plan", "docs/examples/plugin-boundary-plan.example.json", validate_plugin_boundary_plan),
 ]
 
