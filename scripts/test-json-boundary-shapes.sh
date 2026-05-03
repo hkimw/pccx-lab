@@ -118,6 +118,7 @@ run_case \
     "[lab-status] shape ok" \
     "[launcher-diagnostics-handoff] shape ok" \
     "[mcp-read-only-tool-plan] shape ok" \
+    "[mcp-audit-event] shape ok" \
     "[plugin-boundary-plan] shape ok"
 
 run_case \

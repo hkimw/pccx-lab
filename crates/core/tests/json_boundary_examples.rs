@@ -240,6 +240,71 @@ fn mcp_read_only_tool_plan_example_keeps_descriptor_only_safety_boundary() {
 }
 
 #[test]
+fn mcp_audit_event_example_keeps_redacted_read_only_boundary() {
+    let value: serde_json::Value = parse_example("mcp-audit-event.example.json");
+    let root = value
+        .as_object()
+        .expect("MCP audit event example must be an object");
+
+    assert_eq!(root["schemaVersion"], "pccx.lab.mcp-audit-event.v0");
+    assert_eq!(root["eventState"], "example_only");
+    assert_eq!(root["adapterState"], "not_implemented");
+    assert_eq!(root["outcomeState"], "not_executed");
+    assert_eq!(root["toolId"], "lab.status.read");
+
+    let args = root["fixedArgsPreview"]
+        .as_array()
+        .expect("fixed args preview must be an array");
+    assert_eq!(args[0], "status");
+    assert_eq!(args[1], "--format");
+    assert_eq!(args[2], "json");
+
+    let validation = root["validationSummary"]
+        .as_object()
+        .expect("validation summary must be an object");
+    assert_eq!(validation["summaryOnly"], true);
+    assert_eq!(validation["pathEchoed"], false);
+    assert_eq!(validation["stdoutCaptured"], false);
+    assert_eq!(validation["stderrCaptured"], false);
+    assert_eq!(validation["artifactWritten"], false);
+
+    let redaction = root["redactionState"]
+        .as_object()
+        .expect("redaction state must be an object");
+    assert_eq!(redaction["privatePathsIncluded"], false);
+    assert_eq!(redaction["secretsIncluded"], false);
+    assert_eq!(redaction["tokensIncluded"], false);
+    assert_eq!(redaction["modelWeightPathsIncluded"], false);
+    assert_eq!(redaction["stdoutIncluded"], false);
+    assert_eq!(redaction["stderrIncluded"], false);
+
+    let safety = root["safetyFlags"]
+        .as_object()
+        .expect("safety flags must be an object");
+    assert_eq!(safety["dataOnly"], true);
+    assert_eq!(safety["descriptorOnly"], true);
+    assert_eq!(safety["readOnly"], true);
+    assert_eq!(safety["mcpRuntimeImplemented"], false);
+    assert_eq!(safety["mcpServerImplemented"], false);
+    assert_eq!(safety["shellExecution"], false);
+    assert_eq!(safety["runtimeExecution"], false);
+    assert_eq!(safety["networkCalls"], false);
+    assert_eq!(safety["providerCalls"], false);
+    assert_eq!(safety["hardwareAccess"], false);
+    assert_eq!(safety["fpgaRepoAccess"], false);
+    assert_eq!(safety["modelExecution"], false);
+    assert_eq!(safety["privatePathsIncluded"], false);
+    assert_eq!(safety["secretsIncluded"], false);
+    assert_eq!(safety["tokensIncluded"], false);
+    assert_eq!(safety["stdoutIncluded"], false);
+    assert_eq!(safety["stderrIncluded"], false);
+    assert_eq!(safety["writeBack"], false);
+    assert_eq!(safety["writesArtifacts"], false);
+    assert_eq!(safety["publicPush"], false);
+    assert_eq!(safety["releaseOrTag"], false);
+}
+
+#[test]
 fn plugin_boundary_plan_example_keeps_manifest_only_safety_boundary() {
     let value: serde_json::Value = parse_example("plugin-boundary-plan.example.json");
     let root = value

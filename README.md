@@ -75,6 +75,9 @@ boundary. There is no private back channel into lab internals. See
 - `docs/examples/mcp-read-only-tool-plan.example.json` maps a future
   MCP/tool adapter to read-only CLI/core commands; it is a checked plan,
   not a runtime implementation.
+- `docs/examples/mcp-audit-event.example.json` records the redacted
+  audit-event shape for a future read-only MCP/tool adapter; it is not
+  an audit logger or runtime implementation.
 - `docs/examples/plugin-boundary-plan.example.json` records the plugin
   manifest and host API planning boundary; it is not a plugin loader or
   package distribution flow.

@@ -172,6 +172,23 @@
       "docsAnchor": "docs/CLI_CORE_BOUNDARY.md#mcp-read-only-tool-plan"
     },
     {
+      "boundaryKind": "mcp-audit-event",
+      "examplePath": "docs/examples/mcp-audit-event.example.json",
+      "producingCommand": null,
+      "coreGeneratorOrReader": "docs/CLI_CORE_BOUNDARY.md#mcp-audit-event-boundary",
+      "readerOnly": true,
+      "shapeValidation": {
+        "kind": "mcp-audit-event",
+        "validator": "scripts/json_boundary_shape_validator.py",
+        "fixtureTest": "scripts/test-json-boundary-shapes.sh"
+      },
+      "rustValidation": {
+        "testPath": "crates/core/tests/json_boundary_examples.rs",
+        "testName": "mcp_audit_event_example_keeps_redacted_read_only_boundary"
+      },
+      "docsAnchor": "docs/CLI_CORE_BOUNDARY.md#mcp-audit-event-boundary"
+    },
+    {
       "boundaryKind": "plugin-boundary-plan",
       "examplePath": "docs/examples/plugin-boundary-plan.example.json",
       "producingCommand": null,
