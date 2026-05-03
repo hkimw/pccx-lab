@@ -72,6 +72,9 @@ boundary. There is no private back channel into lab internals. See
   previews for future approved workflow runs.
 - `pccx-lab workflow-results --format json` returns summary-only
   workflow result metadata without full logs.
+- `docs/examples/mcp-read-only-tool-plan.example.json` maps a future
+  MCP/tool adapter to read-only CLI/core commands; it is a checked plan,
+  not a runtime implementation.
 - `pccx-lab run-approved-workflow <proposal-id> --format json` returns
   a blocked result by default; the pilot only runs fixed allowlisted
   pccx-lab commands when explicitly enabled for local validation.

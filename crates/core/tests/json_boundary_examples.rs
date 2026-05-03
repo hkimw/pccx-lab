@@ -198,3 +198,43 @@ fn launcher_device_session_status_example_validates_through_core_reader() {
     assert!(summary.read_only_flags.no_runtime_execution);
     assert!(summary.read_only_flags.no_pccx_lab_execution);
 }
+
+#[test]
+fn mcp_read_only_tool_plan_example_keeps_descriptor_only_safety_boundary() {
+    let value: serde_json::Value = parse_example("mcp-read-only-tool-plan.example.json");
+    let root = value
+        .as_object()
+        .expect("MCP read-only tool plan must be an object");
+
+    assert_eq!(root["schemaVersion"], "pccx.lab.mcp-read-only-tool-plan.v0");
+    assert_eq!(root["planState"], "descriptor_only");
+    assert_eq!(root["adapterState"], "not_implemented");
+
+    let tools = root["toolList"]
+        .as_array()
+        .expect("tool list must be an array");
+    assert!(!tools.is_empty());
+    for tool in tools {
+        assert_eq!(tool["readOnly"], true);
+        assert!(tool["fixedArgsPreview"].as_array().is_some());
+    }
+
+    let safety = root["safetyFlags"]
+        .as_object()
+        .expect("safety flags must be an object");
+    assert_eq!(safety["dataOnly"], true);
+    assert_eq!(safety["descriptorOnly"], true);
+    assert_eq!(safety["readOnly"], true);
+    assert_eq!(safety["mcpRuntimeImplemented"], false);
+    assert_eq!(safety["mcpServerImplemented"], false);
+    assert_eq!(safety["shellExecution"], false);
+    assert_eq!(safety["runtimeExecution"], false);
+    assert_eq!(safety["networkCalls"], false);
+    assert_eq!(safety["providerCalls"], false);
+    assert_eq!(safety["hardwareAccess"], false);
+    assert_eq!(safety["fpgaRepoAccess"], false);
+    assert_eq!(safety["modelExecution"], false);
+    assert_eq!(safety["writeBack"], false);
+    assert_eq!(safety["publicPush"], false);
+    assert_eq!(safety["releaseOrTag"], false);
+}
