@@ -857,6 +857,224 @@ def validate_mcp_read_only_analysis_flow(value: Any) -> None:
     require_string_array(require_field(root, "$", "issueRefs"), "$.issueRefs", min_items=1)
 
 
+def validate_mcp_read_only_report_contract(value: Any) -> None:
+    root = expect_object(value, "$")
+    require_schema(root, "$", "pccx.lab.mcp-read-only-report-contract.v0")
+    require_string_fields(
+        root,
+        "$",
+        [
+            "tool",
+            "contractId",
+            "contractState",
+            "adapterState",
+            "defaultMode",
+            "automationPath",
+        ],
+    )
+    if root["contractState"] != "descriptor_only":
+        raise ShapeError("unexpected value at $.contractState: expected descriptor_only")
+    if root["adapterState"] != "not_implemented":
+        raise ShapeError("unexpected value at $.adapterState: expected not_implemented")
+    if root["defaultMode"] != "read_only":
+        raise ShapeError("unexpected value at $.defaultMode: expected read_only")
+
+    refs = require_object_array(
+        require_field(root, "$", "entryBoundaryRefs"),
+        "$.entryBoundaryRefs",
+        min_items=1,
+    )
+    for ref in refs:
+        require_string_fields(
+            ref,
+            "$.entryBoundaryRefs[]",
+            ["refId", "schemaVersion", "examplePath", "state"],
+        )
+
+    sections = require_object_array(
+        require_field(root, "$", "reportSections"),
+        "$.reportSections",
+        min_items=4,
+    )
+    section_ids = set()
+    for section in sections:
+        path = "$.reportSections[]"
+        require_string_fields(
+            section,
+            path,
+            [
+                "sectionId",
+                "sourceBoundary",
+                "outputKind",
+                "sectionState",
+                "summary",
+            ],
+        )
+        section_id = section["sectionId"]
+        if section_id in section_ids:
+            raise ShapeError(f"duplicate value at $.reportSections[].sectionId: {section_id}")
+        section_ids.add(section_id)
+        expect_integer(require_field(section, path, "itemLimit"), child(path, "itemLimit"))
+        true_fields = ["summaryOnly"]
+        false_fields = [
+            "artifactWrite",
+            "repositoryMutation",
+            "privatePathEchoAllowed",
+            "stdoutIncluded",
+            "stderrIncluded",
+            "rawLogIncluded",
+        ]
+        require_bool_fields(section, path, true_fields + false_fields)
+        if section["summaryOnly"] is not True:
+            raise ShapeError("unexpected value at $.reportSections[].summaryOnly: expected true")
+        for field in false_fields:
+            if section[field] is not False:
+                raise ShapeError(f"unexpected value at $.reportSections[].{field}: expected false")
+        fields = require_object_array(
+            require_field(section, path, "fieldDescriptors"),
+            child(path, "fieldDescriptors"),
+            min_items=1,
+        )
+        for field in fields:
+            require_string_fields(
+                field,
+                "$.reportSections[].fieldDescriptors[]",
+                ["fieldName", "valueKind", "policy"],
+            )
+
+    sample_report = expect_object(require_field(root, "$", "sampleReport"), "$.sampleReport")
+    require_string_fields(
+        sample_report,
+        "$.sampleReport",
+        ["reportId", "reportState", "reportFormat", "overallStatus", "createdAt"],
+    )
+    if sample_report["reportState"] != "summary_only_fixture":
+        raise ShapeError("unexpected value at $.sampleReport.reportState: expected summary_only_fixture")
+    sample_false_fields = [
+        "trackedFileMutation",
+        "artifactWrite",
+        "pathEchoAllowed",
+        "stdoutIncluded",
+        "stderrIncluded",
+        "rawLogIncluded",
+        "privatePathsIncluded",
+        "generatedArtifactsIncluded",
+    ]
+    require_bool_fields(sample_report, "$.sampleReport", sample_false_fields)
+    for field in sample_false_fields:
+        if sample_report[field] is not False:
+            raise ShapeError(f"unexpected value at $.sampleReport.{field}: expected false")
+
+    sample_sections = require_object_array(
+        require_field(sample_report, "$.sampleReport", "sections"),
+        "$.sampleReport.sections",
+        min_items=1,
+    )
+    for section in sample_sections:
+        path = "$.sampleReport.sections[]"
+        require_string_fields(
+            section,
+            path,
+            ["sectionId", "title", "summary", "sourceRef", "evidenceState"],
+        )
+        if section["sectionId"] not in section_ids:
+            raise ShapeError(
+                "unexpected value at $.sampleReport.sections[].sectionId: "
+                f"unknown section {section['sectionId']}"
+            )
+        expect_integer(require_field(section, path, "itemCount"), child(path, "itemCount"))
+        require_bool_fields(section, path, ["pathIncluded", "artifactWrite"])
+        for field in ["pathIncluded", "artifactWrite"]:
+            if section[field] is not False:
+                raise ShapeError(f"unexpected value at $.sampleReport.sections[].{field}: expected false")
+
+    output_policy = expect_object(require_field(root, "$", "outputPolicy"), "$.outputPolicy")
+    require_string_fields(output_policy, "$.outputPolicy", ["state", "noMutationRule", "redactionRule"])
+    true_policy_flags = ["summaryOnly", "approvalRequiredForPathInputs", "auditRequired"]
+    false_policy_flags = [
+        "commandExecutionByFixture",
+        "trackedFileMutationAllowed",
+        "artifactWriteAllowed",
+        "pathEchoAllowed",
+        "stdoutAllowed",
+        "stderrAllowed",
+        "rawLogAllowed",
+        "privatePathsAllowed",
+        "generatedArtifactsAllowed",
+    ]
+    require_bool_fields(output_policy, "$.outputPolicy", true_policy_flags + false_policy_flags)
+    for flag in true_policy_flags:
+        if output_policy[flag] is not True:
+            raise ShapeError(f"unexpected value at $.outputPolicy.{flag}: expected true")
+    for flag in false_policy_flags:
+        if output_policy[flag] is not False:
+            raise ShapeError(f"unexpected value at $.outputPolicy.{flag}: expected false")
+
+    blocked_actions = require_field(root, "$", "blockedActions")
+    require_string_array(blocked_actions, "$.blockedActions", min_items=1)
+    for required in [
+        "mcp-server-start",
+        "mcp-client-session",
+        "arbitrary-shell-command",
+        "artifact-write",
+        "repository-write-back",
+        "provider-call",
+        "network-call",
+        "hardware-probe",
+        "kv260-access",
+        "fpga-repo-access",
+        "runtime-launch",
+        "model-load",
+        "telemetry-upload",
+        "public-push",
+        "release-or-tag",
+    ]:
+        if required not in blocked_actions:
+            raise ShapeError(f"missing blocked action at $.blockedActions: {required}")
+
+    safety = expect_object(require_field(root, "$", "safetyFlags"), "$.safetyFlags")
+    true_flags = ["dataOnly", "descriptorOnly", "readOnly", "reportFixtureOnly"]
+    false_flags = [
+        "mcpRuntimeImplemented",
+        "mcpServerImplemented",
+        "mcpClientImplemented",
+        "commandExecution",
+        "shellExecution",
+        "runtimeExecution",
+        "networkCalls",
+        "providerCalls",
+        "launcherExecution",
+        "editorExecution",
+        "hardwareAccess",
+        "kv260Access",
+        "fpgaRepoAccess",
+        "modelExecution",
+        "modelWeightsIncluded",
+        "privatePathsIncluded",
+        "secretsIncluded",
+        "tokensIncluded",
+        "stdoutIncluded",
+        "stderrIncluded",
+        "rawLogsIncluded",
+        "telemetry",
+        "writeBack",
+        "writesArtifacts",
+        "publicPush",
+        "releaseOrTag",
+        "stableApiAbiClaim",
+    ]
+    require_bool_fields(safety, "$.safetyFlags", true_flags + false_flags)
+    for flag in true_flags:
+        if safety[flag] is not True:
+            raise ShapeError(f"unexpected value at $.safetyFlags.{flag}: expected true")
+    for flag in false_flags:
+        if safety[flag] is not False:
+            raise ShapeError(f"unexpected value at $.safetyFlags.{flag}: expected false")
+
+    require_string_array(require_field(root, "$", "limitations"), "$.limitations", min_items=1)
+    require_string_array(require_field(root, "$", "issueRefs"), "$.issueRefs", min_items=1)
+
+
 def validate_mcp_permission_model(value: Any) -> None:
     root = expect_object(value, "$")
     require_schema(root, "$", "pccx.lab.mcp-permission-model.v0")
@@ -1999,6 +2217,7 @@ SPECS = [
     BoundarySpec("launcher-device-session-status", "docs/examples/launcher-device-session-status.example.json", validate_launcher_device_session_status),
     BoundarySpec("mcp-read-only-tool-plan", "docs/examples/mcp-read-only-tool-plan.example.json", validate_mcp_read_only_tool_plan),
     BoundarySpec("mcp-read-only-analysis-flow", "docs/examples/mcp-read-only-analysis-flow.example.json", validate_mcp_read_only_analysis_flow),
+    BoundarySpec("mcp-read-only-report-contract", "docs/examples/mcp-read-only-report-contract.example.json", validate_mcp_read_only_report_contract),
     BoundarySpec("mcp-permission-model", "docs/examples/mcp-permission-model.example.json", validate_mcp_permission_model),
     BoundarySpec("mcp-audit-event", "docs/examples/mcp-audit-event.example.json", validate_mcp_audit_event),
     BoundarySpec("plugin-permission-model", "docs/examples/plugin-permission-model.example.json", validate_plugin_permission_model),

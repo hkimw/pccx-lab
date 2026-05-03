@@ -79,6 +79,10 @@ boundary. There is no private back channel into lab internals. See
   checked dry-run flow contract for composing existing CLI/core summaries
   into a future read-only report path; it is not a command executor or
   report writer.
+- `docs/examples/mcp-read-only-report-contract.example.json` records the
+  summary-only report output shape for a future read-only tool adapter;
+  it is not an MCP runtime, command executor, artifact writer, or report
+  writer.
 - `docs/examples/mcp-permission-model.example.json` records the
   descriptor-only permission profiles and approval gates for a future
   MCP/tool adapter; it is not a permission runtime or command executor.
