@@ -154,28 +154,43 @@ fn public_core_json_contracts() -> Vec<(String, String)> {
     ]
 }
 
-fn assert_no_forbidden_public_claims(label: &str, text: &str) {
+fn forbidden_public_claims(text: &str) -> Vec<&'static str> {
     let lower = text.to_lowercase();
-    for phrase in FORBIDDEN_PUBLIC_CLAIMS {
-        assert!(
-            !lower.contains(phrase),
-            "{label} contains guarded public claim wording: {phrase}"
-        );
-    }
+    FORBIDDEN_PUBLIC_CLAIMS
+        .iter()
+        .copied()
+        .filter(|phrase| lower.contains(phrase))
+        .collect()
+}
+
+fn assert_no_forbidden_public_claims(label: &str, text: &str) {
+    let claims = forbidden_public_claims(text);
+    assert!(
+        claims.is_empty(),
+        "{label} contains guarded public claim wording: {}",
+        claims.join(", ")
+    );
+}
+
+fn non_negated_stable_plugin_abi_lines(text: &str) -> Vec<&str> {
+    text.lines()
+        .filter(|line| {
+            let lower = line.to_lowercase();
+            lower.contains("stable plugin abi")
+                && !SAFE_STABLE_PLUGIN_ABI_MENTIONS
+                    .iter()
+                    .any(|phrase| lower.contains(phrase))
+        })
+        .collect()
 }
 
 fn assert_stable_plugin_abi_mentions_are_negated(label: &str, text: &str) {
-    for line in text.lines() {
-        let lower = line.to_lowercase();
-        if lower.contains("stable plugin abi") {
-            assert!(
-                SAFE_STABLE_PLUGIN_ABI_MENTIONS
-                    .iter()
-                    .any(|phrase| lower.contains(phrase)),
-                "{label} contains a non-negated stable plugin ABI mention: {line}"
-            );
-        }
-    }
+    let lines = non_negated_stable_plugin_abi_lines(text);
+    assert!(
+        lines.is_empty(),
+        "{label} contains a non-negated stable plugin ABI mention: {}",
+        lines.join(" | ")
+    );
 }
 
 #[test]
@@ -192,4 +207,46 @@ fn public_core_json_contracts_do_not_use_guarded_claim_wording() {
         assert_no_forbidden_public_claims(&label, &text);
         assert_stable_plugin_abi_mentions_are_negated(&label, &text);
     }
+}
+
+#[test]
+fn public_claim_guard_rejects_representative_negative_fixtures() {
+    let cases = [
+        ("assistant overclaim", "AI Copilot analysis"),
+        (
+            "provider credential claim",
+            "Configure the API key for real API completions.",
+        ),
+        ("runtime claim", "MCP runtime complete."),
+        ("board claim", "KV260 inference works at 20 tok/s achieved."),
+        ("plugin API claim", "Stable plugin API."),
+    ];
+
+    for (label, text) in cases {
+        assert!(
+            !forbidden_public_claims(text).is_empty(),
+            "{label} fixture unexpectedly passed"
+        );
+    }
+}
+
+#[test]
+fn public_claim_guard_allows_safe_boundary_fixture() {
+    let text = [
+        "Local workflow assistant.",
+        "Draft helper and proposal-only preview.",
+        "CLI-first verification lab.",
+        "No stable plugin ABI is promised.",
+    ]
+    .join("\n");
+
+    assert!(forbidden_public_claims(&text).is_empty());
+    assert!(non_negated_stable_plugin_abi_lines(&text).is_empty());
+}
+
+#[test]
+fn stable_plugin_abi_helper_rejects_non_negated_fixture() {
+    let lines = non_negated_stable_plugin_abi_lines("Stable plugin ABI is supported.");
+
+    assert_eq!(lines, vec!["Stable plugin ABI is supported."]);
 }
