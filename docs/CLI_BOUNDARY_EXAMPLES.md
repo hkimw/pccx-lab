@@ -19,7 +19,7 @@ wrappers backed by `pccx-core`.
 | CI or headless worker | `pccx-lab ... --format json` | Parse deterministic JSON and keep logs bounded. |
 | Future editor consumer | CLI JSON, then reviewed IPC if needed | Do not bypass pccx-lab or read private GUI state. |
 | Future launcher consumer | Status, diagnostics handoff, proposals, summaries | Treat runtime bridges as separate reviewed work. |
-| Future MCP/tool consumer | Descriptor, proposal, and read-only tool-plan JSON | Consume descriptor-only contracts until a controlled adapter exists. |
+| Future MCP/tool consumer | Descriptor, proposal, read-only tool-plan, and report-contract JSON | Consume descriptor-only contracts until a controlled adapter exists. |
 | Future plugin consumer | Plugin boundary-plan and output-contract JSON | Treat manifest, capability, and output data as planning metadata until a loader boundary exists. |
 
 No stable plugin ABI is promised. No provider, launcher, editor, or MCP
@@ -215,6 +215,41 @@ start an MCP runtime, execute commands, read local files, write reports,
 mutate repositories, call providers, use the network, touch hardware, or
 control release/tag actions.
 
+## MCP Read-Only Report Contract
+
+Full fixture:
+[`mcp-read-only-report-contract.example.json`](examples/mcp-read-only-report-contract.example.json)
+
+```json
+{
+  "schemaVersion": "pccx.lab.mcp-read-only-report-contract.v0",
+  "contractState": "descriptor_only",
+  "adapterState": "not_implemented",
+  "reportSections": [
+    {
+      "sectionId": "lab_status_summary",
+      "summaryOnly": true,
+      "artifactWrite": false
+    },
+    {
+      "sectionId": "workflow_result_summary",
+      "summaryOnly": true,
+      "artifactWrite": false
+    }
+  ],
+  "sampleReport": {
+    "reportState": "summary_only_fixture",
+    "trackedFileMutation": false,
+    "artifactWrite": false
+  }
+}
+```
+
+Use this fixture to review the bounded report shape for a future
+read-only analysis flow. It does not start an MCP runtime, execute
+commands, write report artifacts, mutate repositories, echo private
+paths, include full logs, or create release/tag output.
+
 ## Plugin Boundary Plan
 
 Full fixture:
@@ -395,6 +430,8 @@ this summary contract.
   is reviewed.
 - Use the MCP read-only tool-plan fixture for tool-list, permission, and
   audit-plan alignment before implementing any adapter.
+- Use the MCP report-contract fixture for summary-only report output
+  alignment before implementing any adapter runtime or report writer.
 - Use the plugin boundary-plan fixture for manifest and host API
   alignment before implementing any loader.
 - Use the plugin output-contract fixture for summary-only output shape

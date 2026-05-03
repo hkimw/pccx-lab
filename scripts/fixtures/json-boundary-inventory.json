@@ -189,6 +189,23 @@
       "docsAnchor": "docs/CLI_CORE_BOUNDARY.md#mcp-read-only-analysis-flow"
     },
     {
+      "boundaryKind": "mcp-read-only-report-contract",
+      "examplePath": "docs/examples/mcp-read-only-report-contract.example.json",
+      "producingCommand": null,
+      "coreGeneratorOrReader": "docs/CLI_CORE_BOUNDARY.md#mcp-read-only-report-contract",
+      "readerOnly": true,
+      "shapeValidation": {
+        "kind": "mcp-read-only-report-contract",
+        "validator": "scripts/json_boundary_shape_validator.py",
+        "fixtureTest": "scripts/test-json-boundary-shapes.sh"
+      },
+      "rustValidation": {
+        "testPath": "crates/core/tests/json_boundary_examples.rs",
+        "testName": "mcp_read_only_report_contract_example_keeps_summary_only_boundary"
+      },
+      "docsAnchor": "docs/CLI_CORE_BOUNDARY.md#mcp-read-only-report-contract"
+    },
+    {
       "boundaryKind": "mcp-permission-model",
       "examplePath": "docs/examples/mcp-permission-model.example.json",
       "producingCommand": null,

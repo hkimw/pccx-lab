@@ -338,6 +338,131 @@ fn mcp_read_only_analysis_flow_example_keeps_dry_run_boundary() {
 }
 
 #[test]
+fn mcp_read_only_report_contract_example_keeps_summary_only_boundary() {
+    let value: serde_json::Value = parse_example("mcp-read-only-report-contract.example.json");
+    let root = value
+        .as_object()
+        .expect("MCP read-only report contract must be an object");
+
+    assert_eq!(
+        root["schemaVersion"],
+        "pccx.lab.mcp-read-only-report-contract.v0"
+    );
+    assert_eq!(root["contractState"], "descriptor_only");
+    assert_eq!(root["adapterState"], "not_implemented");
+    assert_eq!(root["defaultMode"], "read_only");
+
+    let sections = root["reportSections"]
+        .as_array()
+        .expect("report sections must be an array");
+    assert!(
+        sections.len() >= 4,
+        "report contract should cover status, descriptors, proposals, and results"
+    );
+    for section in sections {
+        assert_eq!(section["summaryOnly"], true);
+        assert_eq!(section["artifactWrite"], false);
+        assert_eq!(section["repositoryMutation"], false);
+        assert_eq!(section["privatePathEchoAllowed"], false);
+        assert_eq!(section["stdoutIncluded"], false);
+        assert_eq!(section["stderrIncluded"], false);
+        assert_eq!(section["rawLogIncluded"], false);
+    }
+
+    let report = root["sampleReport"]
+        .as_object()
+        .expect("sample report must be an object");
+    assert_eq!(report["reportState"], "summary_only_fixture");
+    assert_eq!(report["trackedFileMutation"], false);
+    assert_eq!(report["artifactWrite"], false);
+    assert_eq!(report["pathEchoAllowed"], false);
+    assert_eq!(report["stdoutIncluded"], false);
+    assert_eq!(report["stderrIncluded"], false);
+    assert_eq!(report["rawLogIncluded"], false);
+    assert_eq!(report["privatePathsIncluded"], false);
+    assert_eq!(report["generatedArtifactsIncluded"], false);
+
+    let sample_sections = report["sections"]
+        .as_array()
+        .expect("sample report sections must be an array");
+    assert!(sample_sections
+        .iter()
+        .all(|section| section["pathIncluded"] == false && section["artifactWrite"] == false));
+
+    let policy = root["outputPolicy"]
+        .as_object()
+        .expect("output policy must be an object");
+    assert_eq!(policy["summaryOnly"], true);
+    assert_eq!(policy["approvalRequiredForPathInputs"], true);
+    assert_eq!(policy["auditRequired"], true);
+    assert_eq!(policy["commandExecutionByFixture"], false);
+    assert_eq!(policy["trackedFileMutationAllowed"], false);
+    assert_eq!(policy["artifactWriteAllowed"], false);
+    assert_eq!(policy["pathEchoAllowed"], false);
+    assert_eq!(policy["stdoutAllowed"], false);
+    assert_eq!(policy["stderrAllowed"], false);
+    assert_eq!(policy["rawLogAllowed"], false);
+    assert_eq!(policy["privatePathsAllowed"], false);
+    assert_eq!(policy["generatedArtifactsAllowed"], false);
+
+    let blocked = root["blockedActions"]
+        .as_array()
+        .expect("blocked actions must be an array");
+    for action in [
+        "mcp-server-start",
+        "mcp-client-session",
+        "arbitrary-shell-command",
+        "artifact-write",
+        "repository-write-back",
+        "provider-call",
+        "network-call",
+        "hardware-probe",
+        "kv260-access",
+        "fpga-repo-access",
+        "runtime-launch",
+        "model-load",
+        "telemetry-upload",
+        "public-push",
+        "release-or-tag",
+    ] {
+        assert!(
+            blocked.iter().any(|item| item == action),
+            "blockedActions must include {action}"
+        );
+    }
+
+    let safety = root["safetyFlags"]
+        .as_object()
+        .expect("safety flags must be an object");
+    assert_eq!(safety["dataOnly"], true);
+    assert_eq!(safety["descriptorOnly"], true);
+    assert_eq!(safety["readOnly"], true);
+    assert_eq!(safety["reportFixtureOnly"], true);
+    assert_eq!(safety["mcpRuntimeImplemented"], false);
+    assert_eq!(safety["mcpServerImplemented"], false);
+    assert_eq!(safety["mcpClientImplemented"], false);
+    assert_eq!(safety["commandExecution"], false);
+    assert_eq!(safety["shellExecution"], false);
+    assert_eq!(safety["runtimeExecution"], false);
+    assert_eq!(safety["networkCalls"], false);
+    assert_eq!(safety["providerCalls"], false);
+    assert_eq!(safety["hardwareAccess"], false);
+    assert_eq!(safety["kv260Access"], false);
+    assert_eq!(safety["fpgaRepoAccess"], false);
+    assert_eq!(safety["modelExecution"], false);
+    assert_eq!(safety["privatePathsIncluded"], false);
+    assert_eq!(safety["secretsIncluded"], false);
+    assert_eq!(safety["tokensIncluded"], false);
+    assert_eq!(safety["stdoutIncluded"], false);
+    assert_eq!(safety["stderrIncluded"], false);
+    assert_eq!(safety["rawLogsIncluded"], false);
+    assert_eq!(safety["writeBack"], false);
+    assert_eq!(safety["writesArtifacts"], false);
+    assert_eq!(safety["publicPush"], false);
+    assert_eq!(safety["releaseOrTag"], false);
+}
+
+#[test]
 fn mcp_permission_model_example_keeps_permission_boundary_non_executing() {
     let value: serde_json::Value = parse_example("mcp-permission-model.example.json");
     let root = value
