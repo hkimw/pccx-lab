@@ -25,6 +25,7 @@ separate workflow logic island.
 | `pccx-lab run-approved-workflow <proposal-id> --format json` | disabled-by-default pilot | Fixed allowlisted runner pilot; blocked unless explicitly enabled. |
 | `docs/examples/sail-adoption-plan.example.json` | planned Sail adoption boundary | Checked descriptor-only Sail adoption plan for future reference-model review; no Sail source reader, parser, compiler, model execution, refinement check, proof path, report writer, artifact writer, or hardware path is implemented. |
 | `docs/examples/sail-interface-boundary.example.json` | planned Sail interface boundary | Checked descriptor-only Sail CLI/core handoff boundary over approved summaries; no Sail source reader, parser, compiler, AST reader, model execution, refinement check, proof path, report reader/writer, artifact reader/writer, or hardware path is implemented. |
+| `docs/examples/sail-review-packet.example.json` | planned Sail review packet | Checked summary-only Sail review packet over approved adoption, interface, workflow, verification, and report-gate summaries; no Sail source reader, RTL source reader, AST reader, parser, compiler, model generator, model execution, refinement check, proof path, report reader/writer, artifact reader/writer, or hardware path is implemented. |
 | `docs/examples/hybrid-strategy-plan.example.json` | planned hybrid strategy boundary | Checked descriptor-only C++/SystemVerilog and custom-script control plan; no source reader, grammar reader, parser, compiler, runtime, simulator runner, verification run, report writer, artifact writer, or hardware-control path is implemented. |
 | `docs/examples/hybrid-interface-boundary.example.json` | planned hybrid interface boundary | Checked descriptor-only hybrid CLI/core handoff boundary over approved summaries; no C++/SystemVerilog/custom-script source reader, grammar reader, parser, compiler, runtime, script execution, simulator runner, verification run, report reader/writer, artifact reader/writer, or hardware-control path is implemented. |
 | `docs/examples/hybrid-review-packet.example.json` | planned hybrid review packet | Checked summary-only hybrid review packet over approved strategy, interface, workflow, verification, and report-gate summaries; no source reader, grammar reader, parser, compiler, runtime, script execution, simulator runner, verification run, report reader/writer, artifact reader/writer, or hardware-control path is implemented. |
@@ -101,6 +102,7 @@ aligned.
 | `workflow-runner-result` | `docs/examples/workflow-runner-blocked.example.json` | `pccx-lab run-approved-workflow <proposal-id> --format json`; `pccx_core::runner::blocked_workflow_result` | Shape validator, inventory test, Rust deserialize test |
 | `sail-adoption-plan` | `docs/examples/sail-adoption-plan.example.json` | Reader only; planned descriptor-only Sail adoption boundary over approved CLI/core planning summaries | Shape validator, inventory test, Rust JSON-shape test |
 | `sail-interface-boundary` | `docs/examples/sail-interface-boundary.example.json` | Reader only; planned descriptor-only Sail CLI/core handoff boundary over approved summaries | Shape validator, inventory test, Rust JSON-shape test |
+| `sail-review-packet` | `docs/examples/sail-review-packet.example.json` | Reader only; planned summary-only Sail review packet over approved adoption, interface, workflow, verification, and report-gate summaries | Shape validator, inventory test, Rust JSON-shape test |
 | `hybrid-strategy-plan` | `docs/examples/hybrid-strategy-plan.example.json` | Reader only; planned descriptor-only hybrid C++/SystemVerilog and custom-script boundary over approved CLI/core planning summaries | Shape validator, inventory test, Rust JSON-shape test |
 | `hybrid-interface-boundary` | `docs/examples/hybrid-interface-boundary.example.json` | Reader only; planned descriptor-only hybrid CLI/core handoff boundary over approved summaries | Shape validator, inventory test, Rust JSON-shape test |
 | `hybrid-review-packet` | `docs/examples/hybrid-review-packet.example.json` | Reader only; planned summary-only hybrid review packet over approved strategy, interface, workflow, verification, and report-gate summaries | Shape validator, inventory test, Rust JSON-shape test |
@@ -422,6 +424,29 @@ implementation requires separate reviewed boundaries for source inputs,
 parser/compiler behavior, model generation, execution, refinement,
 proof, report output, and artifacts. No runtime, hardware, marketplace,
 release, or API/ABI stability claim is made.
+
+## Sail review packet
+
+[`docs/examples/sail-review-packet.example.json`](examples/sail-review-packet.example.json)
+defines the checked summary-only review packet for future Sail adoption
+work. It records approved adoption, interface, workflow, verification,
+and report-gate summary references, plus blocked source, parser,
+compiler, model, refinement, proof, report, artifact, and hardware
+gates.
+
+The fixture is metadata only. It does not read Sail sources, read RTL
+sources, read ASTs, import traces, generate models, execute models, run
+refinement checks, run proofs, run simulators, run verification, read
+or write reports, read or write artifacts, execute commands, mutate
+repositories, call providers, use the network, touch hardware, access
+KV260, access FPGA repos, load models, upload telemetry, push publicly,
+or control releases/tags.
+
+The review packet is approved for summary metadata only. A future
+implementation requires separate reviewed boundaries for source inputs,
+parser/compiler behavior, model generation, execution, refinement,
+proof, report output, artifacts, and evidence. No runtime, hardware,
+marketplace, release, or API/ABI stability claim is made.
 
 ## Hybrid strategy plan boundary
 

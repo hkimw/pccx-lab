@@ -6344,6 +6344,226 @@ fn sail_interface_boundary_example_keeps_descriptor_only_boundary() {
 }
 
 #[test]
+fn sail_review_packet_example_keeps_summary_only_boundary() {
+    let value: serde_json::Value = parse_example("sail-review-packet.example.json");
+    let root = value
+        .as_object()
+        .expect("Sail review packet must be an object");
+
+    assert_eq!(root["schemaVersion"], "pccx.lab.sail-review-packet.v0");
+    assert_eq!(root["reviewState"], "descriptor_only");
+    assert_eq!(root["adapterState"], "not_implemented");
+    assert_eq!(root["defaultMode"], "read_only");
+    assert_eq!(root["packetKind"], "summary_only_sail_review_packet");
+    assert_eq!(root["automationPath"], "cli_core_first");
+
+    let sources = root["sourceBoundaryRefs"]
+        .as_array()
+        .expect("source boundary refs must be an array");
+    assert!(sources.iter().any(|source| {
+        source["refId"] == "sail_adoption_plan"
+            && source["summaryReferenceAllowed"] == true
+            && source["sourceReadAllowed"] == false
+            && source["executionAllowed"] == false
+    }));
+    assert!(sources.iter().any(|source| {
+        source["refId"] == "sail_interface_boundary"
+            && source["summaryReferenceAllowed"] == true
+            && source["sourceReadAllowed"] == false
+            && source["artifactWriteAllowed"] == false
+    }));
+    assert!(sources.iter().any(|source| {
+        source["refId"] == "verification_gate"
+            && source["verificationRunAllowed"] == false
+            && source["refinementExecutionAllowed"] == false
+            && source["formalProofAllowed"] == false
+            && source["hardwareControlAllowed"] == false
+    }));
+
+    let inputs = root["reviewInputs"]
+        .as_array()
+        .expect("review inputs must be an array");
+    assert!(
+        inputs.len() >= 5,
+        "review packet should include adoption, interface, workflow, verification, and report summaries"
+    );
+    for input in inputs {
+        assert_eq!(input["inputState"], "approved_summary_only");
+        assert_eq!(input["summaryOnly"], true);
+        assert_eq!(input["approvalRequired"], true);
+        assert_eq!(input["sailSourceRead"], false);
+        assert_eq!(input["rtlSourceRead"], false);
+        assert_eq!(input["sailAstRead"], false);
+        assert_eq!(input["generatedModelRead"], false);
+        assert_eq!(input["parserOutputRead"], false);
+        assert_eq!(input["compilerOutputRead"], false);
+        assert_eq!(input["modelExecutionRead"], false);
+        assert_eq!(input["refinementResultRead"], false);
+        assert_eq!(input["proofResultRead"], false);
+        assert_eq!(input["verificationResultRead"], false);
+        assert_eq!(input["reportRead"], false);
+        assert_eq!(input["artifactRead"], false);
+        assert_eq!(input["localFileRead"], false);
+        assert_eq!(input["repositoryRead"], false);
+        assert_eq!(input["privatePathEchoAllowed"], false);
+        assert_eq!(input["stdoutIncluded"], false);
+        assert_eq!(input["stderrIncluded"], false);
+        assert_eq!(input["rawLogIncluded"], false);
+        assert_eq!(input["artifactPathIncluded"], false);
+        assert!(input["fieldDescriptors"].as_array().is_some());
+    }
+
+    let policy = root["reviewPolicy"]
+        .as_object()
+        .expect("review policy must be an object");
+    assert_eq!(policy["summaryOnly"], true);
+    assert_eq!(policy["approvalRequired"], true);
+    assert_eq!(policy["auditRequired"], true);
+    assert_eq!(policy["sailSourceReadAllowed"], false);
+    assert_eq!(policy["rtlSourceReadAllowed"], false);
+    assert_eq!(policy["sailAstReadAllowed"], false);
+    assert_eq!(policy["parserRequestAllowed"], false);
+    assert_eq!(policy["compilerRequestAllowed"], false);
+    assert_eq!(policy["modelGenerationAllowed"], false);
+    assert_eq!(policy["modelExecutionAllowed"], false);
+    assert_eq!(policy["refinementExecutionAllowed"], false);
+    assert_eq!(policy["formalProofAllowed"], false);
+    assert_eq!(policy["verificationRunAllowed"], false);
+    assert_eq!(policy["simulatorExecutionAllowed"], false);
+    assert_eq!(policy["hardwareControlAllowed"], false);
+    assert_eq!(policy["commandExecutionAllowed"], false);
+    assert_eq!(policy["reportReadAllowed"], false);
+    assert_eq!(policy["reportWriteAllowed"], false);
+    assert_eq!(policy["artifactReadAllowed"], false);
+    assert_eq!(policy["artifactWriteAllowed"], false);
+    assert_eq!(policy["repositoryMutationAllowed"], false);
+    assert_eq!(policy["publicPushAllowed"], false);
+    assert_eq!(policy["releaseOrTagAllowed"], false);
+    assert_eq!(policy["providerCallAllowed"], false);
+    assert_eq!(policy["networkCallAllowed"], false);
+    assert_eq!(policy["hardwareAccessAllowed"], false);
+    assert_eq!(policy["kv260AccessAllowed"], false);
+    assert_eq!(policy["fpgaRepoAccessAllowed"], false);
+    assert_eq!(policy["modelLoadAllowed"], false);
+
+    let packet = root["sampleReviewPacket"]
+        .as_object()
+        .expect("sample review packet must be an object");
+    assert_eq!(packet["reviewPacketState"], "summary_only_fixture");
+    assert_eq!(packet["summaryOnly"], true);
+    assert_eq!(packet["pathIncluded"], false);
+    assert_eq!(packet["privatePathsIncluded"], false);
+    assert_eq!(packet["stdoutIncluded"], false);
+    assert_eq!(packet["stderrIncluded"], false);
+    assert_eq!(packet["rawLogsIncluded"], false);
+    assert_eq!(packet["artifactPathsIncluded"], false);
+    assert_eq!(packet["generatedArtifactsIncluded"], false);
+    assert_eq!(packet["sourceIncluded"], false);
+    assert_eq!(packet["sailAstIncluded"], false);
+    assert_eq!(packet["generatedModelIncluded"], false);
+    assert_eq!(packet["rawReportIncluded"], false);
+    assert_eq!(packet["reviewOutputPublished"], false);
+    assert_eq!(packet["projectUpdated"], false);
+
+    let sections = packet["reviewSections"]
+        .as_array()
+        .expect("sample review sections must be an array");
+    assert!(sections.iter().all(|section| {
+        section["summaryOnly"] == true
+            && section["pathIncluded"] == false
+            && section["sourceIncluded"] == false
+            && section["sailAstIncluded"] == false
+            && section["generatedModelIncluded"] == false
+            && section["rawReportIncluded"] == false
+    }));
+
+    let blocked = root["blockedActions"]
+        .as_array()
+        .expect("blocked actions must be an array");
+    for action in [
+        "sail-source-read",
+        "sail-ast-read",
+        "sail-parser",
+        "sail-compiler",
+        "sail-model-generation",
+        "sail-model-execution",
+        "rtl-source-read",
+        "rtl-refinement-check",
+        "formal-proof",
+        "verification-run",
+        "simulator-execution",
+        "hardware-control",
+        "report-read",
+        "artifact-read",
+        "command-execution",
+        "kv260-access",
+        "fpga-repo-access",
+        "release-or-tag",
+    ] {
+        assert!(
+            blocked.iter().any(|item| item == action),
+            "blockedActions must include {action}"
+        );
+    }
+
+    let safety = root["safetyFlags"]
+        .as_object()
+        .expect("safety flags must be an object");
+    assert_eq!(safety["dataOnly"], true);
+    assert_eq!(safety["descriptorOnly"], true);
+    assert_eq!(safety["readOnly"], true);
+    assert_eq!(safety["sailReviewPacketFixtureOnly"], true);
+    assert_eq!(safety["summaryOnly"], true);
+    assert_eq!(safety["cliCoreFirst"], true);
+    assert_eq!(safety["sailSourceRead"], false);
+    assert_eq!(safety["rtlSourceRead"], false);
+    assert_eq!(safety["sailAstIncluded"], false);
+    assert_eq!(safety["generatedModelIncluded"], false);
+    assert_eq!(safety["sailParserImplemented"], false);
+    assert_eq!(safety["sailCompilerImplemented"], false);
+    assert_eq!(safety["sailModelImplemented"], false);
+    assert_eq!(safety["sailExecution"], false);
+    assert_eq!(safety["rtlRefinementExecution"], false);
+    assert_eq!(safety["formalVerificationExecution"], false);
+    assert_eq!(safety["simulatorExecution"], false);
+    assert_eq!(safety["verificationExecution"], false);
+    assert_eq!(safety["hardwareControl"], false);
+    assert_eq!(safety["commandExecution"], false);
+    assert_eq!(safety["shellExecution"], false);
+    assert_eq!(safety["runtimeExecution"], false);
+    assert_eq!(safety["localFileRead"], false);
+    assert_eq!(safety["repositoryRead"], false);
+    assert_eq!(safety["rawTraceRead"], false);
+    assert_eq!(safety["rawReportRead"], false);
+    assert_eq!(safety["readsArtifacts"], false);
+    assert_eq!(safety["writesArtifacts"], false);
+    assert_eq!(safety["reportReaderImplemented"], false);
+    assert_eq!(safety["reportWriterImplemented"], false);
+    assert_eq!(safety["networkCalls"], false);
+    assert_eq!(safety["providerCalls"], false);
+    assert_eq!(safety["hardwareAccess"], false);
+    assert_eq!(safety["kv260Access"], false);
+    assert_eq!(safety["fpgaRepoAccess"], false);
+    assert_eq!(safety["modelExecution"], false);
+    assert_eq!(safety["privatePathsIncluded"], false);
+    assert_eq!(safety["secretsIncluded"], false);
+    assert_eq!(safety["tokensIncluded"], false);
+    assert_eq!(safety["stdoutIncluded"], false);
+    assert_eq!(safety["stderrIncluded"], false);
+    assert_eq!(safety["rawLogsIncluded"], false);
+    assert_eq!(safety["artifactPathsIncluded"], false);
+    assert_eq!(safety["generatedArtifactsIncluded"], false);
+    assert_eq!(safety["telemetry"], false);
+    assert_eq!(safety["writeBack"], false);
+    assert_eq!(safety["repositoryMutation"], false);
+    assert_eq!(safety["publicPush"], false);
+    assert_eq!(safety["releaseOrTag"], false);
+    assert_eq!(safety["stableApiAbiClaim"], false);
+    assert_eq!(safety["runtimeClaim"], false);
+    assert_eq!(safety["hardwareClaim"], false);
+}
+
+#[test]
 fn hybrid_strategy_plan_example_keeps_descriptor_only_boundary() {
     let value: serde_json::Value = parse_example("hybrid-strategy-plan.example.json");
     let root = value
