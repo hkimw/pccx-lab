@@ -90,6 +90,10 @@ boundary. There is no private back channel into lab internals. See
   approval-request and repository-mutation gate for a future MCP/tool
   adapter; it is not an MCP runtime, permission executor, command
   executor, audit logger, or write path.
+- `docs/examples/mcp-approval-decision.example.json` records a denied
+  approval-decision gate for a future MCP/tool adapter; it is not an MCP
+  runtime, approval executor, permission executor, command executor,
+  audit logger, tool invocation path, or write path.
 - `docs/examples/mcp-audit-event.example.json` records the redacted
   audit-event shape for a future read-only MCP/tool adapter; it is not
   an audit logger or runtime implementation.
