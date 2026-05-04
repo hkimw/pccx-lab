@@ -517,6 +517,64 @@ execute commands, write reports, mutate repositories, call providers,
 use the network, touch hardware, or control releases/tags. No stable
 plugin ABI, compatibility, or marketplace claim is made.
 
+## Plugin Capability Detail
+
+Full fixture:
+[`plugin-capability-detail.example.json`](examples/plugin-capability-detail.example.json)
+
+```json
+{
+  "schemaVersion": "pccx.lab.plugin-capability-detail.v0",
+  "detailState": "descriptor_only",
+  "adapterState": "not_implemented",
+  "defaultMode": "read_only",
+  "capabilityDetailRequest": {
+    "requestKind": "planned_plugin_capability_detail",
+    "selectedCapabilityId": "plugin.diagnostics.summary",
+    "summaryOnly": true,
+    "manifestContentIncluded": false,
+    "pluginLoaderAllowed": false,
+    "capabilityDispatchAllowed": false
+  },
+  "selectedCapability": {
+    "capabilityId": "plugin.diagnostics.summary",
+    "detailState": "visible_descriptor",
+    "inputDescriptor": {
+      "descriptorState": "metadata_only",
+      "manifestContentIncluded": false,
+      "localFileReadAllowed": false,
+      "secretsReadAllowed": false,
+      "tokensReadAllowed": false
+    },
+    "outputDescriptor": {
+      "payloadIncluded": false,
+      "reportContentIncluded": false,
+      "stdoutIncluded": false,
+      "stderrIncluded": false,
+      "rawLogsIncluded": false
+    },
+    "dispatchPolicy": {
+      "requiresSeparateLoadBoundary": true,
+      "requiresSeparateDispatchBoundary": true,
+      "approvedForDetail": true,
+      "approvedForLoad": false,
+      "approvedForDispatch": false,
+      "capabilityDispatchAllowed": false,
+      "pluginInvocationAllowed": false
+    }
+  }
+}
+```
+
+Use this fixture to review descriptor-only detail metadata for one
+listed plugin capability before implementing any loader, runtime,
+sandbox, host API binding, or capability dispatch path. It does not read
+manifests or packages, load plugin code, dispatch capabilities, execute
+commands, write reports, mutate repositories, call providers, use the
+network, touch hardware, or control releases/tags.
+No stable plugin ABI is promised, and no compatibility or marketplace
+claim is made.
+
 ## Plugin Dry-Run Flow
 
 Full fixture:
