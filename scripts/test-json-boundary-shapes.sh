@@ -144,6 +144,7 @@ run_case \
     "[hybrid-interface-boundary] shape ok" \
     "[hybrid-review-packet] shape ok" \
     "[hybrid-evidence-manifest] shape ok" \
+    "[hybrid-evidence-detail] shape ok" \
     "[plugin-permission-model] shape ok" \
     "[plugin-audit-event] shape ok" \
     "[plugin-manifest-validation-result] shape ok" \
