@@ -119,6 +119,12 @@ boundary. There is no private back channel into lab internals. See
   script execution path, simulator runner, verification run,
   report/artifact reader or writer, command runner, repository reader,
   or hardware-control path.
+- `docs/examples/hybrid-evidence-detail.example.json` records a
+  descriptor-only detail view for one selected approved hybrid evidence
+  summary reference; it is not a source reader, grammar reader, parser,
+  compiler, runtime, script execution path, simulator runner,
+  verification run, report/artifact reader or writer, command runner,
+  repository reader, marketplace flow, or hardware-control path.
 - `docs/examples/mcp-read-only-tool-plan.example.json` maps a future
   MCP/tool adapter to read-only CLI/core commands; it is a checked plan,
   not a runtime implementation.
