@@ -123,6 +123,7 @@ run_case \
     "[mcp-verification-run-comparison] shape ok" \
     "[mcp-pr-summary-handoff] shape ok" \
     "[mcp-review-packet] shape ok" \
+    "[mcp-evidence-manifest] shape ok" \
     "[mcp-permission-model] shape ok" \
     "[mcp-approval-request] shape ok" \
     "[mcp-approval-decision] shape ok" \

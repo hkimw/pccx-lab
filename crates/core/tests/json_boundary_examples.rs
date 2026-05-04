@@ -1157,6 +1157,231 @@ fn mcp_review_packet_example_keeps_summary_only_boundary() {
 }
 
 #[test]
+fn mcp_evidence_manifest_example_keeps_summary_only_boundary() {
+    let value: serde_json::Value = parse_example("mcp-evidence-manifest.example.json");
+    let root = value
+        .as_object()
+        .expect("MCP evidence manifest must be an object");
+
+    assert_eq!(root["schemaVersion"], "pccx.lab.mcp-evidence-manifest.v0");
+    assert_eq!(root["manifestState"], "descriptor_only");
+    assert_eq!(root["adapterState"], "not_implemented");
+    assert_eq!(root["defaultMode"], "read_only");
+    assert_eq!(root["manifestKind"], "approved_summary_evidence_refs");
+
+    let refs = root["sourceBoundaryRefs"]
+        .as_array()
+        .expect("source boundary refs must be an array");
+    assert!(refs.iter().any(|source| {
+        source["refId"] == "lab_status"
+            && source["summaryOnly"] == true
+            && source["pathEchoAllowed"] == false
+            && source["artifactReadAllowed"] == false
+    }));
+    assert!(refs.iter().any(|source| {
+        source["refId"] == "mcp_review_packet"
+            && source["toolInvocationAllowed"] == false
+            && source["repositoryMutationAllowed"] == false
+    }));
+
+    let evidence_refs = root["approvedEvidenceRefs"]
+        .as_array()
+        .expect("approved evidence refs must be an array");
+    assert!(
+        evidence_refs.len() >= 3,
+        "manifest should cover lab, launcher, and verification summaries"
+    );
+    for evidence in evidence_refs {
+        assert_eq!(evidence["evidenceState"], "approved_summary_only");
+        assert_eq!(evidence["summaryOnly"], true);
+        assert_eq!(evidence["approvalRequired"], true);
+        assert_eq!(evidence["approvedSummaryRef"], true);
+        assert_eq!(evidence["localFileRead"], false);
+        assert_eq!(evidence["repositoryRead"], false);
+        assert_eq!(evidence["rawTraceRead"], false);
+        assert_eq!(evidence["rawReportRead"], false);
+        assert_eq!(evidence["rawLogRead"], false);
+        assert_eq!(evidence["artifactRead"], false);
+        assert_eq!(evidence["artifactWrite"], false);
+        assert_eq!(evidence["privatePathEchoAllowed"], false);
+        assert_eq!(evidence["stdoutIncluded"], false);
+        assert_eq!(evidence["stderrIncluded"], false);
+        assert_eq!(evidence["rawLogIncluded"], false);
+        assert_eq!(evidence["artifactPathIncluded"], false);
+        assert_eq!(evidence["hardwareDumpIncluded"], false);
+        assert_eq!(evidence["boardDumpIncluded"], false);
+        assert_eq!(evidence["modelWeightPathIncluded"], false);
+        assert!(evidence["fieldDescriptors"].as_array().is_some());
+    }
+
+    let policy = root["manifestPolicy"]
+        .as_object()
+        .expect("manifest policy must be an object");
+    assert_eq!(policy["summaryOnly"], true);
+    assert_eq!(policy["approvalRequired"], true);
+    assert_eq!(policy["auditRequired"], true);
+    assert_eq!(policy["mcpRuntimeAllowed"], false);
+    assert_eq!(policy["toolInvocationAllowed"], false);
+    assert_eq!(policy["commandExecutionAllowed"], false);
+    assert_eq!(policy["localFileReadAllowed"], false);
+    assert_eq!(policy["repositoryReadAllowed"], false);
+    assert_eq!(policy["rawTraceReadAllowed"], false);
+    assert_eq!(policy["rawReportReadAllowed"], false);
+    assert_eq!(policy["rawLogReadAllowed"], false);
+    assert_eq!(policy["artifactReadAllowed"], false);
+    assert_eq!(policy["artifactWriteAllowed"], false);
+    assert_eq!(policy["reportWriteAllowed"], false);
+    assert_eq!(policy["evidenceArtifactWriteAllowed"], false);
+    assert_eq!(policy["repositoryMutationAllowed"], false);
+    assert_eq!(policy["publicTextPublicationAllowed"], false);
+    assert_eq!(policy["hardwareAccessAllowed"], false);
+    assert_eq!(policy["kv260AccessAllowed"], false);
+    assert_eq!(policy["fpgaRepoAccessAllowed"], false);
+
+    let manifest = root["sampleManifest"]
+        .as_object()
+        .expect("sample manifest must be an object");
+    assert_eq!(manifest["manifestState"], "summary_only_fixture");
+    assert_eq!(manifest["summaryOnly"], true);
+    assert_eq!(manifest["pathIncluded"], false);
+    assert_eq!(manifest["privatePathsIncluded"], false);
+    assert_eq!(manifest["stdoutIncluded"], false);
+    assert_eq!(manifest["stderrIncluded"], false);
+    assert_eq!(manifest["rawLogsIncluded"], false);
+    assert_eq!(manifest["artifactPathsIncluded"], false);
+    assert_eq!(manifest["generatedArtifactsIncluded"], false);
+    assert_eq!(manifest["rawTraceIncluded"], false);
+    assert_eq!(manifest["rawReportIncluded"], false);
+    assert_eq!(manifest["hardwareDumpIncluded"], false);
+    assert_eq!(manifest["boardDumpIncluded"], false);
+    assert_eq!(manifest["modelPathsIncluded"], false);
+    assert_eq!(manifest["manifestPublished"], false);
+    assert_eq!(manifest["evidenceArtifactWritten"], false);
+
+    let rows = manifest["evidenceRows"]
+        .as_array()
+        .expect("sample manifest evidence rows must be an array");
+    assert!(rows.iter().all(|row| {
+        row["summaryOnly"] == true
+            && row["pathIncluded"] == false
+            && row["privatePathsIncluded"] == false
+            && row["rawTraceIncluded"] == false
+            && row["rawReportIncluded"] == false
+            && row["rawLogsIncluded"] == false
+            && row["artifactPathIncluded"] == false
+            && row["hardwareDumpIncluded"] == false
+            && row["boardDumpIncluded"] == false
+            && row["modelPathIncluded"] == false
+    }));
+
+    let mutation = root["noMutationEvidence"]
+        .as_object()
+        .expect("no mutation evidence must be an object");
+    assert_eq!(mutation["trackedFileMutationAllowed"], false);
+    assert_eq!(mutation["trackedFileDiffCaptured"], false);
+    assert_eq!(mutation["localFileReadAllowed"], false);
+    assert_eq!(mutation["repositoryReadAllowed"], false);
+    assert_eq!(mutation["artifactReadAllowed"], false);
+    assert_eq!(mutation["artifactWriteAllowed"], false);
+    assert_eq!(mutation["reportWriteAllowed"], false);
+    assert_eq!(mutation["evidenceArtifactWriteAllowed"], false);
+    assert_eq!(mutation["repositoryMutationAllowed"], false);
+    assert_eq!(mutation["toolInvocationAllowed"], false);
+    assert_eq!(mutation["commandExecutionAllowed"], false);
+
+    let blocked = root["blockedActions"]
+        .as_array()
+        .expect("blocked actions must be an array");
+    for action in [
+        "mcp-server-start",
+        "mcp-client-session",
+        "tool-invocation",
+        "command-execution",
+        "arbitrary-shell-command",
+        "local-file-read",
+        "repository-read",
+        "raw-trace-read",
+        "raw-report-read",
+        "raw-log-read",
+        "artifact-read",
+        "artifact-write",
+        "report-write",
+        "evidence-artifact-write",
+        "repository-write-back",
+        "public-text-publish",
+        "provider-call",
+        "network-call",
+        "launcher-execution",
+        "editor-execution",
+        "hardware-probe",
+        "kv260-access",
+        "fpga-repo-access",
+        "runtime-launch",
+        "model-load",
+        "telemetry-upload",
+        "public-push",
+        "release-or-tag",
+    ] {
+        assert!(
+            blocked.iter().any(|item| item == action),
+            "blockedActions must include {action}"
+        );
+    }
+
+    let safety = root["safetyFlags"]
+        .as_object()
+        .expect("safety flags must be an object");
+    assert_eq!(safety["dataOnly"], true);
+    assert_eq!(safety["descriptorOnly"], true);
+    assert_eq!(safety["readOnly"], true);
+    assert_eq!(safety["evidenceManifestFixtureOnly"], true);
+    assert_eq!(safety["summaryOnly"], true);
+    assert_eq!(safety["mcpRuntimeImplemented"], false);
+    assert_eq!(safety["mcpServerImplemented"], false);
+    assert_eq!(safety["mcpClientImplemented"], false);
+    assert_eq!(safety["toolInvocationPathImplemented"], false);
+    assert_eq!(safety["toolInvocationAttempted"], false);
+    assert_eq!(safety["commandExecution"], false);
+    assert_eq!(safety["shellExecution"], false);
+    assert_eq!(safety["runtimeExecution"], false);
+    assert_eq!(safety["localFileRead"], false);
+    assert_eq!(safety["repositoryRead"], false);
+    assert_eq!(safety["rawTraceRead"], false);
+    assert_eq!(safety["rawReportRead"], false);
+    assert_eq!(safety["rawLogRead"], false);
+    assert_eq!(safety["readsArtifacts"], false);
+    assert_eq!(safety["writesArtifacts"], false);
+    assert_eq!(safety["reportWriterImplemented"], false);
+    assert_eq!(safety["evidenceArtifactWriterImplemented"], false);
+    assert_eq!(safety["auditLoggerImplemented"], false);
+    assert_eq!(safety["auditPersistence"], false);
+    assert_eq!(safety["networkCalls"], false);
+    assert_eq!(safety["providerCalls"], false);
+    assert_eq!(safety["launcherExecution"], false);
+    assert_eq!(safety["editorExecution"], false);
+    assert_eq!(safety["hardwareAccess"], false);
+    assert_eq!(safety["kv260Access"], false);
+    assert_eq!(safety["fpgaRepoAccess"], false);
+    assert_eq!(safety["modelExecution"], false);
+    assert_eq!(safety["modelWeightsIncluded"], false);
+    assert_eq!(safety["privatePathsIncluded"], false);
+    assert_eq!(safety["secretsIncluded"], false);
+    assert_eq!(safety["tokensIncluded"], false);
+    assert_eq!(safety["stdoutIncluded"], false);
+    assert_eq!(safety["stderrIncluded"], false);
+    assert_eq!(safety["rawLogsIncluded"], false);
+    assert_eq!(safety["artifactPathsIncluded"], false);
+    assert_eq!(safety["hardwareDumpIncluded"], false);
+    assert_eq!(safety["boardDumpIncluded"], false);
+    assert_eq!(safety["writeBack"], false);
+    assert_eq!(safety["repositoryMutation"], false);
+    assert_eq!(safety["publicPush"], false);
+    assert_eq!(safety["releaseOrTag"], false);
+    assert_eq!(safety["stableApiAbiClaim"], false);
+    assert_eq!(safety["marketplaceClaim"], false);
+}
+
+#[test]
 fn mcp_permission_model_example_keeps_permission_boundary_non_executing() {
     let value: serde_json::Value = parse_example("mcp-permission-model.example.json");
     let root = value
