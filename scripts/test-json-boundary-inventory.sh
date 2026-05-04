@@ -130,6 +130,7 @@ run_case \
     "[mcp-verification-run-comparison] inventory ok" \
     "[mcp-pr-summary-handoff] inventory ok" \
     "[mcp-review-packet] inventory ok" \
+    "[mcp-evidence-manifest] inventory ok" \
     "[mcp-permission-model] inventory ok" \
     "[mcp-approval-request] inventory ok" \
     "[mcp-approval-decision] inventory ok" \

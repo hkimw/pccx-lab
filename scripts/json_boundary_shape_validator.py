@@ -2124,6 +2124,384 @@ def validate_mcp_review_packet(value: Any) -> None:
     require_string_array(require_field(root, "$", "issueRefs"), "$.issueRefs", min_items=1)
 
 
+def validate_mcp_evidence_manifest(value: Any) -> None:
+    root = expect_object(value, "$")
+    require_schema(root, "$", "pccx.lab.mcp-evidence-manifest.v0")
+    require_string_fields(
+        root,
+        "$",
+        [
+            "tool",
+            "manifestId",
+            "manifestState",
+            "adapterState",
+            "defaultMode",
+            "manifestKind",
+        ],
+    )
+    if root["manifestState"] != "descriptor_only":
+        raise ShapeError("unexpected value at $.manifestState: expected descriptor_only")
+    if root["adapterState"] != "not_implemented":
+        raise ShapeError("unexpected value at $.adapterState: expected not_implemented")
+    if root["defaultMode"] != "read_only":
+        raise ShapeError("unexpected value at $.defaultMode: expected read_only")
+    if root["manifestKind"] != "approved_summary_evidence_refs":
+        raise ShapeError(
+            "unexpected value at $.manifestKind: expected approved_summary_evidence_refs"
+        )
+
+    refs = require_object_array(
+        require_field(root, "$", "sourceBoundaryRefs"),
+        "$.sourceBoundaryRefs",
+        min_items=3,
+    )
+    for ref in refs:
+        path = "$.sourceBoundaryRefs[]"
+        require_string_fields(ref, path, ["refId", "schemaVersion", "examplePath", "state"])
+        if "summaryOnly" in ref and expect_bool(require_field(ref, path, "summaryOnly"), child(path, "summaryOnly")) is not True:
+            raise ShapeError("unexpected value at $.sourceBoundaryRefs[].summaryOnly: expected true")
+        for field in [
+            "pathEchoAllowed",
+            "artifactReadAllowed",
+            "artifactWriteAllowed",
+            "hardwareAccessAllowed",
+            "rawTraceAllowed",
+            "rawReportAllowed",
+            "publicTextPublicationAllowed",
+            "repositoryMutationAllowed",
+            "toolInvocationAllowed",
+            "auditLoggerAllowed",
+        ]:
+            if field in ref and expect_bool(require_field(ref, path, field), child(path, field)) is not False:
+                raise ShapeError(f"unexpected value at $.sourceBoundaryRefs[].{field}: expected false")
+
+    evidence_refs = require_object_array(
+        require_field(root, "$", "approvedEvidenceRefs"),
+        "$.approvedEvidenceRefs",
+        min_items=3,
+    )
+    evidence_ids = set()
+    for evidence in evidence_refs:
+        path = "$.approvedEvidenceRefs[]"
+        require_string_fields(
+            evidence,
+            path,
+            ["evidenceId", "evidenceKind", "evidenceState", "sourceRef", "summary"],
+        )
+        evidence_id = evidence["evidenceId"]
+        if evidence_id in evidence_ids:
+            raise ShapeError(f"duplicate value at $.approvedEvidenceRefs[].evidenceId: {evidence_id}")
+        evidence_ids.add(evidence_id)
+        if evidence["evidenceState"] != "approved_summary_only":
+            raise ShapeError(
+                "unexpected value at $.approvedEvidenceRefs[].evidenceState: "
+                "expected approved_summary_only"
+            )
+        true_fields = ["summaryOnly", "approvalRequired", "approvedSummaryRef"]
+        false_fields = [
+            "localFileRead",
+            "repositoryRead",
+            "rawTraceRead",
+            "rawReportRead",
+            "rawLogRead",
+            "artifactRead",
+            "artifactWrite",
+            "privatePathEchoAllowed",
+            "stdoutIncluded",
+            "stderrIncluded",
+            "rawLogIncluded",
+            "artifactPathIncluded",
+            "hardwareDumpIncluded",
+            "boardDumpIncluded",
+            "modelWeightPathIncluded",
+        ]
+        require_bool_fields(evidence, path, true_fields + false_fields)
+        for field in true_fields:
+            if evidence[field] is not True:
+                raise ShapeError(f"unexpected value at $.approvedEvidenceRefs[].{field}: expected true")
+        for field in false_fields:
+            if evidence[field] is not False:
+                raise ShapeError(f"unexpected value at $.approvedEvidenceRefs[].{field}: expected false")
+        descriptors = require_object_array(
+            require_field(evidence, path, "fieldDescriptors"),
+            child(path, "fieldDescriptors"),
+            min_items=1,
+        )
+        for descriptor in descriptors:
+            require_string_fields(
+                descriptor,
+                "$.approvedEvidenceRefs[].fieldDescriptors[]",
+                ["fieldName", "valueKind", "policy"],
+            )
+
+    policy = expect_object(require_field(root, "$", "manifestPolicy"), "$.manifestPolicy")
+    require_string_fields(policy, "$.manifestPolicy", ["state", "manifestKind", "redactionRule"])
+    if policy["state"] != "planned":
+        raise ShapeError("unexpected value at $.manifestPolicy.state: expected planned")
+    if policy["manifestKind"] != "approved_summary_refs_only":
+        raise ShapeError(
+            "unexpected value at $.manifestPolicy.manifestKind: "
+            "expected approved_summary_refs_only"
+        )
+    expect_integer(require_field(policy, "$.manifestPolicy", "maxEvidenceRefs"), "$.manifestPolicy.maxEvidenceRefs")
+    true_policy_flags = ["summaryOnly", "approvalRequired", "auditRequired"]
+    false_policy_flags = [
+        "mcpRuntimeAllowed",
+        "mcpServerAllowed",
+        "mcpClientAllowed",
+        "toolInvocationAllowed",
+        "commandExecutionAllowed",
+        "localFileReadAllowed",
+        "repositoryReadAllowed",
+        "rawTraceReadAllowed",
+        "rawReportReadAllowed",
+        "rawLogReadAllowed",
+        "artifactReadAllowed",
+        "artifactWriteAllowed",
+        "reportWriteAllowed",
+        "evidenceArtifactWriteAllowed",
+        "repositoryMutationAllowed",
+        "publicPushAllowed",
+        "releaseOrTagAllowed",
+        "publicTextPublicationAllowed",
+        "pathEchoAllowed",
+        "stdoutAllowed",
+        "stderrAllowed",
+        "rawLogAllowed",
+        "privatePathsAllowed",
+        "generatedArtifactsAllowed",
+        "hardwareAccessAllowed",
+        "kv260AccessAllowed",
+        "fpgaRepoAccessAllowed",
+        "launcherExecutionAllowed",
+        "editorExecutionAllowed",
+        "providerCallAllowed",
+        "networkCallAllowed",
+        "modelLoadAllowed",
+    ]
+    require_bool_fields(policy, "$.manifestPolicy", true_policy_flags + false_policy_flags)
+    for flag in true_policy_flags:
+        if policy[flag] is not True:
+            raise ShapeError(f"unexpected value at $.manifestPolicy.{flag}: expected true")
+    for flag in false_policy_flags:
+        if policy[flag] is not False:
+            raise ShapeError(f"unexpected value at $.manifestPolicy.{flag}: expected false")
+
+    manifest = expect_object(require_field(root, "$", "sampleManifest"), "$.sampleManifest")
+    require_string_fields(manifest, "$.sampleManifest", ["manifestState", "targetScope", "summary"])
+    if manifest["manifestState"] != "summary_only_fixture":
+        raise ShapeError(
+            "unexpected value at $.sampleManifest.manifestState: expected summary_only_fixture"
+        )
+    manifest_true_fields = ["summaryOnly"]
+    manifest_false_fields = [
+        "pathIncluded",
+        "privatePathsIncluded",
+        "stdoutIncluded",
+        "stderrIncluded",
+        "rawLogsIncluded",
+        "artifactPathsIncluded",
+        "generatedArtifactsIncluded",
+        "rawTraceIncluded",
+        "rawReportIncluded",
+        "hardwareDumpIncluded",
+        "boardDumpIncluded",
+        "modelPathsIncluded",
+        "manifestPublished",
+        "evidenceArtifactWritten",
+    ]
+    require_bool_fields(manifest, "$.sampleManifest", manifest_true_fields + manifest_false_fields)
+    if manifest["summaryOnly"] is not True:
+        raise ShapeError("unexpected value at $.sampleManifest.summaryOnly: expected true")
+    for field in manifest_false_fields:
+        if manifest[field] is not False:
+            raise ShapeError(f"unexpected value at $.sampleManifest.{field}: expected false")
+
+    row_false_fields = [
+        "pathIncluded",
+        "privatePathsIncluded",
+        "rawTraceIncluded",
+        "rawReportIncluded",
+        "rawLogsIncluded",
+        "artifactPathIncluded",
+        "hardwareDumpIncluded",
+        "boardDumpIncluded",
+        "modelPathIncluded",
+    ]
+    rows = require_object_array(
+        require_field(manifest, "$.sampleManifest", "evidenceRows"),
+        "$.sampleManifest.evidenceRows",
+        min_items=2,
+    )
+    for row in rows:
+        path = "$.sampleManifest.evidenceRows[]"
+        require_string_fields(row, path, ["rowId", "evidenceKind", "sourceRef", "state", "summary"])
+        require_bool_fields(row, path, ["summaryOnly"] + row_false_fields)
+        if row["summaryOnly"] is not True:
+            raise ShapeError("unexpected value at $.sampleManifest.evidenceRows[].summaryOnly: expected true")
+        for field in row_false_fields:
+            if row[field] is not False:
+                raise ShapeError(f"unexpected value at $.sampleManifest.evidenceRows[].{field}: expected false")
+
+    validation_rows = require_object_array(
+        require_field(manifest, "$.sampleManifest", "validationRows"),
+        "$.sampleManifest.validationRows",
+        min_items=1,
+    )
+    for row in validation_rows:
+        path = "$.sampleManifest.validationRows[]"
+        require_string_fields(row, path, ["rowId", "state", "summary"])
+        require_bool_fields(
+            row,
+            path,
+            [
+                "summaryOnly",
+                "commandIncluded",
+                "pathIncluded",
+                "stdoutIncluded",
+                "stderrIncluded",
+                "rawLogsIncluded",
+                "artifactPathIncluded",
+            ],
+        )
+        if row["summaryOnly"] is not True:
+            raise ShapeError("unexpected value at $.sampleManifest.validationRows[].summaryOnly: expected true")
+        for field in [
+            "commandIncluded",
+            "pathIncluded",
+            "stdoutIncluded",
+            "stderrIncluded",
+            "rawLogsIncluded",
+            "artifactPathIncluded",
+        ]:
+            if row[field] is not False:
+                raise ShapeError(f"unexpected value at $.sampleManifest.validationRows[].{field}: expected false")
+
+    mutation = expect_object(require_field(root, "$", "noMutationEvidence"), "$.noMutationEvidence")
+    require_string_fields(mutation, "$.noMutationEvidence", ["state", "evidenceRule"])
+    mutation_false_fields = [
+        "trackedFileMutationAllowed",
+        "trackedFileDiffCaptured",
+        "localFileReadAllowed",
+        "repositoryReadAllowed",
+        "artifactReadAllowed",
+        "artifactWriteAllowed",
+        "reportWriteAllowed",
+        "evidenceArtifactWriteAllowed",
+        "repositoryMutationAllowed",
+        "toolInvocationAllowed",
+        "commandExecutionAllowed",
+        "publicPushAllowed",
+        "releaseOrTagAllowed",
+    ]
+    require_bool_fields(mutation, "$.noMutationEvidence", mutation_false_fields)
+    for field in mutation_false_fields:
+        if mutation[field] is not False:
+            raise ShapeError(f"unexpected value at $.noMutationEvidence.{field}: expected false")
+
+    blocked_actions = require_field(root, "$", "blockedActions")
+    require_string_array(blocked_actions, "$.blockedActions", min_items=1)
+    for required in [
+        "mcp-server-start",
+        "mcp-client-session",
+        "tool-invocation",
+        "command-execution",
+        "arbitrary-shell-command",
+        "local-file-read",
+        "repository-read",
+        "raw-trace-read",
+        "raw-report-read",
+        "raw-log-read",
+        "artifact-read",
+        "artifact-write",
+        "report-write",
+        "evidence-artifact-write",
+        "repository-write-back",
+        "public-text-publish",
+        "provider-call",
+        "network-call",
+        "launcher-execution",
+        "editor-execution",
+        "hardware-probe",
+        "kv260-access",
+        "fpga-repo-access",
+        "runtime-launch",
+        "model-load",
+        "telemetry-upload",
+        "public-push",
+        "release-or-tag",
+    ]:
+        if required not in blocked_actions:
+            raise ShapeError(f"missing blocked action at $.blockedActions: {required}")
+
+    safety = expect_object(require_field(root, "$", "safetyFlags"), "$.safetyFlags")
+    true_flags = [
+        "dataOnly",
+        "descriptorOnly",
+        "readOnly",
+        "evidenceManifestFixtureOnly",
+        "summaryOnly",
+    ]
+    false_flags = [
+        "mcpRuntimeImplemented",
+        "mcpServerImplemented",
+        "mcpClientImplemented",
+        "toolInvocationPathImplemented",
+        "toolInvocationAttempted",
+        "commandExecution",
+        "shellExecution",
+        "runtimeExecution",
+        "localFileRead",
+        "repositoryRead",
+        "rawTraceRead",
+        "rawReportRead",
+        "rawLogRead",
+        "readsArtifacts",
+        "writesArtifacts",
+        "reportWriterImplemented",
+        "evidenceArtifactWriterImplemented",
+        "auditLoggerImplemented",
+        "auditPersistence",
+        "diagnosticsProduced",
+        "reportProduced",
+        "networkCalls",
+        "providerCalls",
+        "launcherExecution",
+        "editorExecution",
+        "hardwareAccess",
+        "kv260Access",
+        "fpgaRepoAccess",
+        "modelExecution",
+        "modelWeightsIncluded",
+        "privatePathsIncluded",
+        "secretsIncluded",
+        "tokensIncluded",
+        "stdoutIncluded",
+        "stderrIncluded",
+        "rawLogsIncluded",
+        "artifactPathsIncluded",
+        "hardwareDumpIncluded",
+        "boardDumpIncluded",
+        "telemetry",
+        "writeBack",
+        "repositoryMutation",
+        "publicPush",
+        "releaseOrTag",
+        "stableApiAbiClaim",
+        "marketplaceClaim",
+    ]
+    require_bool_fields(safety, "$.safetyFlags", true_flags + false_flags)
+    for flag in true_flags:
+        if safety[flag] is not True:
+            raise ShapeError(f"unexpected value at $.safetyFlags.{flag}: expected true")
+    for flag in false_flags:
+        if safety[flag] is not False:
+            raise ShapeError(f"unexpected value at $.safetyFlags.{flag}: expected false")
+
+    require_string_array(require_field(root, "$", "limitations"), "$.limitations", min_items=1)
+    require_string_array(require_field(root, "$", "issueRefs"), "$.issueRefs", min_items=1)
+
+
 def validate_mcp_permission_model(value: Any) -> None:
     root = expect_object(value, "$")
     require_schema(root, "$", "pccx.lab.mcp-permission-model.v0")
@@ -6859,6 +7237,7 @@ SPECS = [
     BoundarySpec("mcp-verification-run-comparison", "docs/examples/mcp-verification-run-comparison.example.json", validate_mcp_verification_run_comparison),
     BoundarySpec("mcp-pr-summary-handoff", "docs/examples/mcp-pr-summary-handoff.example.json", validate_mcp_pr_summary_handoff),
     BoundarySpec("mcp-review-packet", "docs/examples/mcp-review-packet.example.json", validate_mcp_review_packet),
+    BoundarySpec("mcp-evidence-manifest", "docs/examples/mcp-evidence-manifest.example.json", validate_mcp_evidence_manifest),
     BoundarySpec("mcp-permission-model", "docs/examples/mcp-permission-model.example.json", validate_mcp_permission_model),
     BoundarySpec("mcp-approval-request", "docs/examples/mcp-approval-request.example.json", validate_mcp_approval_request),
     BoundarySpec("mcp-approval-decision", "docs/examples/mcp-approval-decision.example.json", validate_mcp_approval_decision),
