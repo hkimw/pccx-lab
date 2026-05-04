@@ -478,6 +478,23 @@
       "docsAnchor": "docs/CLI_CORE_BOUNDARY.md#plugin-capability-list-boundary"
     },
     {
+      "boundaryKind": "plugin-capability-detail",
+      "examplePath": "docs/examples/plugin-capability-detail.example.json",
+      "producingCommand": null,
+      "coreGeneratorOrReader": "docs/CLI_CORE_BOUNDARY.md#plugin-capability-detail-boundary",
+      "readerOnly": true,
+      "shapeValidation": {
+        "kind": "plugin-capability-detail",
+        "validator": "scripts/json_boundary_shape_validator.py",
+        "fixtureTest": "scripts/test-json-boundary-shapes.sh"
+      },
+      "rustValidation": {
+        "testPath": "crates/core/tests/json_boundary_examples.rs",
+        "testName": "plugin_capability_detail_example_keeps_descriptor_only_detail_boundary"
+      },
+      "docsAnchor": "docs/CLI_CORE_BOUNDARY.md#plugin-capability-detail-boundary"
+    },
+    {
       "boundaryKind": "plugin-load-request",
       "examplePath": "docs/examples/plugin-load-request.example.json",
       "producingCommand": null,

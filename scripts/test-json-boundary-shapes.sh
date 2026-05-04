@@ -136,6 +136,7 @@ run_case \
     "[plugin-audit-event] shape ok" \
     "[plugin-manifest-validation-result] shape ok" \
     "[plugin-capability-list] shape ok" \
+    "[plugin-capability-detail] shape ok" \
     "[plugin-load-request] shape ok" \
     "[plugin-review-packet] shape ok" \
     "[plugin-boundary-plan] shape ok" \

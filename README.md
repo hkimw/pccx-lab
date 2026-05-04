@@ -144,6 +144,11 @@ boundary. There is no private back channel into lab internals. See
   consumers; it is not a manifest reader, package reader, plugin
   loader, runtime, capability dispatcher, compatibility promise, or
   marketplace flow.
+- `docs/examples/plugin-capability-detail.example.json` records a
+  descriptor-only capability detail view for one selected listed
+  capability; it is not a manifest reader, package reader, plugin
+  loader, runtime, sandbox, capability dispatcher, compatibility
+  promise, or marketplace flow.
 - `docs/examples/plugin-load-request.example.json` records a blocked
   load-request gate for a future reviewed plugin loader path; it is not
   a plugin loader, runtime, sandbox, manifest reader, package installer,

@@ -3958,6 +3958,265 @@ fn plugin_capability_list_example_keeps_descriptor_only_boundary() {
 }
 
 #[test]
+fn plugin_capability_detail_example_keeps_descriptor_only_detail_boundary() {
+    let value: serde_json::Value = parse_example("plugin-capability-detail.example.json");
+    let root = value
+        .as_object()
+        .expect("plugin capability detail must be an object");
+
+    assert_eq!(
+        root["schemaVersion"],
+        "pccx.lab.plugin-capability-detail.v0"
+    );
+    assert_eq!(root["detailState"], "descriptor_only");
+    assert_eq!(root["adapterState"], "not_implemented");
+    assert_eq!(root["defaultMode"], "read_only");
+
+    let refs = root["sourceBoundaryRefs"]
+        .as_array()
+        .expect("source boundary refs must be an array");
+    assert!(refs.iter().any(|source| {
+        source["refId"] == "plugin_capability_list"
+            && source["capabilityListAvailable"] == true
+            && source["capabilityDetailAvailable"] == true
+            && source["pluginLoaderAllowed"] == false
+            && source["capabilityDispatchAllowed"] == false
+            && source["pluginInvocationAllowed"] == false
+    }));
+    assert!(refs.iter().any(|source| {
+        source["refId"] == "plugin_manifest_validation_result"
+            && source["summaryOnly"] == true
+            && source["manifestReaderAllowed"] == false
+            && source["validatorCommandAllowed"] == false
+    }));
+
+    let request = root["capabilityDetailRequest"]
+        .as_object()
+        .expect("capability-detail request must be an object");
+    assert_eq!(request["requestKind"], "planned_plugin_capability_detail");
+    assert_eq!(
+        request["selectedCapabilityId"],
+        "plugin.diagnostics.summary"
+    );
+    assert_eq!(request["summaryOnly"], true);
+    assert_eq!(request["inputRefOnly"], true);
+    assert_eq!(request["pathEchoAllowed"], false);
+    assert_eq!(request["manifestContentIncluded"], false);
+    assert_eq!(request["packageContentIncluded"], false);
+    assert_eq!(request["sourceCodeIncluded"], false);
+    assert_eq!(request["localFileReadAllowed"], false);
+    assert_eq!(request["repositoryReadAllowed"], false);
+    assert_eq!(request["artifactReadAllowed"], false);
+    assert_eq!(request["commandExecutionAllowed"], false);
+    assert_eq!(request["runtimeExecutionAllowed"], false);
+    assert_eq!(request["pluginLoaderAllowed"], false);
+    assert_eq!(request["pluginRuntimeAllowed"], false);
+    assert_eq!(request["sandboxStartAllowed"], false);
+    assert_eq!(request["capabilityDispatchAllowed"], false);
+    assert_eq!(request["pluginInvocationAllowed"], false);
+    assert_eq!(request["permissionExecutorAllowed"], false);
+    assert_eq!(request["marketplaceFlowAllowed"], false);
+    assert_eq!(request["stableApiAbiClaim"], false);
+    assert_eq!(request["compatibilityClaim"], false);
+    assert_eq!(request["marketplaceClaim"], false);
+
+    let selected = root["selectedCapability"]
+        .as_object()
+        .expect("selected capability must be an object");
+    assert_eq!(selected["capabilityId"], "plugin.diagnostics.summary");
+    assert_eq!(selected["detailState"], "visible_descriptor");
+    assert_eq!(selected["permissionProfile"], "manifest_review_read_only");
+
+    let input = selected["inputDescriptor"]
+        .as_object()
+        .expect("input descriptor must be an object");
+    assert_eq!(input["descriptorState"], "metadata_only");
+    assert_eq!(input["userPathAccepted"], false);
+    assert_eq!(input["pathEchoAllowed"], false);
+    assert_eq!(input["manifestContentIncluded"], false);
+    assert_eq!(input["packageContentIncluded"], false);
+    assert_eq!(input["sourceCodeIncluded"], false);
+    assert_eq!(input["localFileReadAllowed"], false);
+    assert_eq!(input["repositoryReadAllowed"], false);
+    assert_eq!(input["rawTraceReadAllowed"], false);
+    assert_eq!(input["rawReportReadAllowed"], false);
+    assert_eq!(input["artifactReadAllowed"], false);
+    assert_eq!(input["secretsReadAllowed"], false);
+    assert_eq!(input["tokensReadAllowed"], false);
+
+    let output = selected["outputDescriptor"]
+        .as_object()
+        .expect("output descriptor must be an object");
+    assert_eq!(output["boundaryRef"], "pccx.lab.plugin-output-contract.v0");
+    assert_eq!(output["payloadIncluded"], false);
+    assert_eq!(output["reportContentIncluded"], false);
+    assert_eq!(output["stdoutIncluded"], false);
+    assert_eq!(output["stderrIncluded"], false);
+    assert_eq!(output["rawLogsIncluded"], false);
+    assert_eq!(output["artifactPathsIncluded"], false);
+    assert_eq!(output["manifestContentIncluded"], false);
+    assert_eq!(output["packageContentIncluded"], false);
+    assert_eq!(output["sourceCodeIncluded"], false);
+
+    let dispatch = selected["dispatchPolicy"]
+        .as_object()
+        .expect("dispatch policy must be an object");
+    assert_eq!(dispatch["requiresSeparateLoadBoundary"], true);
+    assert_eq!(dispatch["requiresSeparateDispatchBoundary"], true);
+    assert_eq!(dispatch["approvalRequiredBeforeDispatch"], true);
+    assert_eq!(dispatch["approvedForListing"], true);
+    assert_eq!(dispatch["approvedForDetail"], true);
+    assert_eq!(dispatch["approvedForLoad"], false);
+    assert_eq!(dispatch["approvedForDispatch"], false);
+    assert_eq!(dispatch["pluginLoaderAllowed"], false);
+    assert_eq!(dispatch["pluginRuntimeAllowed"], false);
+    assert_eq!(dispatch["sandboxStartAllowed"], false);
+    assert_eq!(dispatch["capabilityDispatchAllowed"], false);
+    assert_eq!(dispatch["pluginInvocationAllowed"], false);
+    assert_eq!(dispatch["commandExecutionAllowed"], false);
+    assert_eq!(dispatch["runtimeExecutionAllowed"], false);
+    assert_eq!(dispatch["permissionExecutorAllowed"], false);
+    assert_eq!(dispatch["inputReaderAllowed"], false);
+    assert_eq!(dispatch["traceImporterAllowed"], false);
+    assert_eq!(dispatch["reportWriteAllowed"], false);
+    assert_eq!(dispatch["repositoryMutationAllowed"], false);
+
+    let related = root["relatedCapabilityRefs"]
+        .as_array()
+        .expect("related capability refs must be an array");
+    assert!(related.iter().any(|capability| {
+        capability["capabilityId"] == "plugin.trace.importer"
+            && capability["detailIncluded"] == false
+            && capability["approvedForDetail"] == false
+            && capability["capabilityDispatchAllowed"] == false
+            && capability["pluginInvocationAllowed"] == false
+    }));
+
+    let display = root["displayPolicy"]
+        .as_object()
+        .expect("display policy must be an object");
+    assert_eq!(display["summaryOnly"], true);
+    assert_eq!(display["pathEchoAllowed"], false);
+    assert_eq!(display["manifestContentIncluded"], false);
+    assert_eq!(display["packageContentIncluded"], false);
+    assert_eq!(display["sourceCodeIncluded"], false);
+    assert_eq!(display["privatePathsIncluded"], false);
+    assert_eq!(display["stdoutIncluded"], false);
+    assert_eq!(display["stderrIncluded"], false);
+    assert_eq!(display["rawLogsIncluded"], false);
+    assert_eq!(display["artifactPathsIncluded"], false);
+    assert_eq!(display["reportContentIncluded"], false);
+
+    let mutation = root["noMutationEvidence"]
+        .as_object()
+        .expect("no mutation evidence must be an object");
+    assert_eq!(mutation["trackedFileMutationAllowed"], false);
+    assert_eq!(mutation["localFileReadAllowed"], false);
+    assert_eq!(mutation["repositoryReadAllowed"], false);
+    assert_eq!(mutation["artifactReadAllowed"], false);
+    assert_eq!(mutation["artifactWriteAllowed"], false);
+    assert_eq!(mutation["reportWriteAllowed"], false);
+    assert_eq!(mutation["pluginLoadAllowed"], false);
+    assert_eq!(mutation["capabilityDispatchAllowed"], false);
+    assert_eq!(mutation["pluginInvocationAllowed"], false);
+    assert_eq!(mutation["commandExecutionAllowed"], false);
+    assert_eq!(mutation["marketplacePublicationAllowed"], false);
+
+    let blocked = root["blockedActions"]
+        .as_array()
+        .expect("blocked actions must be an array");
+    for action in [
+        "manifest-reader",
+        "package-reader",
+        "plugin-loader-start",
+        "plugin-runtime-start",
+        "plugin-sandbox-start",
+        "plugin-host-api-bind",
+        "plugin-capability-dispatch",
+        "plugin-invocation",
+        "command-execution",
+        "local-file-read",
+        "repository-read",
+        "raw-trace-read",
+        "raw-report-read",
+        "artifact-read",
+        "artifact-write",
+        "report-write",
+        "package-distribution",
+        "marketplace-flow",
+        "dynamic-code-load",
+        "provider-call",
+        "network-call",
+        "hardware-probe",
+        "kv260-access",
+        "fpga-repo-access",
+        "model-load",
+        "public-push",
+        "release-or-tag",
+    ] {
+        assert!(
+            blocked.iter().any(|item| item == action),
+            "blockedActions must include {action}"
+        );
+    }
+
+    let safety = root["safetyFlags"]
+        .as_object()
+        .expect("safety flags must be an object");
+    assert_eq!(safety["dataOnly"], true);
+    assert_eq!(safety["descriptorOnly"], true);
+    assert_eq!(safety["readOnly"], true);
+    assert_eq!(safety["summaryOnly"], true);
+    assert_eq!(safety["capabilityDetailFixtureOnly"], true);
+    assert_eq!(safety["pluginRuntimeImplemented"], false);
+    assert_eq!(safety["pluginLoaderImplemented"], false);
+    assert_eq!(safety["pluginCodeLoaded"], false);
+    assert_eq!(safety["sandboxImplemented"], false);
+    assert_eq!(safety["hostApiBindingImplemented"], false);
+    assert_eq!(safety["manifestReaderImplemented"], false);
+    assert_eq!(safety["packageReaderImplemented"], false);
+    assert_eq!(safety["inputReaderImplemented"], false);
+    assert_eq!(safety["traceImporterImplemented"], false);
+    assert_eq!(safety["capabilityDispatchImplemented"], false);
+    assert_eq!(safety["pluginInvocationImplemented"], false);
+    assert_eq!(safety["reportWriterImplemented"], false);
+    assert_eq!(safety["auditLoggerImplemented"], false);
+    assert_eq!(safety["stablePluginAbiPromised"], false);
+    assert_eq!(safety["stableApiAbiClaim"], false);
+    assert_eq!(safety["compatibilityClaim"], false);
+    assert_eq!(safety["marketplaceClaim"], false);
+    assert_eq!(safety["marketplaceFlow"], false);
+    assert_eq!(safety["packageDistribution"], false);
+    assert_eq!(safety["commandExecution"], false);
+    assert_eq!(safety["runtimeExecution"], false);
+    assert_eq!(safety["localFileRead"], false);
+    assert_eq!(safety["repositoryRead"], false);
+    assert_eq!(safety["rawTraceRead"], false);
+    assert_eq!(safety["rawReportRead"], false);
+    assert_eq!(safety["rawLogRead"], false);
+    assert_eq!(safety["networkCalls"], false);
+    assert_eq!(safety["providerCalls"], false);
+    assert_eq!(safety["hardwareAccess"], false);
+    assert_eq!(safety["kv260Access"], false);
+    assert_eq!(safety["fpgaRepoAccess"], false);
+    assert_eq!(safety["modelExecution"], false);
+    assert_eq!(safety["privatePathsIncluded"], false);
+    assert_eq!(safety["manifestContentIncluded"], false);
+    assert_eq!(safety["packageContentIncluded"], false);
+    assert_eq!(safety["sourceCodeIncluded"], false);
+    assert_eq!(safety["secretsIncluded"], false);
+    assert_eq!(safety["tokensIncluded"], false);
+    assert_eq!(safety["stdoutIncluded"], false);
+    assert_eq!(safety["stderrIncluded"], false);
+    assert_eq!(safety["rawLogsIncluded"], false);
+    assert_eq!(safety["artifactPathsIncluded"], false);
+    assert_eq!(safety["writeBack"], false);
+    assert_eq!(safety["repositoryMutation"], false);
+    assert_eq!(safety["publicPush"], false);
+    assert_eq!(safety["releaseOrTag"], false);
+}
+
+#[test]
 fn plugin_load_request_example_keeps_loader_disabled_boundary() {
     let value: serde_json::Value = parse_example("plugin-load-request.example.json");
     let root = value

@@ -52,6 +52,7 @@ separate workflow logic island.
 | `docs/examples/plugin-audit-event.example.json` | planned audit event shape | Checked redacted audit-event shape for future approved plugin metadata review; no logger, runtime, or plugin loader is implemented. |
 | `docs/examples/plugin-manifest-validation-result.example.json` | planned manifest validation result | Checked summary-only result shape for a future approved manifest validation request; no manifest reader, validator command, plugin runtime, or loader is implemented. |
 | `docs/examples/plugin-capability-list.example.json` | planned capability list | Checked descriptor-only capability listing for future CLI/core and GUI consumers; no manifest reader, package reader, loader, runtime, dispatcher, compatibility claim, or marketplace flow is implemented. |
+| `docs/examples/plugin-capability-detail.example.json` | planned capability detail | Checked descriptor-only detail view for one selected listed capability; no manifest reader, package reader, loader, runtime, sandbox, dispatcher, compatibility claim, or marketplace flow is implemented. |
 | `docs/examples/plugin-load-request.example.json` | planned load-request gate | Checked blocked load-request shape for a future reviewed plugin loader gate; no loader, runtime, sandbox, manifest reader, package install, or dynamic code loading is implemented. |
 | `docs/examples/plugin-host-session-state.example.json` | planned host/session state | Checked blocked host/session state for a future reviewed plugin loader gate; no loader, runtime, sandbox, host API binding, capability dispatch, or command execution is implemented. |
 | `docs/examples/plugin-invocation-request.example.json` | planned invocation request | Checked blocked invocation-request shape for a future reviewed plugin capability dispatch gate; no loader, runtime, sandbox, host API binding, capability dispatch, or command execution is implemented. |
@@ -105,6 +106,7 @@ aligned.
 | `plugin-boundary-plan` | `docs/examples/plugin-boundary-plan.example.json` | Reader only; planned plugin manifest and host API boundary over existing CLI/core commands | Shape validator, inventory test, Rust JSON-shape test |
 | `plugin-manifest-validation-result` | `docs/examples/plugin-manifest-validation-result.example.json` | Reader only; planned summary-only result shape for a future approved plugin manifest validation request | Shape validator, inventory test, Rust JSON-shape test |
 | `plugin-capability-list` | `docs/examples/plugin-capability-list.example.json` | Reader only; planned descriptor-only capability listing over approved plugin boundary summaries | Shape validator, inventory test, Rust JSON-shape test |
+| `plugin-capability-detail` | `docs/examples/plugin-capability-detail.example.json` | Reader only; planned descriptor-only plugin capability detail over one listed capability summary | Shape validator, inventory test, Rust JSON-shape test |
 | `plugin-load-request` | `docs/examples/plugin-load-request.example.json` | Reader only; planned blocked load-request gate over approved plugin manifest, permission, validation, audit, and review summaries | Shape validator, inventory test, Rust JSON-shape test |
 | `plugin-host-session-state` | `docs/examples/plugin-host-session-state.example.json` | Reader only; planned blocked host/session state over approved plugin plan, permission, validation, review, load-request, and audit summaries | Shape validator, inventory test, Rust JSON-shape test |
 | `plugin-invocation-request` | `docs/examples/plugin-invocation-request.example.json` | Reader only; planned blocked invocation-request gate over approved plugin permission, input, review, load-request, host/session, and audit summaries | Shape validator, inventory test, Rust JSON-shape test |
@@ -897,6 +899,35 @@ upload telemetry, push publicly, or control releases/tags.
 The example capabilities are visible for listing only. They are not
 approved for loading or dispatch. No stable plugin ABI is promised, and
 no compatibility promise, marketplace claim, runtime claim, or hardware
+claim is made.
+
+## plugin capability-detail boundary
+
+[`docs/examples/plugin-capability-detail.example.json`](examples/plugin-capability-detail.example.json)
+defines the checked descriptor-only detail shape for one selected
+capability from the plugin capability-list fixture. It links the
+capability list, manifest-validation result, and permission model
+summaries, then records selected-capability metadata, input/output
+descriptors, and the blocked load/dispatch policy without reading
+manifests or packages or starting any plugin loader, runtime, sandbox,
+host API binding, or capability dispatch path.
+
+The fixture is summary-only metadata. It does not echo paths, include
+manifest contents, include package contents, include source code, read
+local files, read repositories, read raw traces, read raw reports, read
+raw logs, read artifacts, load plugin code, start a loader, start a
+runtime, start a sandbox, bind a host API, dispatch capabilities, call a
+permission executor, import traces, run a validator command, execute
+commands, write reports, write artifacts, mutate repositories, install
+packages, distribute packages, use a marketplace flow, call providers,
+use the network, touch hardware, access KV260, access FPGA repos, load
+models, upload telemetry, push publicly, or control releases/tags.
+
+The selected capability is approved for descriptor listing and
+descriptor detail only. It is not approved for loading or dispatch and
+still requires separate reviewed load and dispatch boundaries before
+any plugin path can exist. No stable plugin ABI is promised, and no
+compatibility promise, marketplace claim, runtime claim, or hardware
 claim is made.
 
 ## plugin load request boundary
