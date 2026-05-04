@@ -143,6 +143,7 @@ run_case \
     "[mcp-sample-catalog] inventory ok" \
     "[mcp-sample-detail] inventory ok" \
     "[sail-interface-boundary] inventory ok" \
+    "[sail-review-packet] inventory ok" \
     "[hybrid-strategy-plan] inventory ok" \
     "[hybrid-interface-boundary] inventory ok" \
     "[hybrid-review-packet] inventory ok" \

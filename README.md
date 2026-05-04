@@ -82,6 +82,12 @@ boundary. There is no private back channel into lab internals. See
   summaries; it is not a Sail source reader, parser, compiler, AST
   reader, model execution path, refinement check, proof path, report
   reader/writer, artifact reader/writer, or hardware path.
+- `docs/examples/sail-review-packet.example.json` records a
+  summary-only Sail review packet over approved adoption, interface,
+  workflow, verification, and report-gate summaries; it is not a Sail
+  source reader, RTL source reader, AST reader, parser, compiler, model
+  generator, model execution path, refinement check, proof path,
+  report/artifact reader or writer, or hardware path.
 - `docs/examples/hybrid-strategy-plan.example.json` records a
   descriptor-only hybrid strategy plan for future C++/SystemVerilog and
   custom-script control tracks; it is not a source reader, grammar
