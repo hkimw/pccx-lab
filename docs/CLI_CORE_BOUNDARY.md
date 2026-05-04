@@ -44,6 +44,7 @@ separate workflow logic island.
 | `docs/examples/mcp-blocked-invocation-result.example.json` | planned blocked result | Checked blocked, non-executed invocation result for a future MCP/tool adapter; no command executor or tool invocation path is implemented. |
 | `docs/examples/mcp-audit-event.example.json` | planned audit event shape | Checked redacted audit-event shape for a future read-only MCP/tool adapter; no logger or runtime is implemented. |
 | `docs/examples/plugin-boundary-plan.example.json` | planned boundary map | Checked plugin manifest and host API plan; no plugin runtime is implemented. |
+| `docs/examples/plugin-sample-plan.example.json` | planned sample plan | Checked descriptor-only sample plugin plan over approved plugin input/output and capability summaries; no sample code, package, loader, runtime, or dispatch path is implemented. |
 | `docs/examples/plugin-dry-run-flow.example.json` | planned flow contract | Checked dry-run plugin flow contract over approved summaries; no plugin loader, runtime, sandbox, or command executor is implemented. |
 | `docs/examples/plugin-input-contract.example.json` | planned input contract | Checked summary-only plugin input shape for approved diagnostics and workflow-result summaries; no plugin runtime or input reader is implemented. |
 | `docs/examples/plugin-trace-summary-input.example.json` | planned trace-summary input gate | Checked summary-only trace metadata input shape for future plugin trace review; no trace importer, raw trace reader, plugin runtime, or input reader is implemented. |
@@ -107,6 +108,7 @@ aligned.
 | `mcp-audit-event` | `docs/examples/mcp-audit-event.example.json` | Reader only; planned redacted audit-event shape for future read-only tool requests | Shape validator, inventory test, Rust JSON-shape test |
 | `plugin-boundary-plan` | `docs/examples/plugin-boundary-plan.example.json` | Reader only; planned plugin manifest and host API boundary over existing CLI/core commands | Shape validator, inventory test, Rust JSON-shape test |
 | `plugin-manifest-validation-result` | `docs/examples/plugin-manifest-validation-result.example.json` | Reader only; planned summary-only result shape for a future approved plugin manifest validation request | Shape validator, inventory test, Rust JSON-shape test |
+| `plugin-sample-plan` | `docs/examples/plugin-sample-plan.example.json` | Reader only; planned descriptor-only sample plugin plan over approved plugin boundary summaries | Shape validator, inventory test, Rust JSON-shape test |
 | `plugin-capability-list` | `docs/examples/plugin-capability-list.example.json` | Reader only; planned descriptor-only capability listing over approved plugin boundary summaries | Shape validator, inventory test, Rust JSON-shape test |
 | `plugin-capability-detail` | `docs/examples/plugin-capability-detail.example.json` | Reader only; planned descriptor-only plugin capability detail over one listed capability summary | Shape validator, inventory test, Rust JSON-shape test |
 | `plugin-load-request` | `docs/examples/plugin-load-request.example.json` | Reader only; planned blocked load-request gate over approved plugin manifest, permission, validation, audit, and review summaries | Shape validator, inventory test, Rust JSON-shape test |
@@ -883,6 +885,34 @@ The host API plan keeps plugin-facing data behind existing CLI/core
 contracts: lab status, workflow descriptors, diagnostics envelopes, and
 workflow result summaries. The GUI may render manifest and capability
 metadata only after CLI/core contracts exist. No stable plugin ABI is promised.
+
+## plugin sample-plan boundary
+
+[`docs/examples/plugin-sample-plan.example.json`](examples/plugin-sample-plan.example.json)
+defines the checked descriptor-only sample plugin plan for a future
+diagnostics summary sample. It links the plugin boundary plan,
+capability detail, input contract, output contract, and permission model
+summaries, then records the manifest-only sample identity, proposed
+CLI/core fixed-argument preview, review gates, and blocked load/dispatch
+steps.
+
+The fixture is metadata only. It does not include a manifest path,
+manifest contents, package path, package contents, sample source, source
+code, diagnostics payload, trace content, report body, stdout, stderr,
+raw logs, artifact paths, private paths, secrets, or tokens. It does not
+read local files, read repositories, import traces, read reports, write
+reports, write artifacts, load plugin code, start a loader, start a
+runtime, start a sandbox, bind a host API, dispatch capabilities, call a
+permission executor, execute commands, install packages, distribute
+packages, use a marketplace flow, call providers, use the network, touch
+hardware, access KV260, access FPGA repos, load models, upload
+telemetry, push publicly, mutate repositories, or control releases/tags.
+
+The sample is approved for descriptor planning only. It is not approved
+for manifest materialization, code generation, package build, loading,
+dispatch, invocation, report writing, artifact writing, or repository
+mutation. No plugin ABI stability, compatibility promise, marketplace
+claim, runtime claim, or hardware claim is made.
 
 ## plugin manifest validation result boundary
 
