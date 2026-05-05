@@ -8306,6 +8306,324 @@ fn sail_source_intake_approval_example_keeps_descriptor_only_boundary() {
 }
 
 #[test]
+fn sail_source_intake_result_example_keeps_descriptor_only_boundary() {
+    let value: serde_json::Value = parse_example("sail-source-intake-result.example.json");
+    let root = value
+        .as_object()
+        .expect("Sail source-intake result boundary must be an object");
+
+    assert_eq!(
+        root["schemaVersion"],
+        "pccx.lab.sail-source-intake-result.v0"
+    );
+    assert_eq!(root["resultState"], "blocked_not_run");
+    assert_eq!(root["approvalState"], "not_approved");
+    assert_eq!(root["intakeState"], "not_started");
+    assert_eq!(root["adapterState"], "not_implemented");
+    assert_eq!(root["defaultMode"], "read_only");
+    assert_eq!(root["hostMode"], "cli_core_first_gui_second");
+    assert_eq!(
+        root["boundaryKind"],
+        "future_sail_source_intake_result_boundary"
+    );
+
+    let refs = root["sourceBoundaryRefs"]
+        .as_array()
+        .expect("source boundary refs must be an array");
+    for ref_id in [
+        "sail_source_intake_approval",
+        "sail_source_intake_boundary",
+        "sail_implementation_gap_matrix",
+        "sail_model_readiness",
+        "sail_evidence_detail",
+    ] {
+        assert!(
+            refs.iter().any(|source| {
+                source["refId"] == ref_id
+                    && source["summaryOnly"] == true
+                    && source["resultInput"] == true
+                    && source["approvedSummaryRef"] == true
+                    && source["sourceIntakeAllowed"] == false
+                    && source["sourceReadAllowed"] == false
+                    && source["rtlSourceReadAllowed"] == false
+                    && source["astReadAllowed"] == false
+                    && source["generatedModelReadAllowed"] == false
+                    && source["repositoryReadAllowed"] == false
+                    && source["commandExecutionAllowed"] == false
+                    && source["runtimeExecutionAllowed"] == false
+            }),
+            "sourceBoundaryRefs must include {ref_id}"
+        );
+    }
+
+    let request = root["resultRequest"]
+        .as_object()
+        .expect("result request must be an object");
+    assert_eq!(request["requestKind"], "planned_sail_source_intake_result");
+    assert_eq!(
+        request["sourceReferenceKind"],
+        "approved-sail-source-intake-result-summaries"
+    );
+    assert_eq!(
+        request["outputBoundary"],
+        "pccx.lab.sail-source-intake-result.v0"
+    );
+    let fixed_args = request["fixedArgsPreview"]
+        .as_array()
+        .expect("fixed args preview must be an array");
+    assert_eq!(fixed_args[0], "sail-model");
+    assert_eq!(fixed_args[1], "source-intake");
+    assert_eq!(fixed_args[2], "result");
+    assert_eq!(fixed_args[3], "--format");
+    assert_eq!(fixed_args[4], "json");
+    assert_eq!(request["summaryOnly"], true);
+    assert_eq!(request["inputRefOnly"], true);
+    assert_eq!(request["approvalRequired"], true);
+    for flag in [
+        "approvalRequested",
+        "approved",
+        "sourceIntakeAllowed",
+        "sourceIntakeAttempted",
+        "sourceIntakeCompleted",
+        "resultPayloadIncluded",
+        "localFileReadAllowed",
+        "repositoryReadAllowed",
+        "sailSourceReadAllowed",
+        "rtlSourceReadAllowed",
+        "sailAstReadAllowed",
+        "generatedModelReadAllowed",
+        "sourceContentReadAllowed",
+        "sourcePathReadAllowed",
+        "sourceHashReadAllowed",
+        "sourceMetadataReadAllowed",
+        "sourceManifestReadAllowed",
+        "parserExecutionAllowed",
+        "compilerExecutionAllowed",
+        "modelGenerationAllowed",
+        "modelExecutionAllowed",
+        "refinementCheckAllowed",
+        "formalProofAllowed",
+        "simulatorExecutionAllowed",
+        "verificationRunAllowed",
+        "hardwareControlAllowed",
+        "commandExecutionAllowed",
+        "providerCallAllowed",
+        "networkCallAllowed",
+        "kv260AccessAllowed",
+        "fpgaRepoAccessAllowed",
+        "stableApiAbiClaim",
+        "marketplaceClaim",
+        "runtimeClaim",
+        "hardwareClaim",
+    ] {
+        assert_eq!(request[flag], false, "resultRequest.{flag} must be false");
+    }
+
+    let result = root["blockedResult"]
+        .as_object()
+        .expect("blocked result must be an object");
+    assert_eq!(result["resultKind"], "sail_source_intake_result");
+    assert_eq!(result["resultState"], "blocked_not_run");
+    assert_eq!(result["approvalState"], "not_approved");
+    assert_eq!(result["intakeState"], "not_started");
+    assert_eq!(result["summaryOnly"], true);
+    assert_eq!(result["descriptorOnly"], true);
+    assert_eq!(result["approvalRequired"], true);
+    for flag in [
+        "approved",
+        "sourceIntakeAllowed",
+        "sourceIntakeAttempted",
+        "sourceIntakeCompleted",
+        "resultMaterialized",
+        "resultPayloadIncluded",
+        "sailSourceReadAllowed",
+        "rtlSourceReadAllowed",
+        "sailAstReadAllowed",
+        "generatedModelReadAllowed",
+        "sourceManifestReadAllowed",
+        "parserExecutionAllowed",
+        "compilerExecutionAllowed",
+        "modelGenerationAllowed",
+        "modelExecutionAllowed",
+        "refinementCheckAllowed",
+        "formalProofAllowed",
+        "verificationRunAllowed",
+        "hardwareControlAllowed",
+        "repositoryReadAllowed",
+        "providerCallAllowed",
+        "networkCallAllowed",
+    ] {
+        assert_eq!(result[flag], false, "blockedResult.{flag} must be false");
+    }
+
+    let checklist = root["resultChecklist"]
+        .as_array()
+        .expect("result checklist must be an array");
+    assert!(checklist.iter().any(|item| {
+        item["checkId"] == "source_intake_approval_gate"
+            && item["state"] == "not_approved"
+            && item["approvalRequired"] == true
+            && item["sourceIntakeAllowed"] == false
+    }));
+    assert!(checklist.iter().any(|item| {
+        item["checkId"] == "source_intake_not_attempted"
+            && item["state"] == "blocked_not_run"
+            && item["sourceIntakeAllowed"] == false
+    }));
+    assert!(checklist.iter().any(|item| {
+        item["checkId"] == "no_result_payload_boundary" && item["state"] == "blocked"
+    }));
+
+    let policy = root["intakeResultPolicy"]
+        .as_object()
+        .expect("intake result policy must be an object");
+    assert_eq!(policy["policyState"], "blocked");
+    assert_eq!(policy["resultState"], "blocked_not_run");
+    assert_eq!(policy["approvalState"], "not_approved");
+    assert_eq!(policy["summaryOnly"], true);
+    assert_eq!(policy["descriptorOnly"], true);
+    assert_eq!(policy["approvalRequired"], true);
+    assert_eq!(policy["auditRequired"], true);
+    for flag in [
+        "approved",
+        "sourceIntakeAllowed",
+        "sourceIntakeAttempted",
+        "sourceIntakeCompleted",
+        "resultMaterialized",
+        "readyForSourceIntake",
+        "readyForSailSourceIntake",
+        "readyForRtlIntake",
+        "readyForManifestRead",
+        "readyForParser",
+        "readyForCompiler",
+        "readyForModelGeneration",
+        "readyForModelExecution",
+        "readyForRefinementCheck",
+        "readyForFormalProof",
+        "readyForVerificationRun",
+        "readyForHardwareControl",
+        "readyForRepositoryRead",
+        "runtimeClaim",
+        "hardwareClaim",
+        "stableApiAbiClaim",
+        "marketplaceClaim",
+    ] {
+        assert_eq!(
+            policy[flag], false,
+            "intakeResultPolicy.{flag} must be false"
+        );
+    }
+
+    let blocked = root["blockedActions"]
+        .as_array()
+        .expect("blocked actions must be an array");
+    for action in [
+        "source-intake-result-materialization",
+        "source-intake-approval-request",
+        "source-intake-approval-execution",
+        "source-intake-dispatch",
+        "approval-executor",
+        "sail-source-read",
+        "rtl-source-read",
+        "source-path-read",
+        "source-content-read",
+        "source-hash-read",
+        "source-metadata-read",
+        "source-manifest-read",
+        "ast-read",
+        "generated-model-read",
+        "parser-execution",
+        "compiler-execution",
+        "model-generation",
+        "model-execution",
+        "refinement-check",
+        "formal-proof",
+        "verification-run",
+        "hardware-control",
+        "local-file-read",
+        "repository-read",
+        "provider-call",
+        "network-call",
+        "hardware-probe",
+        "kv260-access",
+        "fpga-repo-access",
+        "model-load",
+        "public-push",
+        "release-or-tag",
+    ] {
+        assert!(
+            blocked
+                .iter()
+                .any(|blocked_action| blocked_action == action),
+            "blockedActions must include {action}"
+        );
+    }
+
+    let safety = root["safetyFlags"]
+        .as_object()
+        .expect("safety flags must be an object");
+    assert_eq!(safety["dataOnly"], true);
+    assert_eq!(safety["descriptorOnly"], true);
+    assert_eq!(safety["readOnly"], true);
+    assert_eq!(safety["summaryOnly"], true);
+    assert_eq!(safety["sailSourceIntakeResultFixtureOnly"], true);
+    for flag in [
+        "approvalExecutorImplemented",
+        "sourceIntakeApprovalImplemented",
+        "sourceIntakeRequestImplemented",
+        "sourceIntakeDispatchImplemented",
+        "sourceIntakeResultImplemented",
+        "sailSourceReaderImplemented",
+        "rtlSourceReaderImplemented",
+        "sourceManifestReaderImplemented",
+        "sourcePathReaderImplemented",
+        "sourceContentReaderImplemented",
+        "sourceHashReaderImplemented",
+        "sourceMetadataReaderImplemented",
+        "sailAstReaderImplemented",
+        "generatedModelReaderImplemented",
+        "parserImplemented",
+        "compilerImplemented",
+        "modelGenerationImplemented",
+        "modelExecutionImplemented",
+        "refinementCheck",
+        "formalProof",
+        "verificationExecution",
+        "hardwareControl",
+        "commandExecution",
+        "runtimeExecution",
+        "localFileRead",
+        "repositoryRead",
+        "networkCalls",
+        "providerCalls",
+        "hardwareAccess",
+        "kv260Access",
+        "fpgaRepoAccess",
+        "modelExecution",
+        "modelWeightsIncluded",
+        "privatePathsIncluded",
+        "secretsIncluded",
+        "tokensIncluded",
+        "artifactPathsIncluded",
+        "approvalTokenIncluded",
+        "approvalActorIncluded",
+        "hardwareDumpIncluded",
+        "boardDumpIncluded",
+        "telemetry",
+        "writeBack",
+        "repositoryMutation",
+        "publicPush",
+        "releaseOrTag",
+        "stableApiAbiClaim",
+        "marketplaceClaim",
+        "runtimeClaim",
+        "hardwareClaim",
+    ] {
+        assert_eq!(safety[flag], false, "safetyFlags.{flag} must be false");
+    }
+}
+
+#[test]
 fn hybrid_strategy_plan_example_keeps_descriptor_only_boundary() {
     let value: serde_json::Value = parse_example("hybrid-strategy-plan.example.json");
     let root = value
