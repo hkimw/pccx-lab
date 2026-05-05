@@ -151,6 +151,7 @@ run_case \
     "[sail-implementation-gap-matrix] inventory ok" \
     "[sail-source-intake-boundary] inventory ok" \
     "[sail-source-intake-approval] inventory ok" \
+    "[sail-source-intake-status-summary] inventory ok" \
     "[hybrid-strategy-plan] inventory ok" \
     "[hybrid-interface-boundary] inventory ok" \
     "[hybrid-review-packet] inventory ok" \

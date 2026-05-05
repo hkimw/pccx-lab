@@ -20005,6 +20005,492 @@ def validate_sail_source_intake_handoff(value: Any) -> None:
     require_string_array(require_field(root, "$", "issueRefs"), "$.issueRefs", min_items=1)
 
 
+def validate_sail_source_intake_status_summary(value: Any) -> None:
+    root = expect_object(value, "$")
+    require_schema(root, "$", "pccx.lab.sail-source-intake-status-summary.v0")
+    require_string_fields(
+        root,
+        "$",
+        [
+            "tool",
+            "statusSummaryId",
+            "summaryState",
+            "resultState",
+            "approvalState",
+            "intakeState",
+            "handoffState",
+            "adapterState",
+            "defaultMode",
+            "hostMode",
+            "boundaryKind",
+        ],
+    )
+    expected_root_values = {
+        "summaryState": "descriptor_only",
+        "resultState": "blocked_not_run",
+        "approvalState": "not_approved",
+        "intakeState": "not_started",
+        "handoffState": "blocked_summary_only",
+        "adapterState": "not_implemented",
+        "defaultMode": "read_only",
+        "hostMode": "cli_core_first_gui_second",
+        "boundaryKind": "future_sail_source_intake_status_summary",
+    }
+    for field, expected in expected_root_values.items():
+        if root[field] != expected:
+            raise ShapeError(f"unexpected value at $.{field}: expected {expected}")
+
+    refs = require_object_array(
+        require_field(root, "$", "sourceBoundaryRefs"),
+        "$.sourceBoundaryRefs",
+        min_items=6,
+    )
+    ref_ids = set()
+    ref_true_flags = ["summaryOnly", "statusInput", "approvedSummaryRef"]
+    ref_false_flags = [
+        "sourceIntakeAllowed",
+        "sourceIntakeAttempted",
+        "resultMaterialized",
+        "handoffPublished",
+        "sourceReadAllowed",
+        "rtlSourceReadAllowed",
+        "astReadAllowed",
+        "generatedModelReadAllowed",
+        "pathReadAllowed",
+        "repositoryReadAllowed",
+        "reportReadAllowed",
+        "artifactReadAllowed",
+        "commandExecutionAllowed",
+        "runtimeExecutionAllowed",
+        "hardwareControlAllowed",
+    ]
+    for ref in refs:
+        path = "$.sourceBoundaryRefs[]"
+        require_string_fields(ref, path, ["refId", "schemaVersion", "examplePath", "state"])
+        ref_ids.add(ref["refId"])
+        require_bool_fields(ref, path, ref_true_flags + ref_false_flags)
+        for flag in ref_true_flags:
+            if ref[flag] is not True:
+                raise ShapeError(f"unexpected value at $.sourceBoundaryRefs[].{flag}: expected true")
+        for flag in ref_false_flags:
+            if ref[flag] is not False:
+                raise ShapeError(f"unexpected value at $.sourceBoundaryRefs[].{flag}: expected false")
+    for ref_id in [
+        "sail_source_intake_boundary",
+        "sail_source_intake_approval",
+        "sail_source_intake_result",
+        "sail_source_intake_handoff",
+        "sail_implementation_gap_matrix",
+        "sail_evidence_detail",
+    ]:
+        if ref_id not in ref_ids:
+            raise ShapeError(f"missing source boundary ref: {ref_id}")
+    for ref_id in ["sail_source_intake_approval", "sail_source_intake_result", "sail_source_intake_handoff"]:
+        if not any(ref["refId"] == ref_id and ref.get("approved") is False for ref in refs):
+            raise ShapeError(f"missing blocked Sail source-intake status reference: {ref_id}")
+    if not any(
+        ref["refId"] == "sail_implementation_gap_matrix" and ref.get("sourceBoundaryGapRecorded") is True
+        for ref in refs
+    ):
+        raise ShapeError("missing Sail implementation gap-matrix source-boundary gap reference")
+
+    summary = expect_object(require_field(root, "$", "statusSummary"), "$.statusSummary")
+    require_string_fields(
+        summary,
+        "$.statusSummary",
+        [
+            "summaryKind",
+            "sourceReferenceKind",
+            "selectedTrack",
+            "sourceBoundaryState",
+            "approvalState",
+            "resultState",
+            "handoffState",
+            "intakeState",
+            "overallState",
+            "summary",
+        ],
+    )
+    expected_summary_values = {
+        "summaryKind": "planned_sail_source_intake_status",
+        "sourceReferenceKind": "approved-sail-source-intake-status-summaries",
+        "selectedTrack": "sail_source_intake",
+        "sourceBoundaryState": "approved_descriptor_summary",
+        "approvalState": "not_approved",
+        "resultState": "blocked_not_run",
+        "handoffState": "blocked_summary_only",
+        "intakeState": "not_started",
+        "overallState": "blocked",
+    }
+    for field, expected in expected_summary_values.items():
+        if summary[field] != expected:
+            raise ShapeError(f"unexpected value at $.statusSummary.{field}: expected {expected}")
+    summary_true_flags = [
+        "summaryOnly",
+        "descriptorOnly",
+        "generatedFromApprovedSummaries",
+        "statusCardsAvailable",
+        "sourceBoundaryAvailable",
+        "approvalSummaryAvailable",
+        "resultSummaryAvailable",
+        "handoffSummaryAvailable",
+        "gapMatrixSummaryAvailable",
+        "evidenceDetailSummaryAvailable",
+    ]
+    summary_false_flags = [
+        "approved",
+        "sourceIntakeAllowed",
+        "sourceIntakeAttempted",
+        "sourceIntakeCompleted",
+        "resultMaterialized",
+        "handoffPayloadIncluded",
+        "handoffPublished",
+        "publicTextGenerated",
+        "pathEchoAllowed",
+        "privatePathEchoAllowed",
+        "localFileReadAllowed",
+        "repositoryReadAllowed",
+        "sailSourceReadAllowed",
+        "rtlSourceReadAllowed",
+        "sailAstReadAllowed",
+        "generatedModelReadAllowed",
+        "sourceContentReadAllowed",
+        "sourcePathReadAllowed",
+        "sourceHashReadAllowed",
+        "sourceMetadataReadAllowed",
+        "sourceManifestReadAllowed",
+        "parserExecutionAllowed",
+        "compilerExecutionAllowed",
+        "modelGenerationAllowed",
+        "modelExecutionAllowed",
+        "refinementCheckAllowed",
+        "formalProofAllowed",
+        "simulatorExecutionAllowed",
+        "verificationRunAllowed",
+        "hardwareControlAllowed",
+        "rawReportReadAllowed",
+        "rawLogReadAllowed",
+        "artifactReadAllowed",
+        "artifactWriteAllowed",
+        "reportReadAllowed",
+        "reportWriteAllowed",
+        "commandExecutionAllowed",
+        "shellExecutionAllowed",
+        "runtimeExecutionAllowed",
+        "providerCallAllowed",
+        "networkCallAllowed",
+        "launcherExecutionAllowed",
+        "editorExecutionAllowed",
+        "hardwareAccessAllowed",
+        "kv260AccessAllowed",
+        "fpgaRepoAccessAllowed",
+        "modelLoadAllowed",
+        "stableApiAbiClaim",
+        "marketplaceClaim",
+        "runtimeClaim",
+        "hardwareClaim",
+    ]
+    require_bool_fields(summary, "$.statusSummary", summary_true_flags + summary_false_flags)
+    for flag in summary_true_flags:
+        if summary[flag] is not True:
+            raise ShapeError(f"unexpected value at $.statusSummary.{flag}: expected true")
+    for flag in summary_false_flags:
+        if summary[flag] is not False:
+            raise ShapeError(f"unexpected value at $.statusSummary.{flag}: expected false")
+
+    cards = require_object_array(require_field(root, "$", "statusCards"), "$.statusCards", min_items=5)
+    card_ids = set()
+    for card in cards:
+        path = "$.statusCards[]"
+        require_string_fields(card, path, ["cardId", "cardState", "severity", "sourceRef", "summary", "requiredBefore"])
+        require_bool_fields(card, path, ["summaryOnly", "contentIncluded", "pathEchoAllowed", "rawCommandIncluded"])
+        card_ids.add(card["cardId"])
+        if card["summaryOnly"] is not True:
+            raise ShapeError(f"unexpected value at {child(path, 'summaryOnly')}: expected true")
+        for field in ["contentIncluded", "pathEchoAllowed", "rawCommandIncluded"]:
+            if card[field] is not False:
+                raise ShapeError(f"unexpected value at {child(path, field)}: expected false")
+    for card_id in ["source_boundary", "approval_gate", "result_gate", "handoff_gate", "source_access_gate"]:
+        if card_id not in card_ids:
+            raise ShapeError(f"missing Sail source-intake status card: {card_id}")
+
+    flow = expect_object(require_field(root, "$", "summaryFlow"), "$.summaryFlow")
+    require_string_fields(
+        flow,
+        "$.summaryFlow",
+        [
+            "flowId",
+            "flowState",
+            "summaryKind",
+            "commandKind",
+            "sourceReferenceKind",
+            "inputPolicy",
+            "outputPolicy",
+        ],
+    )
+    expected_flow = {
+        "flowState": "blocked",
+        "summaryKind": "source-intake-status-summary",
+        "commandKind": "planned-cli-fixed-args",
+        "sourceReferenceKind": "approved-sail-source-intake-status-summaries",
+    }
+    for field, expected in expected_flow.items():
+        if flow[field] != expected:
+            raise ShapeError(f"unexpected value at $.summaryFlow.{field}: expected {expected}")
+    fixed_args = require_field(flow, "$.summaryFlow", "fixedArgsPreview")
+    require_string_array(fixed_args, "$.summaryFlow.fixedArgsPreview", min_items=5)
+    if fixed_args[:5] != ["sail-model", "source-intake", "status", "--format", "json"]:
+        raise ShapeError("unexpected value at $.summaryFlow.fixedArgsPreview")
+    steps = require_object_array(require_field(flow, "$.summaryFlow", "steps"), "$.summaryFlow.steps", min_items=4)
+    step_ids = set()
+    for step in steps:
+        path = "$.summaryFlow.steps[]"
+        require_string_fields(step, path, ["stepId", "state", "summary", "requiredBefore", "sideEffectPolicy"])
+        step_ids.add(step["stepId"])
+    for step_id in ["source_boundary_status", "approval_status", "result_status", "handoff_status"]:
+        if step_id not in step_ids:
+            raise ShapeError(f"missing Sail source-intake status-summary flow step: {step_id}")
+    require_string_array(
+        require_field(flow, "$.summaryFlow", "blockedReasonRefs"),
+        "$.summaryFlow.blockedReasonRefs",
+        min_items=1,
+    )
+
+    display = expect_object(require_field(root, "$", "displayPolicy"), "$.displayPolicy")
+    require_string_fields(display, "$.displayPolicy", ["surface", "guiPolicy"])
+    require_string_array(require_field(display, "$.displayPolicy", "allowedFields"), "$.displayPolicy.allowedFields", min_items=1)
+    require_string_array(require_field(display, "$.displayPolicy", "blockedFields"), "$.displayPolicy.blockedFields", min_items=1)
+    display_false_flags = [
+        "pathEchoAllowed",
+        "privatePathsIncluded",
+        "payloadIncluded",
+        "stdoutIncluded",
+        "stderrIncluded",
+        "rawLogsIncluded",
+        "rawReportIncluded",
+        "artifactPathsIncluded",
+        "reportContentIncluded",
+        "sourceContentIncluded",
+        "sourcePathIncluded",
+        "sourceHashIncluded",
+        "sourceMetadataIncluded",
+        "sourceManifestIncluded",
+        "sailSourceIncluded",
+        "rtlSourceIncluded",
+        "sailAstIncluded",
+        "generatedModelIncluded",
+        "publicHandoffIncluded",
+    ]
+    require_bool_fields(display, "$.displayPolicy", ["summaryOnly"] + display_false_flags)
+    if display["summaryOnly"] is not True:
+        raise ShapeError("unexpected value at $.displayPolicy.summaryOnly: expected true")
+    for flag in display_false_flags:
+        if display[flag] is not False:
+            raise ShapeError(f"unexpected value at $.displayPolicy.{flag}: expected false")
+
+    review = expect_object(require_field(root, "$", "reviewGate"), "$.reviewGate")
+    require_string_fields(review, "$.reviewGate", ["state", "summary"])
+    review_true_flags = ["approvalRequiredBeforeImplementation", "approvedForStatusSummaryDescriptor"]
+    review_false_flags = [
+        "approvedForApprovalExecution",
+        "approvedForSourceIntakeDispatch",
+        "approvedForSourceRead",
+        "approvedForRtlSourceRead",
+        "approvedForSourcePathRead",
+        "approvedForSourceContentRead",
+        "approvedForSourceHashRead",
+        "approvedForSourceMetadataRead",
+        "approvedForManifestRead",
+        "approvedForAstRead",
+        "approvedForGeneratedModelRead",
+        "approvedForParserExecution",
+        "approvedForCompilerExecution",
+        "approvedForModelGeneration",
+        "approvedForModelExecution",
+        "approvedForRefinementCheck",
+        "approvedForFormalProof",
+        "approvedForSimulatorExecution",
+        "approvedForVerificationRun",
+        "approvedForHardwareControl",
+        "approvedForReportRead",
+        "approvedForReportWrite",
+        "approvedForArtifactRead",
+        "approvedForArtifactWrite",
+        "approvedForRepositoryRead",
+        "approvedForRepositoryMutation",
+        "approvedForPublicHandoff",
+        "approvedForRelease",
+    ]
+    require_bool_fields(review, "$.reviewGate", review_true_flags + review_false_flags)
+    for flag in review_true_flags:
+        if review[flag] is not True:
+            raise ShapeError(f"unexpected value at $.reviewGate.{flag}: expected true")
+    for flag in review_false_flags:
+        if review[flag] is not False:
+            raise ShapeError(f"unexpected value at $.reviewGate.{flag}: expected false")
+
+    mutation = expect_object(require_field(root, "$", "noMutationEvidence"), "$.noMutationEvidence")
+    require_string_fields(mutation, "$.noMutationEvidence", ["state", "evidenceRule"])
+    mutation_false_flags = [
+        "trackedFileMutationAllowed",
+        "trackedFileDiffCaptured",
+        "localFileReadAllowed",
+        "repositoryReadAllowed",
+        "sourceReadAllowed",
+        "sourceWriteAllowed",
+        "manifestReadAllowed",
+        "manifestWriteAllowed",
+        "astReadAllowed",
+        "generatedModelReadAllowed",
+        "reportReadAllowed",
+        "reportWriteAllowed",
+        "artifactReadAllowed",
+        "artifactWriteAllowed",
+        "repositoryMutationAllowed",
+        "approvalExecutionAllowed",
+        "sourceIntakeDispatchAllowed",
+        "parserExecutionAllowed",
+        "compilerExecutionAllowed",
+        "modelGenerationAllowed",
+        "modelExecutionAllowed",
+        "simulatorExecutionAllowed",
+        "verificationRunAllowed",
+        "hardwareControlAllowed",
+        "commandExecutionAllowed",
+        "publicHandoffAllowed",
+        "publicPushAllowed",
+        "releaseOrTagAllowed",
+    ]
+    require_bool_fields(mutation, "$.noMutationEvidence", mutation_false_flags)
+    for flag in mutation_false_flags:
+        if mutation[flag] is not False:
+            raise ShapeError(f"unexpected value at $.noMutationEvidence.{flag}: expected false")
+
+    blocked_actions = require_field(root, "$", "blockedActions")
+    require_string_array(blocked_actions, "$.blockedActions", min_items=1)
+    for required in [
+        "approval-execution",
+        "source-intake-dispatch",
+        "sail-source-read",
+        "rtl-source-read",
+        "source-path-read",
+        "source-content-read",
+        "source-manifest-read",
+        "repository-read",
+        "repository-mutation",
+        "sail-ast-read",
+        "generated-model-read",
+        "parser-execution",
+        "compiler-execution",
+        "model-generation",
+        "model-execution",
+        "verification-run",
+        "report-read",
+        "artifact-read",
+        "command-execution",
+        "provider-call",
+        "network-call",
+        "hardware-control",
+        "kv260-access",
+        "fpga-repo-access",
+        "model-load",
+        "public-handoff-publication",
+        "public-push",
+        "release-or-tag",
+    ]:
+        if required not in blocked_actions:
+            raise ShapeError(f"missing blocked action at $.blockedActions: {required}")
+
+    safety = expect_object(require_field(root, "$", "safetyFlags"), "$.safetyFlags")
+    safety_true_flags = [
+        "dataOnly",
+        "descriptorOnly",
+        "readOnly",
+        "summaryOnly",
+        "sailSourceIntakeStatusSummaryFixtureOnly",
+    ]
+    safety_false_flags = [
+        "approvalExecutionImplemented",
+        "sourceIntakeImplemented",
+        "sourceIntakeDispatched",
+        "sourceIntakeCompleted",
+        "resultMaterialized",
+        "handoffPublished",
+        "publicTextGenerated",
+        "sourceReaderImplemented",
+        "rtlSourceReaderImplemented",
+        "sourcePathRead",
+        "sourceContentRead",
+        "sourceHashRead",
+        "sourceMetadataRead",
+        "manifestReaderImplemented",
+        "sailAstReaderImplemented",
+        "generatedModelReaderImplemented",
+        "parserImplemented",
+        "compilerImplemented",
+        "modelGenerationImplemented",
+        "modelExecutionImplemented",
+        "refinementCheckImplemented",
+        "formalProofImplemented",
+        "simulatorExecutionImplemented",
+        "verificationRunImplemented",
+        "hardwareControlImplemented",
+        "reportReaderImplemented",
+        "reportWriterImplemented",
+        "artifactReaderImplemented",
+        "artifactWriterImplemented",
+        "commandExecution",
+        "shellExecution",
+        "runtimeExecution",
+        "localFileRead",
+        "repositoryRead",
+        "repositoryMutation",
+        "networkCalls",
+        "providerCalls",
+        "launcherExecution",
+        "editorExecution",
+        "hardwareAccess",
+        "kv260Access",
+        "fpgaRepoAccess",
+        "modelLoad",
+        "privatePathsIncluded",
+        "rawCommandIncluded",
+        "sourcePathIncluded",
+        "sourceContentIncluded",
+        "sourceHashIncluded",
+        "sourceMetadataIncluded",
+        "sourceManifestIncluded",
+        "sailSourceIncluded",
+        "rtlSourceIncluded",
+        "sailAstIncluded",
+        "generatedModelIncluded",
+        "stdoutIncluded",
+        "stderrIncluded",
+        "rawLogsIncluded",
+        "rawReportIncluded",
+        "artifactPathsIncluded",
+        "reportContentIncluded",
+        "telemetry",
+        "writeBack",
+        "publicPush",
+        "releaseOrTag",
+        "stableApiAbiClaim",
+        "marketplaceClaim",
+        "runtimeClaim",
+        "hardwareClaim",
+    ]
+    require_bool_fields(safety, "$.safetyFlags", safety_true_flags + safety_false_flags)
+    for flag in safety_true_flags:
+        if safety[flag] is not True:
+            raise ShapeError(f"unexpected value at $.safetyFlags.{flag}: expected true")
+    for flag in safety_false_flags:
+        if safety[flag] is not False:
+            raise ShapeError(f"unexpected value at $.safetyFlags.{flag}: expected false")
+
+    require_string_array(require_field(root, "$", "limitations"), "$.limitations", min_items=1)
+    require_string_array(require_field(root, "$", "issueRefs"), "$.issueRefs", min_items=1)
+
+
 def validate_hybrid_strategy_plan(value: Any) -> None:
     root = expect_object(value, "$")
     require_schema(root, "$", "pccx.lab.hybrid-strategy-plan.v0")
@@ -22711,6 +23197,7 @@ SPECS = [
     BoundarySpec("sail-source-intake-approval", "docs/examples/sail-source-intake-approval.example.json", validate_sail_source_intake_approval),
     BoundarySpec("sail-source-intake-result", "docs/examples/sail-source-intake-result.example.json", validate_sail_source_intake_result),
     BoundarySpec("sail-source-intake-handoff", "docs/examples/sail-source-intake-handoff.example.json", validate_sail_source_intake_handoff),
+    BoundarySpec("sail-source-intake-status-summary", "docs/examples/sail-source-intake-status-summary.example.json", validate_sail_source_intake_status_summary),
     BoundarySpec("hybrid-strategy-plan", "docs/examples/hybrid-strategy-plan.example.json", validate_hybrid_strategy_plan),
     BoundarySpec("hybrid-interface-boundary", "docs/examples/hybrid-interface-boundary.example.json", validate_hybrid_interface_boundary),
     BoundarySpec("hybrid-review-packet", "docs/examples/hybrid-review-packet.example.json", validate_hybrid_review_packet),
