@@ -208,6 +208,16 @@ boundary. There is no private back channel into lab internals. See
   run verification, read or write reports or artifacts, execute commands,
   read repositories, run a release flow, run a marketplace flow, or control
   hardware.
+- `docs/examples/hybrid-source-intake-handoff.example.json` records a
+  descriptor-only blocked handoff summary for future hybrid source-intake
+  result review over approved hybrid boundary summaries; it does not request,
+  record, or grant approval, attempt or complete source intake, materialize
+  result payloads, generate public text, publish a handoff, read sources,
+  read grammar, read source paths, read source content, read source hashes,
+  read source metadata, read manifests, run parsers, run compilers, execute
+  runtimes or scripts, run simulators, run verification, read or write
+  reports or artifacts, execute commands, read repositories, run a release
+  flow, run a marketplace flow, or control hardware.
 - `docs/examples/mcp-read-only-tool-plan.example.json` maps a future
   MCP/tool adapter to read-only CLI/core commands; it is a checked plan,
   not a runtime implementation.
