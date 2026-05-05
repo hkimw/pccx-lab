@@ -15594,6 +15594,431 @@ def validate_sail_source_intake_boundary(value: Any) -> None:
     require_string_array(require_field(root, "$", "issueRefs"), "$.issueRefs", min_items=1)
 
 
+def validate_hybrid_source_intake_boundary(value: Any) -> None:
+    root = expect_object(value, "$")
+    require_schema(root, "$", "pccx.lab.hybrid-source-intake-boundary.v0")
+    require_string_fields(
+        root,
+        "$",
+        [
+            "tool",
+            "intakeBoundaryId",
+            "intakeState",
+            "adapterState",
+            "defaultMode",
+            "hostMode",
+            "boundaryKind",
+        ],
+    )
+    expected_states = {
+        "intakeState": "descriptor_only",
+        "adapterState": "not_implemented",
+        "defaultMode": "read_only",
+        "hostMode": "cli_core_first_gui_second",
+        "boundaryKind": "future_hybrid_source_intake_boundary",
+    }
+    for field, expected in expected_states.items():
+        if root[field] != expected:
+            raise ShapeError(f"unexpected value at $.{field}: expected {expected}")
+
+    refs = require_object_array(
+        require_field(root, "$", "sourceBoundaryRefs"),
+        "$.sourceBoundaryRefs",
+        min_items=4,
+    )
+    ref_ids = set()
+    for ref in refs:
+        path = "$.sourceBoundaryRefs[]"
+        require_string_fields(ref, path, ["refId", "schemaVersion", "examplePath", "state"])
+        ref_ids.add(ref["refId"])
+        if ref.get("summaryOnly") is not True:
+            raise ShapeError("unexpected value at $.sourceBoundaryRefs[].summaryOnly: expected true")
+        if ref.get("intakeInput") is not True:
+            raise ShapeError("unexpected value at $.sourceBoundaryRefs[].intakeInput: expected true")
+        for flag in [
+            "sourceReadAllowed",
+            "grammarReadAllowed",
+            "pathReadAllowed",
+            "repositoryReadAllowed",
+            "commandExecutionAllowed",
+            "runtimeExecutionAllowed",
+            "artifactWriteAllowed",
+            "hardwareControlAllowed",
+        ]:
+            if flag in ref and ref[flag] is not False:
+                raise ShapeError(f"unexpected value at $.sourceBoundaryRefs[].{flag}: expected false")
+    for ref_id in [
+        "hybrid_interface_boundary",
+        "hybrid_evidence_detail",
+        "hybrid_implementation_readiness",
+        "hybrid_implementation_gap_matrix",
+    ]:
+        if ref_id not in ref_ids:
+            raise ShapeError(f"missing source boundary ref: {ref_id}")
+    if not any(
+        ref["refId"] == "hybrid_implementation_gap_matrix" and ref.get("sourceBoundaryGapRecorded") is True
+        for ref in refs
+    ):
+        raise ShapeError("missing hybrid implementation gap-matrix source-boundary gap reference")
+
+    request = expect_object(require_field(root, "$", "intakeRequest"), "$.intakeRequest")
+    require_string_fields(
+        request,
+        "$.intakeRequest",
+        [
+            "requestKind",
+            "commandKind",
+            "sourceReferenceKind",
+            "outputBoundary",
+            "summary",
+        ],
+    )
+    if request["requestKind"] != "planned_hybrid_source_intake_boundary":
+        raise ShapeError("unexpected value at $.intakeRequest.requestKind")
+    if request["sourceReferenceKind"] != "approved-hybrid-boundary-summaries":
+        raise ShapeError("unexpected value at $.intakeRequest.sourceReferenceKind")
+    if request["outputBoundary"] != "pccx.lab.hybrid-source-intake-boundary.v0":
+        raise ShapeError("unexpected value at $.intakeRequest.outputBoundary")
+    fixed_args = require_field(request, "$.intakeRequest", "fixedArgsPreview")
+    require_string_array(fixed_args, "$.intakeRequest.fixedArgsPreview", min_items=4)
+    if fixed_args[:4] != ["hybrid", "source-intake", "--format", "json"]:
+        raise ShapeError("unexpected value at $.intakeRequest.fixedArgsPreview")
+    request_true_flags = ["summaryOnly", "inputRefOnly"]
+    request_false_flags = [
+        "approvalRequired",
+        "pathEchoAllowed",
+        "privatePathEchoAllowed",
+        "localFileReadAllowed",
+        "repositoryReadAllowed",
+        "cppSourceReadAllowed",
+        "systemVerilogSourceReadAllowed",
+        "scriptSourceReadAllowed",
+        "grammarReadAllowed",
+        "sourceContentReadAllowed",
+        "sourcePathReadAllowed",
+        "sourceHashReadAllowed",
+        "sourceMetadataReadAllowed",
+        "parserOutputReadAllowed",
+        "compilerOutputReadAllowed",
+        "runtimePlanReadAllowed",
+        "scriptExecutionResultReadAllowed",
+        "simulatorOutputReadAllowed",
+        "verificationResultReadAllowed",
+        "hardwareControlReadAllowed",
+        "parserExecutionAllowed",
+        "compilerExecutionAllowed",
+        "runtimeExecutionAllowed",
+        "scriptExecutionAllowed",
+        "simulatorExecutionAllowed",
+        "verificationRunAllowed",
+        "hardwareControlAllowed",
+        "rawReportReadAllowed",
+        "rawLogReadAllowed",
+        "artifactReadAllowed",
+        "artifactWriteAllowed",
+        "reportReadAllowed",
+        "reportWriteAllowed",
+        "commandExecutionAllowed",
+        "shellExecutionAllowed",
+        "providerCallAllowed",
+        "networkCallAllowed",
+        "launcherExecutionAllowed",
+        "editorExecutionAllowed",
+        "hardwareAccessAllowed",
+        "kv260AccessAllowed",
+        "fpgaRepoAccessAllowed",
+        "modelLoadAllowed",
+        "stableApiAbiClaim",
+        "marketplaceClaim",
+        "runtimeClaim",
+        "hardwareClaim",
+    ]
+    require_bool_fields(request, "$.intakeRequest", request_true_flags + request_false_flags)
+    for flag in request_true_flags:
+        if request[flag] is not True:
+            raise ShapeError(f"unexpected value at $.intakeRequest.{flag}: expected true")
+    for flag in request_false_flags:
+        if request[flag] is not False:
+            raise ShapeError(f"unexpected value at $.intakeRequest.{flag}: expected false")
+
+    candidates = require_object_array(
+        require_field(root, "$", "candidateInputs"),
+        "$.candidateInputs",
+        min_items=5,
+    )
+    candidate_ids = set()
+    candidate_true_flags = ["summaryOnly", "descriptorOnly", "separateBoundaryRequired"]
+    candidate_false_flags = [
+        "sourceContentIncluded",
+        "sourcePathIncluded",
+        "sourceHashIncluded",
+        "sourceMetadataIncluded",
+        "grammarContentIncluded",
+        "localFileReadAllowed",
+        "repositoryReadAllowed",
+        "parserExecutionAllowed",
+        "compilerExecutionAllowed",
+        "runtimeExecutionAllowed",
+        "scriptExecutionAllowed",
+    ]
+    for candidate in candidates:
+        path = "$.candidateInputs[]"
+        require_string_fields(candidate, path, ["candidateId", "candidateKind", "candidateState", "sourceRef", "summary"])
+        candidate_ids.add(candidate["candidateId"])
+        if candidate["candidateState"] != "blocked_placeholder":
+            raise ShapeError("unexpected value at $.candidateInputs[].candidateState")
+        require_bool_fields(candidate, path, candidate_true_flags + candidate_false_flags)
+        for flag in candidate_true_flags:
+            if candidate[flag] is not True:
+                raise ShapeError(f"unexpected value at $.candidateInputs[].{flag}: expected true")
+        for flag in candidate_false_flags:
+            if candidate[flag] is not False:
+                raise ShapeError(f"unexpected value at $.candidateInputs[].{flag}: expected false")
+    for candidate_id in [
+        "cpp_source_placeholder",
+        "systemverilog_source_placeholder",
+        "script_source_placeholder",
+        "grammar_placeholder",
+        "source_manifest_placeholder",
+    ]:
+        if candidate_id not in candidate_ids:
+            raise ShapeError(f"missing candidate input: {candidate_id}")
+
+    policy = expect_object(require_field(root, "$", "intakePolicy"), "$.intakePolicy")
+    require_string_fields(policy, "$.intakePolicy", ["policyState", "intakeDisposition", "summary"])
+    expected_policy = {
+        "policyState": "blocked_until_separate_boundary",
+        "intakeDisposition": "not_ready_for_source_intake",
+    }
+    for field, expected in expected_policy.items():
+        if policy[field] != expected:
+            raise ShapeError(f"unexpected value at $.intakePolicy.{field}: expected {expected}")
+    policy_true_flags = ["summaryOnly", "descriptorOnly"]
+    policy_false_flags = [
+        "readyForSourceIntake",
+        "readyForCppSourceIntake",
+        "readyForSystemVerilogIntake",
+        "readyForScriptIntake",
+        "readyForGrammarIntake",
+        "readyForManifestRead",
+        "readyForParser",
+        "readyForCompiler",
+        "readyForRuntime",
+        "readyForScriptExecution",
+        "readyForSimulator",
+        "readyForVerificationRun",
+        "readyForHardwareControl",
+        "readyForReportRead",
+        "readyForArtifactRead",
+        "readyForRepositoryRead",
+        "readyForRelease",
+        "readyForMarketplace",
+        "runtimeClaim",
+        "hardwareClaim",
+        "stableApiAbiClaim",
+        "marketplaceClaim",
+    ]
+    require_bool_fields(policy, "$.intakePolicy", policy_true_flags + policy_false_flags)
+    for flag in policy_true_flags:
+        if policy[flag] is not True:
+            raise ShapeError(f"unexpected value at $.intakePolicy.{flag}: expected true")
+    for flag in policy_false_flags:
+        if policy[flag] is not False:
+            raise ShapeError(f"unexpected value at $.intakePolicy.{flag}: expected false")
+
+    display = expect_object(require_field(root, "$", "displayPolicy"), "$.displayPolicy")
+    require_string_fields(display, "$.displayPolicy", ["surface", "guiPolicy"])
+    require_string_array(require_field(display, "$.displayPolicy", "allowedFields"), "$.displayPolicy.allowedFields", min_items=1)
+    require_string_array(require_field(display, "$.displayPolicy", "blockedFields"), "$.displayPolicy.blockedFields", min_items=1)
+    display_true_flags = ["summaryOnly"]
+    display_false_flags = [
+        "pathEchoAllowed",
+        "privatePathsIncluded",
+        "payloadIncluded",
+        "stdoutIncluded",
+        "stderrIncluded",
+        "rawLogsIncluded",
+        "rawReportIncluded",
+        "artifactPathsIncluded",
+        "reportContentIncluded",
+        "sourceContentIncluded",
+        "sourcePathIncluded",
+        "sourceHashIncluded",
+        "sourceMetadataIncluded",
+        "cppSourceIncluded",
+        "systemVerilogSourceIncluded",
+        "scriptSourceIncluded",
+        "grammarContentIncluded",
+        "parserOutputIncluded",
+        "compilerOutputIncluded",
+        "runtimePlanIncluded",
+        "scriptExecutionOutputIncluded",
+        "simulatorOutputIncluded",
+        "verificationOutputIncluded",
+        "hardwareDumpIncluded",
+        "boardDumpIncluded",
+        "modelPathsIncluded",
+    ]
+    require_bool_fields(display, "$.displayPolicy", display_true_flags + display_false_flags)
+    if display["summaryOnly"] is not True:
+        raise ShapeError("unexpected value at $.displayPolicy.summaryOnly: expected true")
+    for flag in display_false_flags:
+        if display[flag] is not False:
+            raise ShapeError(f"unexpected value at $.displayPolicy.{flag}: expected false")
+
+    mutation = expect_object(require_field(root, "$", "noMutationEvidence"), "$.noMutationEvidence")
+    require_string_fields(mutation, "$.noMutationEvidence", ["state", "evidenceRule"])
+    mutation_false_flags = [
+        "trackedFileMutationAllowed",
+        "trackedFileDiffCaptured",
+        "localFileReadAllowed",
+        "repositoryReadAllowed",
+        "cppSourceReadAllowed",
+        "systemVerilogSourceReadAllowed",
+        "scriptSourceReadAllowed",
+        "grammarReadAllowed",
+        "sourcePathReadAllowed",
+        "sourceHashReadAllowed",
+        "sourceMetadataReadAllowed",
+        "parserOutputReadAllowed",
+        "compilerOutputReadAllowed",
+        "runtimePlanReadAllowed",
+        "rawReportReadAllowed",
+        "rawLogReadAllowed",
+        "artifactReadAllowed",
+        "artifactWriteAllowed",
+        "reportReadAllowed",
+        "reportWriteAllowed",
+        "commandExecutionAllowed",
+        "repositoryMutationAllowed",
+        "publicTextPublicationAllowed",
+        "publicPushAllowed",
+        "releaseOrTagAllowed",
+    ]
+    require_bool_fields(mutation, "$.noMutationEvidence", mutation_false_flags)
+    for flag in mutation_false_flags:
+        if mutation[flag] is not False:
+            raise ShapeError(f"unexpected value at $.noMutationEvidence.{flag}: expected false")
+
+    blocked_actions = require_field(root, "$", "blockedActions")
+    require_string_array(blocked_actions, "$.blockedActions", min_items=1)
+    for required in [
+        "cpp-source-read",
+        "systemverilog-source-read",
+        "script-source-read",
+        "grammar-read",
+        "source-path-read",
+        "source-content-read",
+        "source-hash-read",
+        "source-metadata-read",
+        "source-manifest-read",
+        "parser-output-read",
+        "compiler-output-read",
+        "runtime-plan-read",
+        "parser-execution",
+        "compiler-execution",
+        "script-execution",
+        "runtime-execution",
+        "simulator-execution",
+        "verification-run",
+        "hardware-control",
+        "command-execution",
+        "local-file-read",
+        "repository-read",
+        "raw-report-read",
+        "raw-log-read",
+        "artifact-read",
+        "report-read",
+        "marketplace-flow",
+        "provider-call",
+        "network-call",
+        "hardware-probe",
+        "kv260-access",
+        "fpga-repo-access",
+        "model-load",
+        "public-push",
+        "release-or-tag",
+    ]:
+        if required not in blocked_actions:
+            raise ShapeError(f"missing blocked action at $.blockedActions: {required}")
+
+    safety = expect_object(require_field(root, "$", "safetyFlags"), "$.safetyFlags")
+    safety_true_flags = [
+        "dataOnly",
+        "descriptorOnly",
+        "readOnly",
+        "summaryOnly",
+        "hybridSourceIntakeBoundaryFixtureOnly",
+    ]
+    safety_false_flags = [
+        "cppSourceReaderImplemented",
+        "systemVerilogSourceReaderImplemented",
+        "scriptSourceReaderImplemented",
+        "grammarReaderImplemented",
+        "sourceManifestReaderImplemented",
+        "sourcePathReaderImplemented",
+        "sourceContentReaderImplemented",
+        "sourceHashReaderImplemented",
+        "sourceMetadataReaderImplemented",
+        "parserImplemented",
+        "compilerImplemented",
+        "runtimeImplemented",
+        "scriptExecution",
+        "simulatorExecution",
+        "verificationExecution",
+        "hardwareControl",
+        "commandExecution",
+        "shellExecution",
+        "runtimeExecution",
+        "localFileRead",
+        "repositoryRead",
+        "rawReportRead",
+        "rawLogRead",
+        "readsArtifacts",
+        "writesArtifacts",
+        "reportReaderImplemented",
+        "reportWriterImplemented",
+        "networkCalls",
+        "providerCalls",
+        "launcherExecution",
+        "editorExecution",
+        "hardwareAccess",
+        "kv260Access",
+        "fpgaRepoAccess",
+        "modelExecution",
+        "modelWeightsIncluded",
+        "privatePathsIncluded",
+        "secretsIncluded",
+        "tokensIncluded",
+        "stdoutIncluded",
+        "stderrIncluded",
+        "rawLogsIncluded",
+        "rawReportIncluded",
+        "artifactPathsIncluded",
+        "hardwareDumpIncluded",
+        "boardDumpIncluded",
+        "telemetry",
+        "writeBack",
+        "repositoryMutation",
+        "publicPush",
+        "releaseOrTag",
+        "stableApiAbiClaim",
+        "marketplaceClaim",
+        "runtimeClaim",
+        "hardwareClaim",
+    ]
+    require_bool_fields(safety, "$.safetyFlags", safety_true_flags + safety_false_flags)
+    for flag in safety_true_flags:
+        if safety[flag] is not True:
+            raise ShapeError(f"unexpected value at $.safetyFlags.{flag}: expected true")
+    for flag in safety_false_flags:
+        if safety[flag] is not False:
+            raise ShapeError(f"unexpected value at $.safetyFlags.{flag}: expected false")
+
+    require_string_array(require_field(root, "$", "limitations"), "$.limitations", min_items=1)
+    require_string_array(require_field(root, "$", "issueRefs"), "$.issueRefs", min_items=1)
+
+
 def validate_hybrid_strategy_plan(value: Any) -> None:
     root = expect_object(value, "$")
     require_schema(root, "$", "pccx.lab.hybrid-strategy-plan.v0")
@@ -18304,6 +18729,7 @@ SPECS = [
     BoundarySpec("hybrid-evidence-detail", "docs/examples/hybrid-evidence-detail.example.json", validate_hybrid_evidence_detail),
     BoundarySpec("hybrid-implementation-readiness", "docs/examples/hybrid-implementation-readiness.example.json", validate_hybrid_implementation_readiness),
     BoundarySpec("hybrid-implementation-gap-matrix", "docs/examples/hybrid-implementation-gap-matrix.example.json", validate_hybrid_implementation_gap_matrix),
+    BoundarySpec("hybrid-source-intake-boundary", "docs/examples/hybrid-source-intake-boundary.example.json", validate_hybrid_source_intake_boundary),
     BoundarySpec("launcher-diagnostics-handoff", "docs/examples/launcher-diagnostics-handoff.example.json", validate_launcher_handoff),
     BoundarySpec("launcher-device-session-status", "docs/examples/launcher-device-session-status.example.json", validate_launcher_device_session_status),
     BoundarySpec("mcp-read-only-tool-plan", "docs/examples/mcp-read-only-tool-plan.example.json", validate_mcp_read_only_tool_plan),

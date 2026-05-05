@@ -9764,6 +9764,278 @@ fn hybrid_implementation_gap_matrix_example_keeps_descriptor_only_boundary() {
 }
 
 #[test]
+fn hybrid_source_intake_boundary_example_keeps_descriptor_only_boundary() {
+    let value: serde_json::Value = parse_example("hybrid-source-intake-boundary.example.json");
+    let root = value
+        .as_object()
+        .expect("hybrid source-intake boundary must be an object");
+
+    assert_eq!(
+        root["schemaVersion"],
+        "pccx.lab.hybrid-source-intake-boundary.v0"
+    );
+    assert_eq!(root["intakeState"], "descriptor_only");
+    assert_eq!(root["adapterState"], "not_implemented");
+    assert_eq!(root["defaultMode"], "read_only");
+    assert_eq!(root["hostMode"], "cli_core_first_gui_second");
+    assert_eq!(root["boundaryKind"], "future_hybrid_source_intake_boundary");
+
+    let refs = root["sourceBoundaryRefs"]
+        .as_array()
+        .expect("source boundary refs must be an array");
+    for ref_id in [
+        "hybrid_interface_boundary",
+        "hybrid_evidence_detail",
+        "hybrid_implementation_readiness",
+        "hybrid_implementation_gap_matrix",
+    ] {
+        assert!(
+            refs.iter().any(|source| {
+                source["refId"] == ref_id
+                    && source["summaryOnly"] == true
+                    && source["intakeInput"] == true
+                    && source["sourceReadAllowed"] == false
+                    && source["grammarReadAllowed"] == false
+                    && source["repositoryReadAllowed"] == false
+                    && source["runtimeExecutionAllowed"] == false
+            }),
+            "sourceBoundaryRefs must include {ref_id}"
+        );
+    }
+    assert!(refs.iter().any(|source| {
+        source["refId"] == "hybrid_implementation_gap_matrix"
+            && source["sourceBoundaryGapRecorded"] == true
+    }));
+
+    let request = root["intakeRequest"]
+        .as_object()
+        .expect("intake request must be an object");
+    assert_eq!(
+        request["requestKind"],
+        "planned_hybrid_source_intake_boundary"
+    );
+    assert_eq!(
+        request["sourceReferenceKind"],
+        "approved-hybrid-boundary-summaries"
+    );
+    assert_eq!(
+        request["outputBoundary"],
+        "pccx.lab.hybrid-source-intake-boundary.v0"
+    );
+    let fixed_args = request["fixedArgsPreview"]
+        .as_array()
+        .expect("fixed args preview must be an array");
+    assert_eq!(fixed_args[0], "hybrid");
+    assert_eq!(fixed_args[1], "source-intake");
+    assert_eq!(fixed_args[2], "--format");
+    assert_eq!(fixed_args[3], "json");
+    assert_eq!(request["summaryOnly"], true);
+    assert_eq!(request["inputRefOnly"], true);
+    assert_eq!(request["pathEchoAllowed"], false);
+    assert_eq!(request["privatePathEchoAllowed"], false);
+    assert_eq!(request["localFileReadAllowed"], false);
+    assert_eq!(request["repositoryReadAllowed"], false);
+    assert_eq!(request["cppSourceReadAllowed"], false);
+    assert_eq!(request["systemVerilogSourceReadAllowed"], false);
+    assert_eq!(request["scriptSourceReadAllowed"], false);
+    assert_eq!(request["grammarReadAllowed"], false);
+    assert_eq!(request["sourceContentReadAllowed"], false);
+    assert_eq!(request["sourcePathReadAllowed"], false);
+    assert_eq!(request["sourceHashReadAllowed"], false);
+    assert_eq!(request["sourceMetadataReadAllowed"], false);
+    assert_eq!(request["parserOutputReadAllowed"], false);
+    assert_eq!(request["compilerOutputReadAllowed"], false);
+    assert_eq!(request["runtimePlanReadAllowed"], false);
+    assert_eq!(request["parserExecutionAllowed"], false);
+    assert_eq!(request["compilerExecutionAllowed"], false);
+    assert_eq!(request["runtimeExecutionAllowed"], false);
+    assert_eq!(request["scriptExecutionAllowed"], false);
+    assert_eq!(request["simulatorExecutionAllowed"], false);
+    assert_eq!(request["verificationRunAllowed"], false);
+    assert_eq!(request["hardwareControlAllowed"], false);
+    assert_eq!(request["providerCallAllowed"], false);
+    assert_eq!(request["networkCallAllowed"], false);
+    assert_eq!(request["hardwareAccessAllowed"], false);
+    assert_eq!(request["kv260AccessAllowed"], false);
+    assert_eq!(request["fpgaRepoAccessAllowed"], false);
+    assert_eq!(request["modelLoadAllowed"], false);
+    assert_eq!(request["stableApiAbiClaim"], false);
+    assert_eq!(request["marketplaceClaim"], false);
+    assert_eq!(request["runtimeClaim"], false);
+    assert_eq!(request["hardwareClaim"], false);
+
+    let candidates = root["candidateInputs"]
+        .as_array()
+        .expect("candidate inputs must be an array");
+    for candidate_id in [
+        "cpp_source_placeholder",
+        "systemverilog_source_placeholder",
+        "script_source_placeholder",
+        "grammar_placeholder",
+        "source_manifest_placeholder",
+    ] {
+        assert!(
+            candidates.iter().any(|item| {
+                item["candidateId"] == candidate_id
+                    && item["candidateState"] == "blocked_placeholder"
+                    && item["summaryOnly"] == true
+                    && item["descriptorOnly"] == true
+                    && item["separateBoundaryRequired"] == true
+                    && item["sourceContentIncluded"] == false
+                    && item["sourcePathIncluded"] == false
+                    && item["sourceHashIncluded"] == false
+                    && item["sourceMetadataIncluded"] == false
+                    && item["localFileReadAllowed"] == false
+                    && item["repositoryReadAllowed"] == false
+            }),
+            "candidateInputs must include {candidate_id}"
+        );
+    }
+
+    let policy = root["intakePolicy"]
+        .as_object()
+        .expect("intake policy must be an object");
+    assert_eq!(policy["policyState"], "blocked_until_separate_boundary");
+    assert_eq!(policy["intakeDisposition"], "not_ready_for_source_intake");
+    assert_eq!(policy["summaryOnly"], true);
+    assert_eq!(policy["descriptorOnly"], true);
+    assert_eq!(policy["readyForSourceIntake"], false);
+    assert_eq!(policy["readyForCppSourceIntake"], false);
+    assert_eq!(policy["readyForSystemVerilogIntake"], false);
+    assert_eq!(policy["readyForScriptIntake"], false);
+    assert_eq!(policy["readyForGrammarIntake"], false);
+    assert_eq!(policy["readyForManifestRead"], false);
+    assert_eq!(policy["readyForParser"], false);
+    assert_eq!(policy["readyForCompiler"], false);
+    assert_eq!(policy["readyForRuntime"], false);
+    assert_eq!(policy["readyForScriptExecution"], false);
+    assert_eq!(policy["readyForSimulator"], false);
+    assert_eq!(policy["readyForVerificationRun"], false);
+    assert_eq!(policy["readyForHardwareControl"], false);
+    assert_eq!(policy["runtimeClaim"], false);
+    assert_eq!(policy["hardwareClaim"], false);
+    assert_eq!(policy["stableApiAbiClaim"], false);
+    assert_eq!(policy["marketplaceClaim"], false);
+
+    let display = root["displayPolicy"]
+        .as_object()
+        .expect("display policy must be an object");
+    assert_eq!(display["summaryOnly"], true);
+    assert_eq!(display["pathEchoAllowed"], false);
+    assert_eq!(display["privatePathsIncluded"], false);
+    assert_eq!(display["sourceContentIncluded"], false);
+    assert_eq!(display["sourcePathIncluded"], false);
+    assert_eq!(display["sourceHashIncluded"], false);
+    assert_eq!(display["sourceMetadataIncluded"], false);
+    assert_eq!(display["cppSourceIncluded"], false);
+    assert_eq!(display["systemVerilogSourceIncluded"], false);
+    assert_eq!(display["scriptSourceIncluded"], false);
+    assert_eq!(display["grammarContentIncluded"], false);
+    assert_eq!(display["parserOutputIncluded"], false);
+    assert_eq!(display["compilerOutputIncluded"], false);
+    assert_eq!(display["runtimePlanIncluded"], false);
+    assert_eq!(display["artifactPathsIncluded"], false);
+    assert_eq!(display["modelPathsIncluded"], false);
+
+    let blocked = root["blockedActions"]
+        .as_array()
+        .expect("blocked actions must be an array");
+    for action in [
+        "cpp-source-read",
+        "systemverilog-source-read",
+        "script-source-read",
+        "grammar-read",
+        "source-path-read",
+        "source-content-read",
+        "source-hash-read",
+        "source-metadata-read",
+        "source-manifest-read",
+        "parser-output-read",
+        "compiler-output-read",
+        "runtime-plan-read",
+        "parser-execution",
+        "compiler-execution",
+        "script-execution",
+        "runtime-execution",
+        "simulator-execution",
+        "verification-run",
+        "hardware-control",
+        "local-file-read",
+        "repository-read",
+        "marketplace-flow",
+        "provider-call",
+        "network-call",
+        "hardware-probe",
+        "kv260-access",
+        "fpga-repo-access",
+        "model-load",
+        "release-or-tag",
+    ] {
+        assert!(
+            blocked.iter().any(|item| item == action),
+            "blockedActions must include {action}"
+        );
+    }
+
+    let safety = root["safetyFlags"]
+        .as_object()
+        .expect("safety flags must be an object");
+    assert_eq!(safety["dataOnly"], true);
+    assert_eq!(safety["descriptorOnly"], true);
+    assert_eq!(safety["readOnly"], true);
+    assert_eq!(safety["summaryOnly"], true);
+    assert_eq!(safety["hybridSourceIntakeBoundaryFixtureOnly"], true);
+    assert_eq!(safety["cppSourceReaderImplemented"], false);
+    assert_eq!(safety["systemVerilogSourceReaderImplemented"], false);
+    assert_eq!(safety["scriptSourceReaderImplemented"], false);
+    assert_eq!(safety["grammarReaderImplemented"], false);
+    assert_eq!(safety["sourceManifestReaderImplemented"], false);
+    assert_eq!(safety["sourcePathReaderImplemented"], false);
+    assert_eq!(safety["sourceContentReaderImplemented"], false);
+    assert_eq!(safety["sourceHashReaderImplemented"], false);
+    assert_eq!(safety["sourceMetadataReaderImplemented"], false);
+    assert_eq!(safety["parserImplemented"], false);
+    assert_eq!(safety["compilerImplemented"], false);
+    assert_eq!(safety["runtimeImplemented"], false);
+    assert_eq!(safety["scriptExecution"], false);
+    assert_eq!(safety["simulatorExecution"], false);
+    assert_eq!(safety["verificationExecution"], false);
+    assert_eq!(safety["hardwareControl"], false);
+    assert_eq!(safety["commandExecution"], false);
+    assert_eq!(safety["runtimeExecution"], false);
+    assert_eq!(safety["localFileRead"], false);
+    assert_eq!(safety["repositoryRead"], false);
+    assert_eq!(safety["readsArtifacts"], false);
+    assert_eq!(safety["writesArtifacts"], false);
+    assert_eq!(safety["networkCalls"], false);
+    assert_eq!(safety["providerCalls"], false);
+    assert_eq!(safety["hardwareAccess"], false);
+    assert_eq!(safety["kv260Access"], false);
+    assert_eq!(safety["fpgaRepoAccess"], false);
+    assert_eq!(safety["modelExecution"], false);
+    assert_eq!(safety["modelWeightsIncluded"], false);
+    assert_eq!(safety["privatePathsIncluded"], false);
+    assert_eq!(safety["secretsIncluded"], false);
+    assert_eq!(safety["tokensIncluded"], false);
+    assert_eq!(safety["stdoutIncluded"], false);
+    assert_eq!(safety["stderrIncluded"], false);
+    assert_eq!(safety["rawLogsIncluded"], false);
+    assert_eq!(safety["rawReportIncluded"], false);
+    assert_eq!(safety["artifactPathsIncluded"], false);
+    assert_eq!(safety["hardwareDumpIncluded"], false);
+    assert_eq!(safety["boardDumpIncluded"], false);
+    assert_eq!(safety["telemetry"], false);
+    assert_eq!(safety["writeBack"], false);
+    assert_eq!(safety["repositoryMutation"], false);
+    assert_eq!(safety["publicPush"], false);
+    assert_eq!(safety["releaseOrTag"], false);
+    assert_eq!(safety["stableApiAbiClaim"], false);
+    assert_eq!(safety["marketplaceClaim"], false);
+    assert_eq!(safety["runtimeClaim"], false);
+    assert_eq!(safety["hardwareClaim"], false);
+}
+
+#[test]
 fn plugin_host_session_state_example_keeps_host_session_blocked_boundary() {
     let value: serde_json::Value = parse_example("plugin-host-session-state.example.json");
     let root = value

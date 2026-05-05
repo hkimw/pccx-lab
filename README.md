@@ -170,6 +170,15 @@ boundary. There is no private back channel into lab internals. See
   verification run, report/artifact reader or writer, command runner,
   repository reader, release flow, marketplace flow, or hardware-control
   path.
+- `docs/examples/hybrid-source-intake-boundary.example.json` records a
+  descriptor-only source-intake boundary for future C++/SystemVerilog,
+  custom-script, and grammar handoff planning over approved hybrid
+  boundary summaries; it is not a source reader, grammar reader, source
+  path reader, source content reader, source hash reader, source
+  metadata reader, manifest reader, parser, compiler, runtime, script
+  execution path, simulator runner, verification run, report/artifact
+  reader or writer, command runner, repository reader, release flow,
+  marketplace flow, or hardware-control path.
 - `docs/examples/mcp-read-only-tool-plan.example.json` maps a future
   MCP/tool adapter to read-only CLI/core commands; it is a checked plan,
   not a runtime implementation.
