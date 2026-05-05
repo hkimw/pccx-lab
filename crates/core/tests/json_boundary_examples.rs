@@ -8624,6 +8624,340 @@ fn sail_source_intake_result_example_keeps_descriptor_only_boundary() {
 }
 
 #[test]
+fn sail_source_intake_handoff_example_keeps_descriptor_only_boundary() {
+    let value: serde_json::Value = parse_example("sail-source-intake-handoff.example.json");
+    let root = value
+        .as_object()
+        .expect("Sail source-intake handoff boundary must be an object");
+
+    assert_eq!(
+        root["schemaVersion"],
+        "pccx.lab.sail-source-intake-handoff.v0"
+    );
+    assert_eq!(root["handoffState"], "blocked_summary_only");
+    assert_eq!(root["resultState"], "blocked_not_run");
+    assert_eq!(root["approvalState"], "not_approved");
+    assert_eq!(root["intakeState"], "not_started");
+    assert_eq!(root["adapterState"], "not_implemented");
+    assert_eq!(root["defaultMode"], "read_only");
+    assert_eq!(root["hostMode"], "cli_core_first_gui_second");
+    assert_eq!(
+        root["boundaryKind"],
+        "future_sail_source_intake_handoff_summary"
+    );
+
+    let refs = root["sourceBoundaryRefs"]
+        .as_array()
+        .expect("source boundary refs must be an array");
+    for ref_id in [
+        "sail_source_intake_result",
+        "sail_source_intake_approval",
+        "sail_source_intake_boundary",
+        "sail_implementation_gap_matrix",
+        "sail_evidence_detail",
+    ] {
+        assert!(
+            refs.iter().any(|source| {
+                source["refId"] == ref_id
+                    && source["summaryOnly"] == true
+                    && source["handoffInput"] == true
+                    && source["approvedSummaryRef"] == true
+                    && source["sourceIntakeAllowed"] == false
+                    && source["sourceReadAllowed"] == false
+                    && source["rtlSourceReadAllowed"] == false
+                    && source["astReadAllowed"] == false
+                    && source["generatedModelReadAllowed"] == false
+                    && source["repositoryReadAllowed"] == false
+                    && source["commandExecutionAllowed"] == false
+                    && source["runtimeExecutionAllowed"] == false
+            }),
+            "sourceBoundaryRefs must include {ref_id}"
+        );
+    }
+
+    let request = root["handoffRequest"]
+        .as_object()
+        .expect("handoff request must be an object");
+    assert_eq!(request["requestKind"], "planned_sail_source_intake_handoff");
+    assert_eq!(
+        request["sourceReferenceKind"],
+        "approved-sail-source-intake-handoff-summaries"
+    );
+    assert_eq!(
+        request["outputBoundary"],
+        "pccx.lab.sail-source-intake-handoff.v0"
+    );
+    let fixed_args = request["fixedArgsPreview"]
+        .as_array()
+        .expect("fixed args preview must be an array");
+    assert_eq!(fixed_args[0], "sail-model");
+    assert_eq!(fixed_args[1], "source-intake");
+    assert_eq!(fixed_args[2], "handoff");
+    assert_eq!(fixed_args[3], "--format");
+    assert_eq!(fixed_args[4], "json");
+    assert_eq!(request["summaryOnly"], true);
+    assert_eq!(request["inputRefOnly"], true);
+    assert_eq!(request["approvalRequired"], true);
+    for flag in [
+        "approvalRequested",
+        "approved",
+        "sourceIntakeAllowed",
+        "sourceIntakeAttempted",
+        "sourceIntakeCompleted",
+        "resultMaterialized",
+        "handoffPayloadIncluded",
+        "handoffPublished",
+        "publicTextGenerated",
+        "localFileReadAllowed",
+        "repositoryReadAllowed",
+        "sailSourceReadAllowed",
+        "rtlSourceReadAllowed",
+        "sailAstReadAllowed",
+        "generatedModelReadAllowed",
+        "sourceContentReadAllowed",
+        "sourcePathReadAllowed",
+        "sourceHashReadAllowed",
+        "sourceMetadataReadAllowed",
+        "sourceManifestReadAllowed",
+        "parserExecutionAllowed",
+        "compilerExecutionAllowed",
+        "modelGenerationAllowed",
+        "modelExecutionAllowed",
+        "refinementCheckAllowed",
+        "formalProofAllowed",
+        "simulatorExecutionAllowed",
+        "verificationRunAllowed",
+        "hardwareControlAllowed",
+        "commandExecutionAllowed",
+        "providerCallAllowed",
+        "networkCallAllowed",
+        "kv260AccessAllowed",
+        "fpgaRepoAccessAllowed",
+        "stableApiAbiClaim",
+        "marketplaceClaim",
+        "runtimeClaim",
+        "hardwareClaim",
+    ] {
+        assert_eq!(request[flag], false, "handoffRequest.{flag} must be false");
+    }
+
+    let handoff = root["blockedHandoff"]
+        .as_object()
+        .expect("blocked handoff must be an object");
+    assert_eq!(handoff["handoffKind"], "sail_source_intake_handoff");
+    assert_eq!(handoff["handoffState"], "blocked_summary_only");
+    assert_eq!(handoff["resultState"], "blocked_not_run");
+    assert_eq!(handoff["approvalState"], "not_approved");
+    assert_eq!(handoff["intakeState"], "not_started");
+    assert_eq!(handoff["summaryOnly"], true);
+    assert_eq!(handoff["descriptorOnly"], true);
+    assert_eq!(handoff["approvalRequired"], true);
+    for flag in [
+        "approved",
+        "sourceIntakeAllowed",
+        "sourceIntakeAttempted",
+        "sourceIntakeCompleted",
+        "resultMaterialized",
+        "handoffPayloadIncluded",
+        "handoffPublished",
+        "publicTextGenerated",
+        "sailSourceReadAllowed",
+        "rtlSourceReadAllowed",
+        "sailAstReadAllowed",
+        "generatedModelReadAllowed",
+        "sourceManifestReadAllowed",
+        "parserExecutionAllowed",
+        "compilerExecutionAllowed",
+        "modelGenerationAllowed",
+        "modelExecutionAllowed",
+        "refinementCheckAllowed",
+        "formalProofAllowed",
+        "verificationRunAllowed",
+        "hardwareControlAllowed",
+        "repositoryReadAllowed",
+        "providerCallAllowed",
+        "networkCallAllowed",
+    ] {
+        assert_eq!(handoff[flag], false, "blockedHandoff.{flag} must be false");
+    }
+
+    let checklist = root["handoffChecklist"]
+        .as_array()
+        .expect("handoff checklist must be an array");
+    assert!(checklist.iter().any(|item| {
+        item["checkId"] == "source_intake_result_blocked"
+            && item["state"] == "blocked_not_run"
+            && item["approvalRequired"] == true
+            && item["sourceIntakeAllowed"] == false
+    }));
+    assert!(checklist.iter().any(|item| {
+        item["checkId"] == "source_intake_approval_not_granted"
+            && item["state"] == "not_approved"
+            && item["sourceIntakeAllowed"] == false
+    }));
+    assert!(checklist.iter().any(|item| {
+        item["checkId"] == "no_public_handoff_payload" && item["state"] == "blocked"
+    }));
+
+    let policy = root["handoffPolicy"]
+        .as_object()
+        .expect("handoff policy must be an object");
+    assert_eq!(policy["policyState"], "blocked");
+    assert_eq!(policy["handoffState"], "blocked_summary_only");
+    assert_eq!(policy["resultState"], "blocked_not_run");
+    assert_eq!(policy["approvalState"], "not_approved");
+    assert_eq!(policy["summaryOnly"], true);
+    assert_eq!(policy["descriptorOnly"], true);
+    assert_eq!(policy["approvalRequired"], true);
+    assert_eq!(policy["auditRequired"], true);
+    for flag in [
+        "approved",
+        "sourceIntakeAllowed",
+        "sourceIntakeAttempted",
+        "sourceIntakeCompleted",
+        "resultMaterialized",
+        "handoffPayloadIncluded",
+        "handoffPublished",
+        "publicTextGenerated",
+        "readyForSourceIntake",
+        "readyForSailSourceIntake",
+        "readyForRtlIntake",
+        "readyForParser",
+        "readyForCompiler",
+        "readyForModelGeneration",
+        "readyForModelExecution",
+        "readyForRefinementCheck",
+        "readyForFormalProof",
+        "readyForVerificationRun",
+        "readyForHardwareControl",
+        "readyForRepositoryRead",
+        "runtimeClaim",
+        "hardwareClaim",
+        "stableApiAbiClaim",
+        "marketplaceClaim",
+    ] {
+        assert_eq!(policy[flag], false, "handoffPolicy.{flag} must be false");
+    }
+
+    let display = root["displayPolicy"]
+        .as_object()
+        .expect("display policy must be an object");
+    assert_eq!(display["summaryOnly"], true);
+    assert_eq!(display["sourceContentIncluded"], false);
+    assert_eq!(display["sourcePathIncluded"], false);
+    assert_eq!(display["sourceHashIncluded"], false);
+    assert_eq!(display["sourceManifestIncluded"], false);
+    assert_eq!(display["sailSourceIncluded"], false);
+    assert_eq!(display["rtlSourceIncluded"], false);
+    assert_eq!(display["sailAstIncluded"], false);
+    assert_eq!(display["generatedModelIncluded"], false);
+    assert_eq!(display["resultPayloadIncluded"], false);
+    assert_eq!(display["handoffPayloadIncluded"], false);
+    assert_eq!(display["publicTextIncluded"], false);
+    assert_eq!(display["artifactPathsIncluded"], false);
+    assert_eq!(display["approvalTokenIncluded"], false);
+    assert_eq!(display["approvalActorIncluded"], false);
+    assert_eq!(display["hardwareDumpIncluded"], false);
+    assert_eq!(display["boardDumpIncluded"], false);
+
+    let blocked = root["blockedActions"]
+        .as_array()
+        .expect("blocked actions must be an array");
+    for action in [
+        "source-intake-handoff-materialization",
+        "source-intake-result-materialization",
+        "source-intake-approval-request",
+        "source-intake-dispatch",
+        "sail-source-read",
+        "rtl-source-read",
+        "ast-read",
+        "generated-model-read",
+        "public-text-publication",
+        "local-file-read",
+        "repository-read",
+        "artifact-read",
+        "report-read",
+        "provider-call",
+        "network-call",
+        "hardware-probe",
+        "kv260-access",
+        "fpga-repo-access",
+        "model-load",
+        "release-or-tag",
+    ] {
+        assert!(
+            blocked.iter().any(|item| item == action),
+            "blockedActions must include {action}"
+        );
+    }
+
+    let safety = root["safetyFlags"]
+        .as_object()
+        .expect("safety flags must be an object");
+    assert_eq!(safety["dataOnly"], true);
+    assert_eq!(safety["descriptorOnly"], true);
+    assert_eq!(safety["readOnly"], true);
+    assert_eq!(safety["summaryOnly"], true);
+    assert_eq!(safety["sailSourceIntakeHandoffFixtureOnly"], true);
+    for flag in [
+        "approvalExecutorImplemented",
+        "sourceIntakeApprovalImplemented",
+        "sourceIntakeRequestImplemented",
+        "sourceIntakeDispatchImplemented",
+        "sourceIntakeResultImplemented",
+        "sourceIntakeHandoffImplemented",
+        "sailSourceReaderImplemented",
+        "rtlSourceReaderImplemented",
+        "sourceManifestReaderImplemented",
+        "sourcePathReaderImplemented",
+        "sourceContentReaderImplemented",
+        "sourceHashReaderImplemented",
+        "sourceMetadataReaderImplemented",
+        "sailAstReaderImplemented",
+        "generatedModelReaderImplemented",
+        "parserImplemented",
+        "compilerImplemented",
+        "modelGenerationImplemented",
+        "modelExecutionImplemented",
+        "refinementCheck",
+        "formalProof",
+        "verificationExecution",
+        "hardwareControl",
+        "commandExecution",
+        "runtimeExecution",
+        "localFileRead",
+        "repositoryRead",
+        "networkCalls",
+        "providerCalls",
+        "hardwareAccess",
+        "kv260Access",
+        "fpgaRepoAccess",
+        "modelExecution",
+        "modelWeightsIncluded",
+        "privatePathsIncluded",
+        "secretsIncluded",
+        "tokensIncluded",
+        "artifactPathsIncluded",
+        "approvalTokenIncluded",
+        "approvalActorIncluded",
+        "hardwareDumpIncluded",
+        "boardDumpIncluded",
+        "publicTextIncluded",
+        "telemetry",
+        "writeBack",
+        "repositoryMutation",
+        "publicPush",
+        "releaseOrTag",
+        "stableApiAbiClaim",
+        "marketplaceClaim",
+        "runtimeClaim",
+        "hardwareClaim",
+    ] {
+        assert_eq!(safety[flag], false, "safetyFlags.{flag} must be false");
+    }
+}
+
+#[test]
 fn hybrid_strategy_plan_example_keeps_descriptor_only_boundary() {
     let value: serde_json::Value = parse_example("hybrid-strategy-plan.example.json");
     let root = value
