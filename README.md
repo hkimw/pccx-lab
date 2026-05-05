@@ -157,6 +157,17 @@ boundary. There is no private back channel into lab internals. See
   run refinement checks, run proofs, run simulators, run verification, read
   or write reports or artifacts, execute commands, read repositories, run a
   release flow, run a marketplace flow, or control hardware.
+- `docs/examples/sail-source-intake-status-summary.example.json` records a
+  descriptor-only status summary for future Sail source-intake display over
+  approved Sail source-intake boundary, approval, result, handoff,
+  gap-matrix, and evidence-detail summaries; it does not execute approval,
+  dispatch source intake, read Sail sources, read RTL sources, read source
+  paths, read source content, read source hashes, read source metadata, read
+  manifests, read ASTs, read generated models, run parsers, run compilers,
+  generate or execute models, run refinement checks, run proofs, run
+  simulators, run verification, read or write reports or artifacts, execute
+  commands, read repositories, publish handoffs, run a release flow, run a
+  marketplace flow, or control hardware.
 - `docs/examples/hybrid-strategy-plan.example.json` records a
   descriptor-only hybrid strategy plan for future C++/SystemVerilog and
   custom-script control tracks; it is not a source reader, grammar

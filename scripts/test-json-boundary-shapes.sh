@@ -148,6 +148,7 @@ run_case \
     "[sail-source-intake-approval] shape ok" \
     "[sail-source-intake-result] shape ok" \
     "[sail-source-intake-handoff] shape ok" \
+    "[sail-source-intake-status-summary] shape ok" \
     "[hybrid-strategy-plan] shape ok" \
     "[hybrid-interface-boundary] shape ok" \
     "[hybrid-review-packet] shape ok" \
