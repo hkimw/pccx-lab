@@ -342,6 +342,23 @@
       "docsAnchor": "docs/CLI_CORE_BOUNDARY.md#hybrid-implementation-readiness-boundary"
     },
     {
+      "boundaryKind": "hybrid-implementation-gap-matrix",
+      "examplePath": "docs/examples/hybrid-implementation-gap-matrix.example.json",
+      "producingCommand": null,
+      "coreGeneratorOrReader": "docs/CLI_CORE_BOUNDARY.md#hybrid-implementation-gap-matrix-boundary",
+      "readerOnly": true,
+      "shapeValidation": {
+        "kind": "hybrid-implementation-gap-matrix",
+        "validator": "scripts/json_boundary_shape_validator.py",
+        "fixtureTest": "scripts/test-json-boundary-shapes.sh"
+      },
+      "rustValidation": {
+        "testPath": "crates/core/tests/json_boundary_examples.rs",
+        "testName": "hybrid_implementation_gap_matrix_example_keeps_descriptor_only_boundary"
+      },
+      "docsAnchor": "docs/CLI_CORE_BOUNDARY.md#hybrid-implementation-gap-matrix-boundary"
+    },
+    {
       "boundaryKind": "launcher-diagnostics-handoff",
       "examplePath": "docs/examples/launcher-diagnostics-handoff.example.json",
       "producingCommand": null,
