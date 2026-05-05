@@ -9253,6 +9253,258 @@ fn hybrid_implementation_readiness_example_keeps_descriptor_only_boundary() {
 }
 
 #[test]
+fn hybrid_implementation_gap_matrix_example_keeps_descriptor_only_boundary() {
+    let value: serde_json::Value = parse_example("hybrid-implementation-gap-matrix.example.json");
+    let root = value
+        .as_object()
+        .expect("hybrid implementation gap matrix must be an object");
+
+    assert_eq!(
+        root["schemaVersion"],
+        "pccx.lab.hybrid-implementation-gap-matrix.v0"
+    );
+    assert_eq!(root["matrixState"], "descriptor_only");
+    assert_eq!(root["adapterState"], "not_implemented");
+    assert_eq!(root["defaultMode"], "read_only");
+    assert_eq!(root["hostMode"], "cli_core_first_gui_second");
+    assert_eq!(
+        root["matrixKind"],
+        "future_hybrid_implementation_gap_matrix"
+    );
+
+    let refs = root["sourceBoundaryRefs"]
+        .as_array()
+        .expect("source boundary refs must be an array");
+    for ref_id in [
+        "hybrid_strategy_plan",
+        "hybrid_interface_boundary",
+        "hybrid_review_packet",
+        "hybrid_evidence_manifest",
+        "hybrid_evidence_detail",
+        "hybrid_implementation_readiness",
+    ] {
+        assert!(
+            refs.iter().any(|source| {
+                source["refId"] == ref_id
+                    && source["summaryOnly"] == true
+                    && source["gapInput"] == true
+            }),
+            "sourceBoundaryRefs must include {ref_id}"
+        );
+    }
+    assert!(refs.iter().any(|source| {
+        source["refId"] == "hybrid_implementation_readiness"
+            && source["sourceReaderAllowed"] == false
+            && source["grammarReaderAllowed"] == false
+            && source["artifactReaderAllowed"] == false
+            && source["reportReaderAllowed"] == false
+            && source["commandExecutionAllowed"] == false
+            && source["runtimeExecutionAllowed"] == false
+            && source["hardwareControlAllowed"] == false
+    }));
+
+    let request = root["gapRequest"]
+        .as_object()
+        .expect("gap request must be an object");
+    assert_eq!(
+        request["requestKind"],
+        "planned_hybrid_implementation_gap_matrix"
+    );
+    assert_eq!(
+        request["sourceReferenceKind"],
+        "approved-hybrid-boundary-summaries"
+    );
+    assert_eq!(
+        request["outputBoundary"],
+        "pccx.lab.hybrid-implementation-gap-matrix.v0"
+    );
+    let fixed_args = request["fixedArgsPreview"]
+        .as_array()
+        .expect("fixed args preview must be an array");
+    assert_eq!(fixed_args[0], "hybrid");
+    assert_eq!(fixed_args[1], "gap-matrix");
+    assert_eq!(fixed_args[2], "--format");
+    assert_eq!(fixed_args[3], "json");
+    assert_eq!(request["summaryOnly"], true);
+    assert_eq!(request["inputRefOnly"], true);
+    assert_eq!(request["pathEchoAllowed"], false);
+    assert_eq!(request["privatePathEchoAllowed"], false);
+    assert_eq!(request["localFileReadAllowed"], false);
+    assert_eq!(request["repositoryReadAllowed"], false);
+    assert_eq!(request["cppSourceReadAllowed"], false);
+    assert_eq!(request["systemVerilogSourceReadAllowed"], false);
+    assert_eq!(request["scriptSourceReadAllowed"], false);
+    assert_eq!(request["grammarReadAllowed"], false);
+    assert_eq!(request["parserExecutionAllowed"], false);
+    assert_eq!(request["compilerExecutionAllowed"], false);
+    assert_eq!(request["runtimeExecutionAllowed"], false);
+    assert_eq!(request["scriptExecutionAllowed"], false);
+    assert_eq!(request["simulatorExecutionAllowed"], false);
+    assert_eq!(request["verificationRunAllowed"], false);
+    assert_eq!(request["hardwareControlAllowed"], false);
+    assert_eq!(request["providerCallAllowed"], false);
+    assert_eq!(request["networkCallAllowed"], false);
+    assert_eq!(request["hardwareAccessAllowed"], false);
+    assert_eq!(request["kv260AccessAllowed"], false);
+    assert_eq!(request["fpgaRepoAccessAllowed"], false);
+    assert_eq!(request["modelLoadAllowed"], false);
+    assert_eq!(request["stableApiAbiClaim"], false);
+    assert_eq!(request["marketplaceClaim"], false);
+    assert_eq!(request["runtimeClaim"], false);
+    assert_eq!(request["hardwareClaim"], false);
+
+    let rows = root["gapRows"]
+        .as_array()
+        .expect("gap rows must be an array");
+    for row_id in [
+        "source_grammar_boundary_gap",
+        "parser_runtime_gap",
+        "script_simulator_verification_gap",
+        "evidence_publication_gap",
+        "release_marketplace_claim_gap",
+    ] {
+        assert!(
+            rows.iter().any(|item| {
+                item["gapId"] == row_id
+                    && item["gapState"] == "blocked_pending_separate_boundary"
+                    && item["summaryOnly"] == true
+                    && item["requiredBeforeImplementation"] == true
+                    && item["separateBoundaryRequired"] == true
+                    && item["cppSourceReadAllowed"] == false
+                    && item["systemVerilogSourceReadAllowed"] == false
+                    && item["scriptSourceReadAllowed"] == false
+                    && item["grammarReadAllowed"] == false
+                    && item["parserExecutionAllowed"] == false
+                    && item["compilerExecutionAllowed"] == false
+                    && item["runtimeExecutionAllowed"] == false
+                    && item["scriptExecutionAllowed"] == false
+                    && item["simulatorExecutionAllowed"] == false
+                    && item["verificationRunAllowed"] == false
+                    && item["hardwareControlAllowed"] == false
+                    && item["releaseAllowed"] == false
+                    && item["marketplaceAllowed"] == false
+            }),
+            "gapRows must include {row_id}"
+        );
+    }
+
+    let summary = root["gapSummary"]
+        .as_object()
+        .expect("gap summary must be an object");
+    assert_eq!(summary["summaryState"], "metadata_only");
+    assert_eq!(summary["implementationState"], "not_implemented");
+    assert_eq!(summary["gapDisposition"], "blocked_by_open_gaps");
+    assert_eq!(summary["summaryOnly"], true);
+    assert_eq!(summary["readyForImplementation"], false);
+    assert_eq!(summary["readyForSourceIntake"], false);
+    assert_eq!(summary["readyForGrammar"], false);
+    assert_eq!(summary["readyForParser"], false);
+    assert_eq!(summary["readyForCompiler"], false);
+    assert_eq!(summary["readyForRuntime"], false);
+    assert_eq!(summary["readyForScriptExecution"], false);
+    assert_eq!(summary["readyForSimulator"], false);
+    assert_eq!(summary["readyForVerificationRun"], false);
+    assert_eq!(summary["readyForHardwareControl"], false);
+    assert_eq!(summary["readyForRelease"], false);
+    assert_eq!(summary["readyForMarketplace"], false);
+    assert_eq!(summary["runtimeClaim"], false);
+    assert_eq!(summary["hardwareClaim"], false);
+    assert_eq!(summary["stableApiAbiClaim"], false);
+    assert_eq!(summary["marketplaceClaim"], false);
+
+    let blocked = root["blockedActions"]
+        .as_array()
+        .expect("blocked actions must be an array");
+    for action in [
+        "cpp-source-read",
+        "systemverilog-source-read",
+        "custom-script-source-read",
+        "grammar-read",
+        "parser",
+        "compiler",
+        "runtime-generation",
+        "script-execution",
+        "simulator-execution",
+        "verification-run",
+        "hardware-control",
+        "command-execution",
+        "local-file-read",
+        "repository-read",
+        "raw-report-read",
+        "raw-log-read",
+        "artifact-read",
+        "report-read",
+        "marketplace-flow",
+        "provider-call",
+        "network-call",
+        "hardware-probe",
+        "kv260-access",
+        "fpga-repo-access",
+        "model-load",
+        "public-push",
+        "release-or-tag",
+    ] {
+        assert!(
+            blocked.iter().any(|item| item == action),
+            "blockedActions must include {action}"
+        );
+    }
+
+    let safety = root["safetyFlags"]
+        .as_object()
+        .expect("safety flags must be an object");
+    assert_eq!(safety["dataOnly"], true);
+    assert_eq!(safety["descriptorOnly"], true);
+    assert_eq!(safety["readOnly"], true);
+    assert_eq!(safety["summaryOnly"], true);
+    assert_eq!(safety["hybridImplementationGapMatrixFixtureOnly"], true);
+    assert_eq!(safety["cppSourceReaderImplemented"], false);
+    assert_eq!(safety["systemVerilogSourceReaderImplemented"], false);
+    assert_eq!(safety["scriptSourceReaderImplemented"], false);
+    assert_eq!(safety["grammarReaderImplemented"], false);
+    assert_eq!(safety["parserImplemented"], false);
+    assert_eq!(safety["compilerImplemented"], false);
+    assert_eq!(safety["runtimeImplemented"], false);
+    assert_eq!(safety["scriptExecution"], false);
+    assert_eq!(safety["simulatorExecution"], false);
+    assert_eq!(safety["verificationExecution"], false);
+    assert_eq!(safety["hardwareControl"], false);
+    assert_eq!(safety["commandExecution"], false);
+    assert_eq!(safety["shellExecution"], false);
+    assert_eq!(safety["runtimeExecution"], false);
+    assert_eq!(safety["localFileRead"], false);
+    assert_eq!(safety["repositoryRead"], false);
+    assert_eq!(safety["readsArtifacts"], false);
+    assert_eq!(safety["writesArtifacts"], false);
+    assert_eq!(safety["networkCalls"], false);
+    assert_eq!(safety["providerCalls"], false);
+    assert_eq!(safety["hardwareAccess"], false);
+    assert_eq!(safety["kv260Access"], false);
+    assert_eq!(safety["fpgaRepoAccess"], false);
+    assert_eq!(safety["modelExecution"], false);
+    assert_eq!(safety["modelWeightsIncluded"], false);
+    assert_eq!(safety["privatePathsIncluded"], false);
+    assert_eq!(safety["secretsIncluded"], false);
+    assert_eq!(safety["tokensIncluded"], false);
+    assert_eq!(safety["stdoutIncluded"], false);
+    assert_eq!(safety["stderrIncluded"], false);
+    assert_eq!(safety["rawLogsIncluded"], false);
+    assert_eq!(safety["rawReportIncluded"], false);
+    assert_eq!(safety["artifactPathsIncluded"], false);
+    assert_eq!(safety["hardwareDumpIncluded"], false);
+    assert_eq!(safety["boardDumpIncluded"], false);
+    assert_eq!(safety["telemetry"], false);
+    assert_eq!(safety["writeBack"], false);
+    assert_eq!(safety["repositoryMutation"], false);
+    assert_eq!(safety["publicPush"], false);
+    assert_eq!(safety["releaseOrTag"], false);
+    assert_eq!(safety["stableApiAbiClaim"], false);
+    assert_eq!(safety["marketplaceClaim"], false);
+    assert_eq!(safety["runtimeClaim"], false);
+    assert_eq!(safety["hardwareClaim"], false);
+}
+
+#[test]
 fn plugin_host_session_state_example_keeps_host_session_blocked_boundary() {
     let value: serde_json::Value = parse_example("plugin-host-session-state.example.json");
     let root = value

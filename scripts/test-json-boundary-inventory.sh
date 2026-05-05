@@ -154,6 +154,7 @@ run_case \
     "[hybrid-evidence-manifest] inventory ok" \
     "[hybrid-evidence-detail] inventory ok" \
     "[hybrid-implementation-readiness] inventory ok" \
+    "[hybrid-implementation-gap-matrix] inventory ok" \
     "[plugin-boundary-plan] inventory ok" \
     "[plugin-manifest-validation-result] inventory ok" \
     "[plugin-sample-catalog] inventory ok" \
