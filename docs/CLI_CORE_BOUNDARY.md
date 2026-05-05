@@ -32,6 +32,7 @@ separate workflow logic island.
 | `docs/examples/sail-implementation-gap-matrix.example.json` | planned Sail implementation gap matrix | Checked descriptor-only Sail implementation gap matrix over approved Sail boundary summaries; no Sail source reader, RTL source reader, AST reader, generated-model reader, parser, compiler, model generator, model execution, refinement check, proof path, verification run, report reader/writer, artifact reader/writer, command runner, repository reader, release flow, marketplace flow, or hardware path is implemented. |
 | `docs/examples/sail-source-intake-boundary.example.json` | planned Sail source intake boundary | Checked descriptor-only Sail source-intake boundary over approved Sail boundary summaries; no Sail source reader, RTL source reader, source path/content/hash/metadata reader, manifest reader, AST reader, generated-model reader, parser, compiler, model generator, model execution, refinement check, proof path, verification run, report reader/writer, artifact reader/writer, command runner, repository reader, release flow, marketplace flow, or hardware path is implemented. |
 | `docs/examples/sail-source-intake-approval.example.json` | planned Sail source intake approval gate | Checked descriptor-only Sail source-intake approval gate over approved Sail boundary summaries; no approval executor, source-intake dispatch, Sail source reader, RTL source reader, source path/content/hash/metadata reader, manifest reader, AST reader, generated-model reader, parser, compiler, model generator, model execution, refinement check, proof path, verification run, report reader/writer, artifact reader/writer, command runner, repository reader, release flow, marketplace flow, or hardware path is implemented. |
+| `docs/examples/sail-source-intake-result.example.json` | planned Sail source intake result boundary | Checked descriptor-only Sail source-intake result boundary over approved Sail boundary summaries; no approval executor, source-intake dispatch, Sail source reader, RTL source reader, source path/content/hash/metadata reader, manifest reader, AST reader, generated-model reader, parser, compiler, model generator, model execution, refinement check, proof path, verification run, report reader/writer, artifact reader/writer, command runner, repository reader, release flow, marketplace flow, or hardware path is implemented. |
 | `docs/examples/hybrid-strategy-plan.example.json` | planned hybrid strategy boundary | Checked descriptor-only C++/SystemVerilog and custom-script control plan; no source reader, grammar reader, parser, compiler, runtime, simulator runner, verification run, report writer, artifact writer, or hardware-control path is implemented. |
 | `docs/examples/hybrid-interface-boundary.example.json` | planned hybrid interface boundary | Checked descriptor-only hybrid CLI/core handoff boundary over approved summaries; no C++/SystemVerilog/custom-script source reader, grammar reader, parser, compiler, runtime, script execution, simulator runner, verification run, report reader/writer, artifact reader/writer, or hardware-control path is implemented. |
 | `docs/examples/hybrid-review-packet.example.json` | planned hybrid review packet | Checked summary-only hybrid review packet over approved strategy, interface, workflow, verification, and report-gate summaries; no source reader, grammar reader, parser, compiler, runtime, script execution, simulator runner, verification run, report reader/writer, artifact reader/writer, or hardware-control path is implemented. |
@@ -121,6 +122,7 @@ aligned.
 | `sail-implementation-gap-matrix` | `docs/examples/sail-implementation-gap-matrix.example.json` | Reader only; planned descriptor-only Sail implementation gap matrix over approved Sail boundary summaries | Shape validator, inventory test, Rust JSON-shape test |
 | `sail-source-intake-boundary` | `docs/examples/sail-source-intake-boundary.example.json` | Reader only; planned descriptor-only Sail source-intake boundary over approved Sail boundary summaries | Shape validator, inventory test, Rust JSON-shape test |
 | `sail-source-intake-approval` | `docs/examples/sail-source-intake-approval.example.json` | Reader only; planned descriptor-only Sail source-intake approval gate over approved Sail source-intake summaries | Shape validator, inventory test, Rust JSON-shape test |
+| `sail-source-intake-result` | `docs/examples/sail-source-intake-result.example.json` | Reader only; planned descriptor-only Sail source-intake result boundary over approved Sail source-intake summaries | Shape validator, inventory test, Rust JSON-shape test |
 | `hybrid-strategy-plan` | `docs/examples/hybrid-strategy-plan.example.json` | Reader only; planned descriptor-only hybrid C++/SystemVerilog and custom-script boundary over approved CLI/core planning summaries | Shape validator, inventory test, Rust JSON-shape test |
 | `hybrid-interface-boundary` | `docs/examples/hybrid-interface-boundary.example.json` | Reader only; planned descriptor-only hybrid CLI/core handoff boundary over approved summaries | Shape validator, inventory test, Rust JSON-shape test |
 | `hybrid-review-packet` | `docs/examples/hybrid-review-packet.example.json` | Reader only; planned summary-only hybrid review packet over approved strategy, interface, workflow, verification, and report-gate summaries | Shape validator, inventory test, Rust JSON-shape test |
@@ -648,6 +650,39 @@ generation, execution, refinement, proof, verification, hardware
 control, report output, artifact handling, evidence publication,
 release flow, or marketplace-facing flow can exist. No runtime,
 hardware, marketplace, release, or API/ABI stability claim is made.
+
+## Sail source-intake result boundary
+
+[`docs/examples/sail-source-intake-result.example.json`](examples/sail-source-intake-result.example.json)
+defines the checked descriptor-only blocked result boundary for future
+Sail source-intake outcomes over approved Sail source-intake approval,
+source-intake, gap-matrix, model-readiness, and evidence-detail
+summaries. It records `blocked_not_run`, `not_approved`, and
+`not_started` states only, with `sourceIntakeAllowed`,
+`sourceIntakeAttempted`, and `resultMaterialized` set to false. The
+fixture does not request, record, or grant approval, attempt source
+intake, complete source intake, or materialize result payloads.
+
+The result boundary is metadata only. It does not read Sail sources,
+read RTL sources, read source paths, read source content, read source
+hashes, read source metadata, read source manifests, read ASTs, read
+generated models, run approval executors, dispatch source intake, run
+parsers, run compilers, generate models, execute models, run refinement
+checks, run proofs, run simulators, run verification, read or write
+reports, read or write artifacts, execute commands, read repositories,
+mutate repositories, publish public text, call providers, use the
+network, touch hardware, access KV260, access FPGA repos, load models,
+upload telemetry, push publicly, or control releases/tags.
+
+The result boundary is approved for descriptor metadata only. Future
+implementation work still requires separate reviewed boundaries before
+any approval request, approval decision, source-intake dispatch, source
+path, source content, source hash, source metadata, manifest,
+parser/compiler behavior, model generation, execution, refinement,
+proof, verification, hardware control, result payload, report output,
+artifact handling, evidence publication, release flow, or
+marketplace-facing flow can exist. No runtime, hardware, marketplace,
+release, or API/ABI stability claim is made.
 
 ## Hybrid strategy plan boundary
 
