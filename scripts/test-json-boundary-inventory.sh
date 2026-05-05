@@ -166,6 +166,7 @@ run_case \
     "[plugin-manifest-validation-result] inventory ok" \
     "[plugin-sample-catalog] inventory ok" \
     "[plugin-sample-detail] inventory ok" \
+    "[plugin-sample-status-summary] inventory ok" \
     "[plugin-capability-list] inventory ok" \
     "[plugin-capability-detail] inventory ok" \
     "[plugin-load-request] inventory ok" \

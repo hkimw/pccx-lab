@@ -170,6 +170,7 @@ run_case \
     "[plugin-sample-plan] shape ok" \
     "[plugin-sample-result] shape ok" \
     "[plugin-sample-detail] shape ok" \
+    "[plugin-sample-status-summary] shape ok" \
     "[plugin-dry-run-flow] shape ok" \
     "[plugin-input-contract] shape ok" \
     "[plugin-trace-summary-input] shape ok" \

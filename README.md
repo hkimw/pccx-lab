@@ -344,6 +344,13 @@ boundary. There is no private back channel into lab internals. See
   a manifest/package/source reader, payload reader, report/artifact reader or
   writer, plugin loader, runtime, sandbox, capability dispatcher, invocation
   path, package distribution, marketplace flow, or compatibility claim.
+- `docs/examples/plugin-sample-status-summary.example.json` records a
+  descriptor-only status summary over the checked plugin sample plan, result,
+  catalog, detail, capability-detail, and permission summaries; it is not
+  sample discovery, a manifest/package/source reader, payload reader,
+  report/artifact reader or writer, plugin loader, runtime, sandbox,
+  capability dispatcher, invocation path, package distribution, marketplace
+  flow, or compatibility claim.
 - `docs/examples/plugin-manifest-validation-result.example.json` records
   the summary-only result shape for a future approved plugin manifest
   validation request; it is not a manifest reader, validator command,
