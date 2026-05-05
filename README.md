@@ -267,6 +267,12 @@ boundary. There is no private back channel into lab internals. See
   discovery, an MCP server/client/runtime/transport, command executor,
   payload reader, report/artifact reader or writer, audit logger, tool
   invocation path, marketplace flow, or compatibility claim.
+- `docs/examples/mcp-sample-status-summary.example.json` records a
+  descriptor-only status summary over the checked MCP sample plan, result,
+  catalog, detail, tool-detail, and permission summaries; it is not sample
+  discovery, an MCP server/client/runtime/transport, command executor,
+  payload reader, report/artifact reader or writer, audit logger, tool
+  invocation path, marketplace flow, or compatibility claim.
 - `docs/examples/mcp-read-only-analysis-flow.example.json` records a
   checked dry-run flow contract for composing existing CLI/core summaries
   into a future read-only report path; it is not a command executor or

@@ -142,6 +142,7 @@ run_case \
     "[mcp-audit-event] inventory ok" \
     "[mcp-sample-catalog] inventory ok" \
     "[mcp-sample-detail] inventory ok" \
+    "[mcp-sample-status-summary] inventory ok" \
     "[sail-interface-boundary] inventory ok" \
     "[sail-review-packet] inventory ok" \
     "[sail-evidence-manifest] inventory ok" \

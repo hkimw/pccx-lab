@@ -124,6 +124,7 @@ run_case \
     "[mcp-sample-result] shape ok" \
     "[mcp-sample-catalog] shape ok" \
     "[mcp-sample-detail] shape ok" \
+    "[mcp-sample-status-summary] shape ok" \
     "[mcp-read-only-analysis-flow] shape ok" \
     "[mcp-read-only-report-contract] shape ok" \
     "[mcp-verification-run-comparison] shape ok" \
