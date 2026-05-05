@@ -15594,6 +15594,483 @@ def validate_sail_source_intake_boundary(value: Any) -> None:
     require_string_array(require_field(root, "$", "issueRefs"), "$.issueRefs", min_items=1)
 
 
+def validate_sail_source_intake_approval(value: Any) -> None:
+    root = expect_object(value, "$")
+    require_schema(root, "$", "pccx.lab.sail-source-intake-approval.v0")
+    require_string_fields(
+        root,
+        "$",
+        [
+            "tool",
+            "approvalGateId",
+            "approvalState",
+            "requestState",
+            "intakeState",
+            "adapterState",
+            "defaultMode",
+            "hostMode",
+            "boundaryKind",
+        ],
+    )
+    expected_states = {
+        "approvalState": "not_approved",
+        "requestState": "not_requested",
+        "intakeState": "blocked",
+        "adapterState": "not_implemented",
+        "defaultMode": "read_only",
+        "hostMode": "cli_core_first_gui_second",
+        "boundaryKind": "future_sail_source_intake_approval_gate",
+    }
+    for field, expected in expected_states.items():
+        if root[field] != expected:
+            raise ShapeError(f"unexpected value at $.{field}: expected {expected}")
+
+    refs = require_object_array(
+        require_field(root, "$", "sourceBoundaryRefs"),
+        "$.sourceBoundaryRefs",
+        min_items=4,
+    )
+    ref_ids = set()
+    for ref in refs:
+        path = "$.sourceBoundaryRefs[]"
+        require_string_fields(ref, path, ["refId", "schemaVersion", "examplePath", "state"])
+        ref_ids.add(ref["refId"])
+        for flag in ["summaryOnly", "approvalInput", "approvedSummaryRef"]:
+            if ref.get(flag) is not True:
+                raise ShapeError(f"unexpected value at $.sourceBoundaryRefs[].{flag}: expected true")
+        for flag in [
+            "sourceIntakeAllowed",
+            "sourceReadAllowed",
+            "rtlSourceReadAllowed",
+            "astReadAllowed",
+            "generatedModelReadAllowed",
+            "pathReadAllowed",
+            "repositoryReadAllowed",
+            "commandExecutionAllowed",
+            "hardwareControlAllowed",
+        ]:
+            if flag in ref and ref[flag] is not False:
+                raise ShapeError(f"unexpected value at $.sourceBoundaryRefs[].{flag}: expected false")
+    for ref_id in [
+        "sail_source_intake_boundary",
+        "sail_implementation_gap_matrix",
+        "sail_model_readiness",
+        "sail_evidence_detail",
+    ]:
+        if ref_id not in ref_ids:
+            raise ShapeError(f"missing source boundary ref: {ref_id}")
+    if not any(ref["refId"] == "sail_implementation_gap_matrix" and ref.get("sourceBoundaryGapRecorded") is True for ref in refs):
+        raise ShapeError("missing sail implementation gap-matrix source-boundary gap reference")
+
+    request = expect_object(require_field(root, "$", "approvalRequest"), "$.approvalRequest")
+    require_string_fields(
+        request,
+        "$.approvalRequest",
+        [
+            "requestKind",
+            "commandKind",
+            "sourceReferenceKind",
+            "outputBoundary",
+            "summary",
+        ],
+    )
+    if request["requestKind"] != "planned_sail_source_intake_approval":
+        raise ShapeError("unexpected value at $.approvalRequest.requestKind")
+    if request["outputBoundary"] != "pccx.lab.sail-source-intake-approval.v0":
+        raise ShapeError("unexpected value at $.approvalRequest.outputBoundary")
+    fixed_args = require_field(request, "$.approvalRequest", "fixedArgsPreview")
+    require_string_array(fixed_args, "$.approvalRequest.fixedArgsPreview", min_items=5)
+    if fixed_args[:5] != ["sail-model", "source-intake", "approval", "--format", "json"]:
+        raise ShapeError("unexpected value at $.approvalRequest.fixedArgsPreview")
+    request_true_flags = ["summaryOnly", "inputRefOnly", "approvalRequired"]
+    request_false_flags = [
+        "approvalRequested",
+        "approved",
+        "sourceIntakeAllowed",
+        "pathEchoAllowed",
+        "privatePathEchoAllowed",
+        "localFileReadAllowed",
+        "repositoryReadAllowed",
+        "sailSourceReadAllowed",
+        "rtlSourceReadAllowed",
+        "sailAstReadAllowed",
+        "generatedModelReadAllowed",
+        "sourceContentReadAllowed",
+        "sourcePathReadAllowed",
+        "sourceHashReadAllowed",
+        "sourceMetadataReadAllowed",
+        "sourceManifestReadAllowed",
+        "parserExecutionAllowed",
+        "compilerExecutionAllowed",
+        "modelGenerationAllowed",
+        "modelExecutionAllowed",
+        "refinementCheckAllowed",
+        "formalProofAllowed",
+        "simulatorExecutionAllowed",
+        "verificationRunAllowed",
+        "hardwareControlAllowed",
+        "rawReportReadAllowed",
+        "rawLogReadAllowed",
+        "artifactReadAllowed",
+        "artifactWriteAllowed",
+        "reportReadAllowed",
+        "reportWriteAllowed",
+        "commandExecutionAllowed",
+        "shellExecutionAllowed",
+        "runtimeExecutionAllowed",
+        "providerCallAllowed",
+        "networkCallAllowed",
+        "launcherExecutionAllowed",
+        "editorExecutionAllowed",
+        "hardwareAccessAllowed",
+        "kv260AccessAllowed",
+        "fpgaRepoAccessAllowed",
+        "modelLoadAllowed",
+        "stableApiAbiClaim",
+        "marketplaceClaim",
+        "runtimeClaim",
+        "hardwareClaim",
+    ]
+    require_bool_fields(request, "$.approvalRequest", request_true_flags + request_false_flags)
+    for flag in request_true_flags:
+        if request[flag] is not True:
+            raise ShapeError(f"unexpected value at $.approvalRequest.{flag}: expected true")
+    for flag in request_false_flags:
+        if request[flag] is not False:
+            raise ShapeError(f"unexpected value at $.approvalRequest.{flag}: expected false")
+
+    decision = expect_object(require_field(root, "$", "approvalDecisionGate"), "$.approvalDecisionGate")
+    require_string_fields(
+        decision,
+        "$.approvalDecisionGate",
+        ["gateState", "decisionState", "requestState", "disposition", "summary"],
+    )
+    expected_decision = {
+        "gateState": "blocked",
+        "decisionState": "not_approved",
+        "requestState": "not_requested",
+        "disposition": "blocked_until_explicit_source_intake_approval",
+    }
+    for field, expected in expected_decision.items():
+        if decision[field] != expected:
+            raise ShapeError(f"unexpected value at $.approvalDecisionGate.{field}: expected {expected}")
+    decision_true_flags = ["summaryOnly", "descriptorOnly", "approvalRequired"]
+    decision_false_flags = [
+        "approvalRequested",
+        "approvalRecorded",
+        "approved",
+        "sourceIntakeAllowed",
+        "sourceManifestReadAllowed",
+        "sailSourceReadAllowed",
+        "rtlSourceReadAllowed",
+        "sailAstReadAllowed",
+        "generatedModelReadAllowed",
+        "sourceContentReadAllowed",
+        "sourcePathReadAllowed",
+        "sourceHashReadAllowed",
+        "sourceMetadataReadAllowed",
+        "parserExecutionAllowed",
+        "compilerExecutionAllowed",
+        "modelGenerationAllowed",
+        "modelExecutionAllowed",
+        "refinementCheckAllowed",
+        "formalProofAllowed",
+        "verificationRunAllowed",
+        "hardwareControlAllowed",
+        "repositoryReadAllowed",
+        "artifactReadAllowed",
+        "reportReadAllowed",
+        "commandExecutionAllowed",
+        "providerCallAllowed",
+        "networkCallAllowed",
+        "publicPushAllowed",
+        "releaseOrTagAllowed",
+    ]
+    require_bool_fields(decision, "$.approvalDecisionGate", decision_true_flags + decision_false_flags)
+    for flag in decision_true_flags:
+        if decision[flag] is not True:
+            raise ShapeError(f"unexpected value at $.approvalDecisionGate.{flag}: expected true")
+    for flag in decision_false_flags:
+        if decision[flag] is not False:
+            raise ShapeError(f"unexpected value at $.approvalDecisionGate.{flag}: expected false")
+
+    checklist = require_object_array(
+        require_field(root, "$", "approvalChecklist"),
+        "$.approvalChecklist",
+        min_items=3,
+    )
+    checklist_true_flags = ["summaryOnly", "approvalRequired", "approvedSummaryRef"]
+    checklist_false_flags = [
+        "sourceIntakeAllowed",
+        "sourceReadAllowed",
+        "pathReadAllowed",
+        "repositoryReadAllowed",
+        "commandExecutionAllowed",
+        "hardwareControlAllowed",
+    ]
+    for item in checklist:
+        path = "$.approvalChecklist[]"
+        require_string_fields(item, path, ["checkId", "state", "sourceRef", "summary"])
+        require_bool_fields(item, path, checklist_true_flags + checklist_false_flags)
+        for flag in checklist_true_flags:
+            if item[flag] is not True:
+                raise ShapeError(f"unexpected value at $.approvalChecklist[].{flag}: expected true")
+        for flag in checklist_false_flags:
+            if item[flag] is not False:
+                raise ShapeError(f"unexpected value at $.approvalChecklist[].{flag}: expected false")
+    expected_checks = {
+        "approved_source_intake_boundary_summary": "summary_available",
+        "explicit_source_intake_approval": "not_requested",
+        "no_source_material_boundary": "blocked",
+    }
+    for check_id, state in expected_checks.items():
+        if not any(item["checkId"] == check_id and item["state"] == state for item in checklist):
+            raise ShapeError(f"missing approval checklist item: {check_id}")
+
+    policy = expect_object(require_field(root, "$", "intakeApprovalPolicy"), "$.intakeApprovalPolicy")
+    require_string_fields(policy, "$.intakeApprovalPolicy", ["policyState", "requestState", "approvalState", "summary"])
+    expected_policy = {
+        "policyState": "blocked",
+        "requestState": "not_requested",
+        "approvalState": "not_approved",
+    }
+    for field, expected in expected_policy.items():
+        if policy[field] != expected:
+            raise ShapeError(f"unexpected value at $.intakeApprovalPolicy.{field}: expected {expected}")
+    policy_true_flags = ["summaryOnly", "descriptorOnly", "approvalRequired", "auditRequired"]
+    policy_false_flags = [
+        "approved",
+        "sourceIntakeAllowed",
+        "readyForSourceIntake",
+        "readyForRtlIntake",
+        "readyForManifestRead",
+        "readyForParser",
+        "readyForCompiler",
+        "readyForModelGeneration",
+        "readyForModelExecution",
+        "readyForRefinementCheck",
+        "readyForFormalProof",
+        "readyForVerificationRun",
+        "readyForHardwareControl",
+        "readyForReportRead",
+        "readyForArtifactRead",
+        "readyForRepositoryRead",
+        "readyForRelease",
+        "readyForMarketplace",
+        "runtimeClaim",
+        "hardwareClaim",
+        "stableApiAbiClaim",
+        "marketplaceClaim",
+    ]
+    require_bool_fields(policy, "$.intakeApprovalPolicy", policy_true_flags + policy_false_flags)
+    for flag in policy_true_flags:
+        if policy[flag] is not True:
+            raise ShapeError(f"unexpected value at $.intakeApprovalPolicy.{flag}: expected true")
+    for flag in policy_false_flags:
+        if policy[flag] is not False:
+            raise ShapeError(f"unexpected value at $.intakeApprovalPolicy.{flag}: expected false")
+
+    display = expect_object(require_field(root, "$", "displayPolicy"), "$.displayPolicy")
+    require_string_fields(display, "$.displayPolicy", ["surface", "guiPolicy"])
+    require_string_array(require_field(display, "$.displayPolicy", "allowedFields"), "$.displayPolicy.allowedFields", min_items=1)
+    require_string_array(require_field(display, "$.displayPolicy", "blockedFields"), "$.displayPolicy.blockedFields", min_items=1)
+    display_true_flags = ["summaryOnly"]
+    display_false_flags = [
+        "pathEchoAllowed",
+        "privatePathsIncluded",
+        "payloadIncluded",
+        "stdoutIncluded",
+        "stderrIncluded",
+        "rawLogsIncluded",
+        "rawReportIncluded",
+        "artifactPathsIncluded",
+        "reportContentIncluded",
+        "sourceContentIncluded",
+        "sourcePathIncluded",
+        "sourceHashIncluded",
+        "sourceMetadataIncluded",
+        "sourceManifestIncluded",
+        "rtlSourceIncluded",
+        "sailAstIncluded",
+        "generatedModelIncluded",
+        "approvalTokenIncluded",
+        "approvalActorIncluded",
+        "hardwareDumpIncluded",
+        "boardDumpIncluded",
+        "modelPathsIncluded",
+    ]
+    require_bool_fields(display, "$.displayPolicy", display_true_flags + display_false_flags)
+    if display["summaryOnly"] is not True:
+        raise ShapeError("unexpected value at $.displayPolicy.summaryOnly: expected true")
+    for flag in display_false_flags:
+        if display[flag] is not False:
+            raise ShapeError(f"unexpected value at $.displayPolicy.{flag}: expected false")
+
+    mutation = expect_object(require_field(root, "$", "noMutationEvidence"), "$.noMutationEvidence")
+    require_string_fields(mutation, "$.noMutationEvidence", ["state", "evidenceRule"])
+    mutation_false_flags = [
+        "trackedFileMutationAllowed",
+        "trackedFileDiffCaptured",
+        "approvalExecutorAllowed",
+        "localFileReadAllowed",
+        "repositoryReadAllowed",
+        "sailSourceReadAllowed",
+        "rtlSourceReadAllowed",
+        "sailAstReadAllowed",
+        "generatedModelReadAllowed",
+        "sourceContentReadAllowed",
+        "sourcePathReadAllowed",
+        "sourceHashReadAllowed",
+        "sourceMetadataReadAllowed",
+        "sourceManifestReadAllowed",
+        "rawReportReadAllowed",
+        "rawLogReadAllowed",
+        "artifactReadAllowed",
+        "artifactWriteAllowed",
+        "reportReadAllowed",
+        "reportWriteAllowed",
+        "commandExecutionAllowed",
+        "repositoryMutationAllowed",
+        "publicTextPublicationAllowed",
+        "publicPushAllowed",
+        "releaseOrTagAllowed",
+    ]
+    require_bool_fields(mutation, "$.noMutationEvidence", mutation_false_flags)
+    for flag in mutation_false_flags:
+        if mutation[flag] is not False:
+            raise ShapeError(f"unexpected value at $.noMutationEvidence.{flag}: expected false")
+
+    blocked_actions = require_field(root, "$", "blockedActions")
+    require_string_array(blocked_actions, "$.blockedActions", min_items=1)
+    for required in [
+        "source-intake-approval-request",
+        "source-intake-approval-execution",
+        "source-intake-dispatch",
+        "approval-executor",
+        "sail-source-read",
+        "rtl-source-read",
+        "source-path-read",
+        "source-content-read",
+        "source-hash-read",
+        "source-metadata-read",
+        "sail-ast-read",
+        "generated-model-read",
+        "source-manifest-read",
+        "sail-parser",
+        "sail-compiler",
+        "sail-model-generation",
+        "sail-model-execution",
+        "refinement-check",
+        "formal-proof",
+        "verification-run",
+        "simulator-execution",
+        "hardware-control",
+        "command-execution",
+        "local-file-read",
+        "repository-read",
+        "raw-report-read",
+        "raw-log-read",
+        "artifact-read",
+        "report-read",
+        "marketplace-flow",
+        "provider-call",
+        "network-call",
+        "hardware-probe",
+        "kv260-access",
+        "fpga-repo-access",
+        "model-load",
+        "public-push",
+        "release-or-tag",
+    ]:
+        if required not in blocked_actions:
+            raise ShapeError(f"missing blocked action at $.blockedActions: {required}")
+
+    safety = expect_object(require_field(root, "$", "safetyFlags"), "$.safetyFlags")
+    safety_true_flags = [
+        "dataOnly",
+        "descriptorOnly",
+        "readOnly",
+        "summaryOnly",
+        "sailSourceIntakeApprovalFixtureOnly",
+    ]
+    safety_false_flags = [
+        "approvalExecutorImplemented",
+        "sourceIntakeApprovalImplemented",
+        "sourceIntakeRequestImplemented",
+        "sourceIntakeDispatchImplemented",
+        "sailSourceReaderImplemented",
+        "rtlSourceReaderImplemented",
+        "sourceManifestReaderImplemented",
+        "sourcePathReaderImplemented",
+        "sourceContentReaderImplemented",
+        "sourceHashReaderImplemented",
+        "sourceMetadataReaderImplemented",
+        "sailAstReaderImplemented",
+        "generatedModelReaderImplemented",
+        "sailParserImplemented",
+        "sailCompilerImplemented",
+        "sailModelGeneratorImplemented",
+        "sailImplementationImplemented",
+        "sailModelExecution",
+        "refinementExecution",
+        "formalProofExecution",
+        "simulatorExecution",
+        "verificationExecution",
+        "hardwareControl",
+        "commandExecution",
+        "shellExecution",
+        "runtimeExecution",
+        "localFileRead",
+        "repositoryRead",
+        "rawReportRead",
+        "rawLogRead",
+        "readsArtifacts",
+        "writesArtifacts",
+        "reportReaderImplemented",
+        "reportWriterImplemented",
+        "networkCalls",
+        "providerCalls",
+        "launcherExecution",
+        "editorExecution",
+        "hardwareAccess",
+        "kv260Access",
+        "fpgaRepoAccess",
+        "modelExecution",
+        "modelWeightsIncluded",
+        "privatePathsIncluded",
+        "secretsIncluded",
+        "tokensIncluded",
+        "stdoutIncluded",
+        "stderrIncluded",
+        "rawLogsIncluded",
+        "rawReportIncluded",
+        "artifactPathsIncluded",
+        "approvalTokenIncluded",
+        "approvalActorIncluded",
+        "hardwareDumpIncluded",
+        "boardDumpIncluded",
+        "telemetry",
+        "writeBack",
+        "repositoryMutation",
+        "publicPush",
+        "releaseOrTag",
+        "stableApiAbiClaim",
+        "marketplaceClaim",
+        "runtimeClaim",
+        "hardwareClaim",
+    ]
+    require_bool_fields(safety, "$.safetyFlags", safety_true_flags + safety_false_flags)
+    for flag in safety_true_flags:
+        if safety[flag] is not True:
+            raise ShapeError(f"unexpected value at $.safetyFlags.{flag}: expected true")
+    for flag in safety_false_flags:
+        if safety[flag] is not False:
+            raise ShapeError(f"unexpected value at $.safetyFlags.{flag}: expected false")
+
+    require_string_array(require_field(root, "$", "limitations"), "$.limitations", min_items=1)
+    require_string_array(require_field(root, "$", "issueRefs"), "$.issueRefs", min_items=1)
+
+
 def validate_hybrid_source_intake_boundary(value: Any) -> None:
     root = expect_object(value, "$")
     require_schema(root, "$", "pccx.lab.hybrid-source-intake-boundary.v0")
@@ -18722,6 +19199,7 @@ SPECS = [
     BoundarySpec("sail-model-readiness", "docs/examples/sail-model-readiness.example.json", validate_sail_model_readiness),
     BoundarySpec("sail-implementation-gap-matrix", "docs/examples/sail-implementation-gap-matrix.example.json", validate_sail_implementation_gap_matrix),
     BoundarySpec("sail-source-intake-boundary", "docs/examples/sail-source-intake-boundary.example.json", validate_sail_source_intake_boundary),
+    BoundarySpec("sail-source-intake-approval", "docs/examples/sail-source-intake-approval.example.json", validate_sail_source_intake_approval),
     BoundarySpec("hybrid-strategy-plan", "docs/examples/hybrid-strategy-plan.example.json", validate_hybrid_strategy_plan),
     BoundarySpec("hybrid-interface-boundary", "docs/examples/hybrid-interface-boundary.example.json", validate_hybrid_interface_boundary),
     BoundarySpec("hybrid-review-packet", "docs/examples/hybrid-review-packet.example.json", validate_hybrid_review_packet),
