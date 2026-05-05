@@ -10299,6 +10299,279 @@ fn hybrid_source_intake_boundary_example_keeps_descriptor_only_boundary() {
 }
 
 #[test]
+fn hybrid_source_intake_approval_example_keeps_descriptor_only_boundary() {
+    let value: serde_json::Value = parse_example("hybrid-source-intake-approval.example.json");
+    let root = value
+        .as_object()
+        .expect("hybrid source-intake approval boundary must be an object");
+
+    assert_eq!(
+        root["schemaVersion"],
+        "pccx.lab.hybrid-source-intake-approval.v0"
+    );
+    assert_eq!(root["approvalState"], "not_approved");
+    assert_eq!(root["requestState"], "not_requested");
+    assert_eq!(root["intakeState"], "blocked");
+    assert_eq!(root["adapterState"], "not_implemented");
+    assert_eq!(root["defaultMode"], "read_only");
+    assert_eq!(root["hostMode"], "cli_core_first_gui_second");
+    assert_eq!(
+        root["boundaryKind"],
+        "future_hybrid_source_intake_approval_gate"
+    );
+
+    let refs = root["sourceBoundaryRefs"]
+        .as_array()
+        .expect("source boundary refs must be an array");
+    for ref_id in [
+        "hybrid_source_intake_boundary",
+        "hybrid_implementation_gap_matrix",
+        "hybrid_implementation_readiness",
+        "hybrid_evidence_detail",
+    ] {
+        assert!(
+            refs.iter().any(|source| {
+                source["refId"] == ref_id
+                    && source["summaryOnly"] == true
+                    && source["approvalInput"] == true
+                    && source["approvedSummaryRef"] == true
+                    && source["sourceIntakeAllowed"] == false
+                    && source["sourceReadAllowed"] == false
+                    && source["grammarReadAllowed"] == false
+                    && source["repositoryReadAllowed"] == false
+                    && source["commandExecutionAllowed"] == false
+                    && source["runtimeExecutionAllowed"] == false
+            }),
+            "sourceBoundaryRefs must include {ref_id}"
+        );
+    }
+
+    let request = root["approvalRequest"]
+        .as_object()
+        .expect("approval request must be an object");
+    assert_eq!(
+        request["requestKind"],
+        "planned_hybrid_source_intake_approval"
+    );
+    assert_eq!(
+        request["sourceReferenceKind"],
+        "approved-hybrid-source-intake-summaries"
+    );
+    assert_eq!(
+        request["outputBoundary"],
+        "pccx.lab.hybrid-source-intake-approval.v0"
+    );
+    let fixed_args = request["fixedArgsPreview"]
+        .as_array()
+        .expect("fixed args preview must be an array");
+    assert_eq!(fixed_args[0], "hybrid");
+    assert_eq!(fixed_args[1], "source-intake");
+    assert_eq!(fixed_args[2], "approval");
+    assert_eq!(fixed_args[3], "--format");
+    assert_eq!(fixed_args[4], "json");
+    assert_eq!(request["summaryOnly"], true);
+    assert_eq!(request["inputRefOnly"], true);
+    assert_eq!(request["approvalRequired"], true);
+    assert_eq!(request["approvalRequested"], false);
+    assert_eq!(request["approved"], false);
+    assert_eq!(request["sourceIntakeAllowed"], false);
+    assert_eq!(request["cppSourceReadAllowed"], false);
+    assert_eq!(request["systemVerilogSourceReadAllowed"], false);
+    assert_eq!(request["scriptSourceReadAllowed"], false);
+    assert_eq!(request["grammarReadAllowed"], false);
+    assert_eq!(request["sourceContentReadAllowed"], false);
+    assert_eq!(request["sourcePathReadAllowed"], false);
+    assert_eq!(request["sourceHashReadAllowed"], false);
+    assert_eq!(request["sourceMetadataReadAllowed"], false);
+    assert_eq!(request["sourceManifestReadAllowed"], false);
+    assert_eq!(request["parserExecutionAllowed"], false);
+    assert_eq!(request["compilerExecutionAllowed"], false);
+    assert_eq!(request["runtimeExecutionAllowed"], false);
+    assert_eq!(request["scriptExecutionAllowed"], false);
+    assert_eq!(request["verificationRunAllowed"], false);
+    assert_eq!(request["hardwareControlAllowed"], false);
+    assert_eq!(request["repositoryReadAllowed"], false);
+    assert_eq!(request["providerCallAllowed"], false);
+    assert_eq!(request["networkCallAllowed"], false);
+    assert_eq!(request["kv260AccessAllowed"], false);
+    assert_eq!(request["fpgaRepoAccessAllowed"], false);
+    assert_eq!(request["stableApiAbiClaim"], false);
+    assert_eq!(request["marketplaceClaim"], false);
+    assert_eq!(request["runtimeClaim"], false);
+    assert_eq!(request["hardwareClaim"], false);
+
+    let decision = root["approvalDecisionGate"]
+        .as_object()
+        .expect("approval decision gate must be an object");
+    assert_eq!(decision["gateState"], "blocked");
+    assert_eq!(decision["decisionState"], "not_approved");
+    assert_eq!(decision["requestState"], "not_requested");
+    assert_eq!(decision["summaryOnly"], true);
+    assert_eq!(decision["descriptorOnly"], true);
+    assert_eq!(decision["approvalRequired"], true);
+    assert_eq!(decision["approvalRequested"], false);
+    assert_eq!(decision["approvalRecorded"], false);
+    assert_eq!(decision["approved"], false);
+    assert_eq!(decision["sourceIntakeAllowed"], false);
+    assert_eq!(decision["sourceManifestReadAllowed"], false);
+    assert_eq!(decision["cppSourceReadAllowed"], false);
+    assert_eq!(decision["systemVerilogSourceReadAllowed"], false);
+    assert_eq!(decision["scriptSourceReadAllowed"], false);
+    assert_eq!(decision["grammarReadAllowed"], false);
+    assert_eq!(decision["sourceContentReadAllowed"], false);
+    assert_eq!(decision["sourcePathReadAllowed"], false);
+    assert_eq!(decision["sourceHashReadAllowed"], false);
+    assert_eq!(decision["sourceMetadataReadAllowed"], false);
+    assert_eq!(decision["parserExecutionAllowed"], false);
+    assert_eq!(decision["compilerExecutionAllowed"], false);
+    assert_eq!(decision["runtimeExecutionAllowed"], false);
+    assert_eq!(decision["scriptExecutionAllowed"], false);
+    assert_eq!(decision["verificationRunAllowed"], false);
+    assert_eq!(decision["hardwareControlAllowed"], false);
+    assert_eq!(decision["repositoryReadAllowed"], false);
+    assert_eq!(decision["providerCallAllowed"], false);
+    assert_eq!(decision["networkCallAllowed"], false);
+
+    let checklist = root["approvalChecklist"]
+        .as_array()
+        .expect("approval checklist must be an array");
+    assert!(checklist.iter().any(|item| {
+        item["checkId"] == "explicit_source_intake_approval"
+            && item["state"] == "not_requested"
+            && item["approvalRequired"] == true
+            && item["sourceIntakeAllowed"] == false
+    }));
+    assert!(checklist.iter().any(|item| {
+        item["checkId"] == "no_source_material_boundary" && item["state"] == "blocked"
+    }));
+
+    let policy = root["intakeApprovalPolicy"]
+        .as_object()
+        .expect("intake approval policy must be an object");
+    assert_eq!(policy["policyState"], "blocked");
+    assert_eq!(policy["requestState"], "not_requested");
+    assert_eq!(policy["approvalState"], "not_approved");
+    assert_eq!(policy["summaryOnly"], true);
+    assert_eq!(policy["descriptorOnly"], true);
+    assert_eq!(policy["approvalRequired"], true);
+    assert_eq!(policy["auditRequired"], true);
+    assert_eq!(policy["approved"], false);
+    assert_eq!(policy["sourceIntakeAllowed"], false);
+    assert_eq!(policy["readyForSourceIntake"], false);
+    assert_eq!(policy["readyForCppSourceIntake"], false);
+    assert_eq!(policy["readyForSystemVerilogIntake"], false);
+    assert_eq!(policy["readyForScriptIntake"], false);
+    assert_eq!(policy["readyForGrammarIntake"], false);
+    assert_eq!(policy["readyForManifestRead"], false);
+    assert_eq!(policy["readyForParser"], false);
+    assert_eq!(policy["readyForCompiler"], false);
+    assert_eq!(policy["readyForRuntime"], false);
+    assert_eq!(policy["readyForScriptExecution"], false);
+    assert_eq!(policy["readyForVerificationRun"], false);
+    assert_eq!(policy["readyForHardwareControl"], false);
+    assert_eq!(policy["readyForRepositoryRead"], false);
+    assert_eq!(policy["runtimeClaim"], false);
+    assert_eq!(policy["hardwareClaim"], false);
+    assert_eq!(policy["stableApiAbiClaim"], false);
+    assert_eq!(policy["marketplaceClaim"], false);
+
+    let blocked = root["blockedActions"]
+        .as_array()
+        .expect("blocked actions must be an array");
+    for action in [
+        "source-intake-approval-request",
+        "source-intake-approval-execution",
+        "source-intake-dispatch",
+        "approval-executor",
+        "cpp-source-read",
+        "systemverilog-source-read",
+        "script-source-read",
+        "grammar-read",
+        "source-path-read",
+        "source-content-read",
+        "source-hash-read",
+        "source-metadata-read",
+        "source-manifest-read",
+        "parser-execution",
+        "compiler-execution",
+        "script-execution",
+        "runtime-execution",
+        "verification-run",
+        "hardware-control",
+        "local-file-read",
+        "repository-read",
+        "provider-call",
+        "network-call",
+        "hardware-probe",
+        "kv260-access",
+        "fpga-repo-access",
+        "model-load",
+        "release-or-tag",
+    ] {
+        assert!(
+            blocked.iter().any(|item| item == action),
+            "blockedActions must include {action}"
+        );
+    }
+
+    let safety = root["safetyFlags"]
+        .as_object()
+        .expect("safety flags must be an object");
+    assert_eq!(safety["dataOnly"], true);
+    assert_eq!(safety["descriptorOnly"], true);
+    assert_eq!(safety["readOnly"], true);
+    assert_eq!(safety["summaryOnly"], true);
+    assert_eq!(safety["hybridSourceIntakeApprovalFixtureOnly"], true);
+    assert_eq!(safety["approvalExecutorImplemented"], false);
+    assert_eq!(safety["sourceIntakeApprovalImplemented"], false);
+    assert_eq!(safety["sourceIntakeRequestImplemented"], false);
+    assert_eq!(safety["sourceIntakeDispatchImplemented"], false);
+    assert_eq!(safety["cppSourceReaderImplemented"], false);
+    assert_eq!(safety["systemVerilogSourceReaderImplemented"], false);
+    assert_eq!(safety["scriptSourceReaderImplemented"], false);
+    assert_eq!(safety["grammarReaderImplemented"], false);
+    assert_eq!(safety["sourceManifestReaderImplemented"], false);
+    assert_eq!(safety["sourcePathReaderImplemented"], false);
+    assert_eq!(safety["sourceContentReaderImplemented"], false);
+    assert_eq!(safety["sourceHashReaderImplemented"], false);
+    assert_eq!(safety["sourceMetadataReaderImplemented"], false);
+    assert_eq!(safety["parserImplemented"], false);
+    assert_eq!(safety["compilerImplemented"], false);
+    assert_eq!(safety["runtimeImplemented"], false);
+    assert_eq!(safety["scriptExecution"], false);
+    assert_eq!(safety["verificationExecution"], false);
+    assert_eq!(safety["hardwareControl"], false);
+    assert_eq!(safety["commandExecution"], false);
+    assert_eq!(safety["runtimeExecution"], false);
+    assert_eq!(safety["localFileRead"], false);
+    assert_eq!(safety["repositoryRead"], false);
+    assert_eq!(safety["networkCalls"], false);
+    assert_eq!(safety["providerCalls"], false);
+    assert_eq!(safety["hardwareAccess"], false);
+    assert_eq!(safety["kv260Access"], false);
+    assert_eq!(safety["fpgaRepoAccess"], false);
+    assert_eq!(safety["modelExecution"], false);
+    assert_eq!(safety["modelWeightsIncluded"], false);
+    assert_eq!(safety["privatePathsIncluded"], false);
+    assert_eq!(safety["secretsIncluded"], false);
+    assert_eq!(safety["tokensIncluded"], false);
+    assert_eq!(safety["artifactPathsIncluded"], false);
+    assert_eq!(safety["approvalTokenIncluded"], false);
+    assert_eq!(safety["approvalActorIncluded"], false);
+    assert_eq!(safety["hardwareDumpIncluded"], false);
+    assert_eq!(safety["boardDumpIncluded"], false);
+    assert_eq!(safety["telemetry"], false);
+    assert_eq!(safety["writeBack"], false);
+    assert_eq!(safety["repositoryMutation"], false);
+    assert_eq!(safety["publicPush"], false);
+    assert_eq!(safety["releaseOrTag"], false);
+    assert_eq!(safety["stableApiAbiClaim"], false);
+    assert_eq!(safety["marketplaceClaim"], false);
+    assert_eq!(safety["runtimeClaim"], false);
+    assert_eq!(safety["hardwareClaim"], false);
+}
+
+#[test]
 fn plugin_host_session_state_example_keeps_host_session_blocked_boundary() {
     let value: serde_json::Value = parse_example("plugin-host-session-state.example.json");
     let root = value
