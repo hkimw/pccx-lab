@@ -44,6 +44,7 @@ separate workflow logic island.
 | `docs/examples/hybrid-implementation-gap-matrix.example.json` | planned hybrid implementation gap matrix | Checked descriptor-only hybrid implementation gap matrix over approved hybrid boundary summaries; no source reader, grammar reader, parser, compiler, runtime, script execution, simulator runner, verification run, report reader/writer, artifact reader/writer, command runner, repository reader, release flow, marketplace flow, or hardware-control path is implemented. |
 | `docs/examples/hybrid-source-intake-boundary.example.json` | planned hybrid source intake boundary | Checked descriptor-only hybrid source-intake boundary over approved hybrid boundary summaries; no C++/SystemVerilog/custom-script source reader, grammar reader, source path/content/hash/metadata reader, manifest reader, parser, compiler, runtime, script execution, simulator runner, verification run, report reader/writer, artifact reader/writer, command runner, repository reader, release flow, marketplace flow, or hardware-control path is implemented. |
 | `docs/examples/hybrid-source-intake-approval.example.json` | planned hybrid source intake approval gate | Checked descriptor-only hybrid source-intake approval gate over approved hybrid boundary summaries; no approval executor, source-intake dispatch, C++/SystemVerilog/custom-script source reader, grammar reader, source path/content/hash/metadata reader, manifest reader, parser, compiler, runtime, script execution, simulator runner, verification run, report reader/writer, artifact reader/writer, command runner, repository reader, release flow, marketplace flow, or hardware-control path is implemented. |
+| `docs/examples/hybrid-source-intake-status-summary.example.json` | planned hybrid source intake status summary | Checked descriptor-only hybrid source-intake status summary over approved source-intake boundary, approval, result, handoff, gap-matrix, and evidence-detail summaries; no approval executor, source-intake dispatch, C++/SystemVerilog/custom-script source reader, grammar reader, source path/content/hash/metadata reader, manifest reader, parser, compiler, runtime, script execution, simulator runner, verification run, report reader/writer, artifact reader/writer, command runner, repository reader, public handoff publication, release flow, marketplace flow, or hardware-control path is implemented. |
 | `pccx-lab analyze <file> --format json` | early scaffold | File-shape diagnostics only. |
 | `pccx-lab diagnostics-handoff validate --file <path> --format json` | read-only validator | Launcher diagnostics handoff schema reader. |
 | `pccx-lab device-session-status validate --file <path> --format json` | read-only validator | Launcher device/session status schema reader. |
@@ -138,6 +139,7 @@ aligned.
 | `hybrid-implementation-gap-matrix` | `docs/examples/hybrid-implementation-gap-matrix.example.json` | Reader only; planned descriptor-only hybrid implementation gap matrix over approved hybrid boundary summaries | Shape validator, inventory test, Rust JSON-shape test |
 | `hybrid-source-intake-boundary` | `docs/examples/hybrid-source-intake-boundary.example.json` | Reader only; planned descriptor-only hybrid source-intake boundary over approved hybrid boundary summaries | Shape validator, inventory test, Rust JSON-shape test |
 | `hybrid-source-intake-approval` | `docs/examples/hybrid-source-intake-approval.example.json` | Reader only; planned descriptor-only hybrid source-intake approval gate over approved hybrid source-intake summaries | Shape validator, inventory test, Rust JSON-shape test |
+| `hybrid-source-intake-status-summary` | `docs/examples/hybrid-source-intake-status-summary.example.json` | Reader only; planned descriptor-only hybrid source-intake status summary over approved hybrid source-intake summaries | Shape validator, inventory test, Rust JSON-shape test |
 | `launcher-diagnostics-handoff` | `docs/examples/launcher-diagnostics-handoff.example.json` | Reader only; `pccx_core::diagnostics_handoff::validate_diagnostics_handoff_json` | Shape validator, inventory test, Rust reader validation test |
 | `launcher-device-session-status` | `docs/examples/launcher-device-session-status.example.json` | Reader only; `pccx_core::device_session_status::validate_device_session_status_json` | Shape validator, inventory test, Rust reader validation test |
 | `mcp-read-only-tool-plan` | `docs/examples/mcp-read-only-tool-plan.example.json` | Reader only; planned future MCP/tool adapter boundary over existing CLI/core commands | Shape validator, inventory test, Rust JSON-shape test |
@@ -1096,6 +1098,42 @@ handoff payload, public handoff text, report output, artifact handling,
 evidence publication, release flow, or marketplace-facing flow can
 exist. No runtime, hardware, marketplace, release, or API/ABI stability
 claim is made.
+
+## Hybrid source-intake status-summary boundary
+
+[`docs/examples/hybrid-source-intake-status-summary.example.json`](examples/hybrid-source-intake-status-summary.example.json)
+defines the checked descriptor-only status summary shape for future
+hybrid source-intake display. It links the source-intake boundary,
+approval, result, handoff, gap-matrix, and evidence-detail summaries,
+then records blocked status cards without executing approval, dispatching
+source intake, reading sources, materializing result payloads, generating
+public handoff text, or publishing a handoff.
+
+The fixture is summary-only metadata. It does not echo paths, include raw
+commands, include source paths, include source contents, include source
+hashes, include source metadata, include manifests, include C++ sources,
+include SystemVerilog sources, include custom-script sources, include
+grammar content, include parser output, include compiler output, include
+runtime plans, include script execution output, include simulator output,
+include verification output, include report bodies, include raw logs,
+include artifact paths, read local files, read repositories, read raw
+traces, read raw reports, write reports, write artifacts, run approval
+executors, dispatch source intake, run parsers, run compilers, execute
+runtimes, execute scripts, run simulators, run verification, mutate
+repositories, publish public handoffs, call providers, use the network,
+touch hardware, access KV260, access FPGA repos, load models, upload
+telemetry, push publicly, or control releases/tags.
+
+The hybrid source-intake status summary is approved for descriptor
+summary metadata only. Future implementation work still requires
+separate reviewed boundaries before any approval execution, source-intake
+dispatch, source reading, source path/content/hash/metadata reading,
+manifest reading, parser/compiler behavior, runtime behavior, script
+execution, simulator execution, verification, hardware control, read or
+write reports, read or write artifacts, execute commands, read
+repositories, mutate repositories, publish public text, call providers,
+use the network, touch hardware, access KV260, access FPGA repos, load
+models, upload telemetry, push publicly, or control releases/tags.
 
 ## analyze command
 

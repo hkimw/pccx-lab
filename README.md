@@ -251,6 +251,17 @@ boundary. There is no private back channel into lab internals. See
   runtimes or scripts, run simulators, run verification, read or write
   reports or artifacts, execute commands, read repositories, run a release
   flow, run a marketplace flow, or control hardware.
+- `docs/examples/hybrid-source-intake-status-summary.example.json` records a
+  descriptor-only status summary for future hybrid source-intake display over
+  approved hybrid source-intake boundary, approval, result, handoff,
+  gap-matrix, and evidence-detail summaries; it does not execute approval,
+  dispatch source intake, read C++ sources, read SystemVerilog sources, read
+  custom-script sources, read grammar input, read source paths, read source
+  content, read source hashes, read source metadata, read manifests, run
+  parsers, run compilers, execute runtimes or scripts, run simulators, run
+  verification, read or write reports or artifacts, execute commands, read
+  repositories, publish handoffs, run a release flow, run a marketplace flow,
+  or control hardware.
 - `docs/examples/mcp-read-only-tool-plan.example.json` maps a future
   MCP/tool adapter to read-only CLI/core commands; it is a checked plan,
   not a runtime implementation.
