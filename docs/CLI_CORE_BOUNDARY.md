@@ -40,6 +40,7 @@ separate workflow logic island.
 | `docs/examples/hybrid-implementation-readiness.example.json` | planned hybrid implementation readiness | Checked descriptor-only hybrid implementation-readiness gate over approved hybrid boundary summaries; no source reader, grammar reader, parser, compiler, runtime, script execution, simulator runner, verification run, report reader/writer, artifact reader/writer, command runner, repository reader, marketplace flow, or hardware-control path is implemented. |
 | `docs/examples/hybrid-implementation-gap-matrix.example.json` | planned hybrid implementation gap matrix | Checked descriptor-only hybrid implementation gap matrix over approved hybrid boundary summaries; no source reader, grammar reader, parser, compiler, runtime, script execution, simulator runner, verification run, report reader/writer, artifact reader/writer, command runner, repository reader, release flow, marketplace flow, or hardware-control path is implemented. |
 | `docs/examples/hybrid-source-intake-boundary.example.json` | planned hybrid source intake boundary | Checked descriptor-only hybrid source-intake boundary over approved hybrid boundary summaries; no C++/SystemVerilog/custom-script source reader, grammar reader, source path/content/hash/metadata reader, manifest reader, parser, compiler, runtime, script execution, simulator runner, verification run, report reader/writer, artifact reader/writer, command runner, repository reader, release flow, marketplace flow, or hardware-control path is implemented. |
+| `docs/examples/hybrid-source-intake-approval.example.json` | planned hybrid source intake approval gate | Checked descriptor-only hybrid source-intake approval gate over approved hybrid boundary summaries; no approval executor, source-intake dispatch, C++/SystemVerilog/custom-script source reader, grammar reader, source path/content/hash/metadata reader, manifest reader, parser, compiler, runtime, script execution, simulator runner, verification run, report reader/writer, artifact reader/writer, command runner, repository reader, release flow, marketplace flow, or hardware-control path is implemented. |
 | `pccx-lab analyze <file> --format json` | early scaffold | File-shape diagnostics only. |
 | `pccx-lab diagnostics-handoff validate --file <path> --format json` | read-only validator | Launcher diagnostics handoff schema reader. |
 | `pccx-lab device-session-status validate --file <path> --format json` | read-only validator | Launcher device/session status schema reader. |
@@ -128,6 +129,7 @@ aligned.
 | `hybrid-implementation-readiness` | `docs/examples/hybrid-implementation-readiness.example.json` | Reader only; planned descriptor-only hybrid implementation-readiness gate over approved hybrid boundary summaries | Shape validator, inventory test, Rust JSON-shape test |
 | `hybrid-implementation-gap-matrix` | `docs/examples/hybrid-implementation-gap-matrix.example.json` | Reader only; planned descriptor-only hybrid implementation gap matrix over approved hybrid boundary summaries | Shape validator, inventory test, Rust JSON-shape test |
 | `hybrid-source-intake-boundary` | `docs/examples/hybrid-source-intake-boundary.example.json` | Reader only; planned descriptor-only hybrid source-intake boundary over approved hybrid boundary summaries | Shape validator, inventory test, Rust JSON-shape test |
+| `hybrid-source-intake-approval` | `docs/examples/hybrid-source-intake-approval.example.json` | Reader only; planned descriptor-only hybrid source-intake approval gate over approved hybrid source-intake summaries | Shape validator, inventory test, Rust JSON-shape test |
 | `launcher-diagnostics-handoff` | `docs/examples/launcher-diagnostics-handoff.example.json` | Reader only; `pccx_core::diagnostics_handoff::validate_diagnostics_handoff_json` | Shape validator, inventory test, Rust reader validation test |
 | `launcher-device-session-status` | `docs/examples/launcher-device-session-status.example.json` | Reader only; `pccx_core::device_session_status::validate_device_session_status_json` | Shape validator, inventory test, Rust reader validation test |
 | `mcp-read-only-tool-plan` | `docs/examples/mcp-read-only-tool-plan.example.json` | Reader only; planned future MCP/tool adapter boundary over existing CLI/core commands | Shape validator, inventory test, Rust JSON-shape test |
@@ -876,6 +878,38 @@ execution, simulator execution, verification, hardware control, report
 output, artifact handling, evidence publication, release flow, or
 marketplace-facing flow can exist. No runtime, hardware, marketplace,
 release, or API/ABI stability claim is made.
+
+## Hybrid source-intake approval boundary
+
+[`docs/examples/hybrid-source-intake-approval.example.json`](examples/hybrid-source-intake-approval.example.json)
+defines the checked descriptor-only approval gate for future hybrid
+source-intake planning over approved hybrid source-intake, gap-matrix,
+implementation-readiness, and evidence-detail summaries. It records
+`not_requested` and `not_approved` states only, with
+`sourceIntakeAllowed` set to false. The fixture does not request,
+record, or grant approval for source intake.
+
+The approval boundary is metadata only. It does not read C++ sources,
+read SystemVerilog sources, read custom-script sources, read grammar
+input, read source paths, read source content, read source hashes, read
+source metadata, read source manifests, read parser output, read
+compiler output, read runtime plans, run approval executors, dispatch
+source intake, run parsers, run compilers, generate runtimes, execute
+scripts, run simulators, run verification, read or write reports, read
+or write artifacts, execute commands, read repositories, mutate
+repositories, publish public text, call providers, use the network,
+touch hardware, access KV260, access FPGA repos, load models, upload
+telemetry, push publicly, or control releases/tags.
+
+The gate is approved for descriptor metadata only. Future
+implementation work still requires separate reviewed boundaries before
+any approval request, approval decision, source path, source content,
+source hash, source metadata, manifest, grammar input, parser/compiler
+behavior, runtime behavior, script execution, simulator execution,
+verification, hardware control, report output, artifact handling,
+evidence publication, release flow, or marketplace-facing flow can
+exist. No runtime, hardware, marketplace, release, or API/ABI stability
+claim is made.
 
 ## analyze command
 
