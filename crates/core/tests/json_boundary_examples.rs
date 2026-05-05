@@ -12508,6 +12508,285 @@ fn hybrid_source_intake_handoff_example_keeps_descriptor_only_boundary() {
 }
 
 #[test]
+fn hybrid_source_intake_status_summary_example_keeps_descriptor_only_boundary() {
+    let value: serde_json::Value =
+        parse_example("hybrid-source-intake-status-summary.example.json");
+    let root = value
+        .as_object()
+        .expect("hybrid source-intake status summary must be an object");
+
+    assert_eq!(
+        root["schemaVersion"],
+        "pccx.lab.hybrid-source-intake-status-summary.v0"
+    );
+    assert_eq!(root["summaryState"], "descriptor_only");
+    assert_eq!(root["resultState"], "blocked_not_run");
+    assert_eq!(root["approvalState"], "not_approved");
+    assert_eq!(root["intakeState"], "not_started");
+    assert_eq!(root["handoffState"], "blocked_summary_only");
+    assert_eq!(root["adapterState"], "not_implemented");
+    assert_eq!(root["defaultMode"], "read_only");
+    assert_eq!(
+        root["boundaryKind"],
+        "future_hybrid_source_intake_status_summary"
+    );
+
+    let refs = root["sourceBoundaryRefs"]
+        .as_array()
+        .expect("source boundary refs must be an array");
+    for ref_id in [
+        "hybrid_source_intake_boundary",
+        "hybrid_source_intake_approval",
+        "hybrid_source_intake_result",
+        "hybrid_source_intake_handoff",
+        "hybrid_implementation_gap_matrix",
+        "hybrid_evidence_detail",
+    ] {
+        assert!(
+            refs.iter().any(|source| {
+                source["refId"] == ref_id
+                    && source["summaryOnly"] == true
+                    && source["statusInput"] == true
+                    && source["approvedSummaryRef"] == true
+                    && source["sourceIntakeAllowed"] == false
+                    && source["sourceReadAllowed"] == false
+                    && source["cppSourceReadAllowed"] == false
+                    && source["systemVerilogSourceReadAllowed"] == false
+                    && source["scriptSourceReadAllowed"] == false
+                    && source["grammarReadAllowed"] == false
+                    && source["repositoryReadAllowed"] == false
+                    && source["commandExecutionAllowed"] == false
+                    && source["runtimeExecutionAllowed"] == false
+            }),
+            "sourceBoundaryRefs must include {ref_id}"
+        );
+    }
+
+    let summary = root["statusSummary"]
+        .as_object()
+        .expect("status summary must be an object");
+    assert_eq!(
+        summary["summaryKind"],
+        "planned_hybrid_source_intake_status"
+    );
+    assert_eq!(
+        summary["sourceReferenceKind"],
+        "approved-hybrid-source-intake-status-summaries"
+    );
+    assert_eq!(summary["selectedTrack"], "hybrid_source_intake");
+    assert_eq!(summary["approvalState"], "not_approved");
+    assert_eq!(summary["resultState"], "blocked_not_run");
+    assert_eq!(summary["handoffState"], "blocked_summary_only");
+    assert_eq!(summary["intakeState"], "not_started");
+    assert_eq!(summary["overallState"], "blocked");
+    assert_eq!(summary["summaryOnly"], true);
+    assert_eq!(summary["descriptorOnly"], true);
+    assert_eq!(summary["generatedFromApprovedSummaries"], true);
+    assert_eq!(summary["statusCardsAvailable"], true);
+    for flag in [
+        "approved",
+        "sourceIntakeAllowed",
+        "sourceIntakeAttempted",
+        "sourceIntakeCompleted",
+        "resultMaterialized",
+        "handoffPayloadIncluded",
+        "handoffPublished",
+        "publicTextGenerated",
+        "repositoryReadAllowed",
+        "cppSourceReadAllowed",
+        "systemVerilogSourceReadAllowed",
+        "scriptSourceReadAllowed",
+        "grammarReadAllowed",
+        "sourceContentReadAllowed",
+        "sourcePathReadAllowed",
+        "sourceHashReadAllowed",
+        "sourceMetadataReadAllowed",
+        "sourceManifestReadAllowed",
+        "parserOutputReadAllowed",
+        "compilerOutputReadAllowed",
+        "runtimePlanReadAllowed",
+        "scriptExecutionResultReadAllowed",
+        "simulatorOutputReadAllowed",
+        "verificationResultReadAllowed",
+        "parserExecutionAllowed",
+        "compilerExecutionAllowed",
+        "runtimeExecutionAllowed",
+        "scriptExecutionAllowed",
+        "verificationRunAllowed",
+        "hardwareControlAllowed",
+        "commandExecutionAllowed",
+        "providerCallAllowed",
+        "networkCallAllowed",
+        "kv260AccessAllowed",
+        "fpgaRepoAccessAllowed",
+        "stableApiAbiClaim",
+        "marketplaceClaim",
+        "runtimeClaim",
+        "hardwareClaim",
+    ] {
+        assert_eq!(summary[flag], false, "statusSummary.{flag} must be false");
+    }
+
+    let cards = root["statusCards"]
+        .as_array()
+        .expect("status cards must be an array");
+    assert!(cards.iter().any(|card| {
+        card["cardId"] == "approval_gate"
+            && card["cardState"] == "not_approved"
+            && card["contentIncluded"] == false
+            && card["pathEchoAllowed"] == false
+    }));
+    assert!(cards.iter().any(|card| {
+        card["cardId"] == "result_gate"
+            && card["cardState"] == "blocked_not_run"
+            && card["contentIncluded"] == false
+    }));
+    assert!(cards
+        .iter()
+        .any(|card| { card["cardId"] == "source_access_gate" && card["cardState"] == "blocked" }));
+
+    let flow = root["summaryFlow"]
+        .as_object()
+        .expect("summary flow must be an object");
+    assert_eq!(flow["flowState"], "blocked");
+    assert_eq!(flow["commandKind"], "planned-cli-fixed-args");
+    let fixed_args = flow["fixedArgsPreview"]
+        .as_array()
+        .expect("fixed args preview must be an array");
+    assert_eq!(fixed_args[0], "hybrid");
+    assert_eq!(fixed_args[1], "source-intake");
+    assert_eq!(fixed_args[2], "status");
+    assert_eq!(fixed_args[3], "--format");
+    assert_eq!(fixed_args[4], "json");
+
+    let display = root["displayPolicy"]
+        .as_object()
+        .expect("display policy must be an object");
+    assert_eq!(display["summaryOnly"], true);
+    assert_eq!(display["sourceContentIncluded"], false);
+    assert_eq!(display["sourcePathIncluded"], false);
+    assert_eq!(display["sourceHashIncluded"], false);
+    assert_eq!(display["sourceManifestIncluded"], false);
+    assert_eq!(display["cppSourceIncluded"], false);
+    assert_eq!(display["systemVerilogSourceIncluded"], false);
+    assert_eq!(display["scriptSourceIncluded"], false);
+    assert_eq!(display["grammarContentIncluded"], false);
+    assert_eq!(display["parserOutputIncluded"], false);
+    assert_eq!(display["compilerOutputIncluded"], false);
+    assert_eq!(display["runtimePlanIncluded"], false);
+    assert_eq!(display["scriptExecutionOutputIncluded"], false);
+    assert_eq!(display["simulatorOutputIncluded"], false);
+    assert_eq!(display["verificationOutputIncluded"], false);
+    assert_eq!(display["artifactPathsIncluded"], false);
+    assert_eq!(display["publicHandoffIncluded"], false);
+
+    let blocked = root["blockedActions"]
+        .as_array()
+        .expect("blocked actions must be an array");
+    for action in [
+        "approval-execution",
+        "source-intake-dispatch",
+        "cpp-source-read",
+        "systemverilog-source-read",
+        "script-source-read",
+        "grammar-read",
+        "source-path-read",
+        "source-content-read",
+        "source-manifest-read",
+        "repository-read",
+        "repository-mutation",
+        "parser-execution",
+        "compiler-execution",
+        "runtime-execution",
+        "script-execution",
+        "verification-run",
+        "report-read",
+        "artifact-read",
+        "command-execution",
+        "provider-call",
+        "network-call",
+        "hardware-control",
+        "kv260-access",
+        "fpga-repo-access",
+        "model-load",
+        "public-handoff-publication",
+        "public-push",
+        "release-or-tag",
+    ] {
+        assert!(
+            blocked.iter().any(|item| item == action),
+            "blockedActions must include {action}"
+        );
+    }
+
+    let safety = root["safetyFlags"]
+        .as_object()
+        .expect("safety flags must be an object");
+    assert_eq!(safety["dataOnly"], true);
+    assert_eq!(safety["descriptorOnly"], true);
+    assert_eq!(safety["readOnly"], true);
+    assert_eq!(safety["summaryOnly"], true);
+    assert_eq!(safety["hybridSourceIntakeStatusSummaryFixtureOnly"], true);
+    for flag in [
+        "approvalExecutionImplemented",
+        "sourceIntakeImplemented",
+        "sourceIntakeDispatched",
+        "sourceIntakeCompleted",
+        "resultMaterialized",
+        "handoffPublished",
+        "publicTextGenerated",
+        "cppSourceReaderImplemented",
+        "systemVerilogSourceReaderImplemented",
+        "scriptSourceReaderImplemented",
+        "grammarReaderImplemented",
+        "manifestReaderImplemented",
+        "parserImplemented",
+        "compilerImplemented",
+        "runtimeImplemented",
+        "scriptExecution",
+        "verificationExecution",
+        "hardwareControlImplemented",
+        "commandExecution",
+        "runtimeExecution",
+        "localFileRead",
+        "repositoryRead",
+        "repositoryMutation",
+        "networkCalls",
+        "providerCalls",
+        "hardwareAccess",
+        "kv260Access",
+        "fpgaRepoAccess",
+        "modelLoad",
+        "privatePathsIncluded",
+        "sourcePathIncluded",
+        "sourceContentIncluded",
+        "sourceHashIncluded",
+        "sourceMetadataIncluded",
+        "sourceManifestIncluded",
+        "cppSourceIncluded",
+        "systemVerilogSourceIncluded",
+        "scriptSourceIncluded",
+        "grammarContentIncluded",
+        "parserOutputIncluded",
+        "compilerOutputIncluded",
+        "runtimePlanIncluded",
+        "scriptExecutionOutputIncluded",
+        "simulatorOutputIncluded",
+        "verificationOutputIncluded",
+        "artifactPathsIncluded",
+        "reportContentIncluded",
+        "publicPush",
+        "releaseOrTag",
+        "stableApiAbiClaim",
+        "marketplaceClaim",
+        "runtimeClaim",
+        "hardwareClaim",
+    ] {
+        assert_eq!(safety[flag], false, "safetyFlags.{flag} must be false");
+    }
+}
+
+#[test]
 fn plugin_host_session_state_example_keeps_host_session_blocked_boundary() {
     let value: serde_json::Value = parse_example("plugin-host-session-state.example.json");
     let root = value
