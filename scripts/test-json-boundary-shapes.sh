@@ -154,6 +154,7 @@ run_case \
     "[hybrid-implementation-gap-matrix] shape ok" \
     "[hybrid-source-intake-boundary] shape ok" \
     "[hybrid-source-intake-approval] shape ok" \
+    "[hybrid-source-intake-result] shape ok" \
     "[plugin-permission-model] shape ok" \
     "[plugin-audit-event] shape ok" \
     "[plugin-manifest-validation-result] shape ok" \
