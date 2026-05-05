@@ -911,6 +911,41 @@ evidence publication, release flow, or marketplace-facing flow can
 exist. No runtime, hardware, marketplace, release, or API/ABI stability
 claim is made.
 
+## Hybrid source-intake result boundary
+
+[`docs/examples/hybrid-source-intake-result.example.json`](examples/hybrid-source-intake-result.example.json)
+defines the checked descriptor-only blocked result boundary for future
+hybrid source-intake outcomes over approved hybrid source-intake
+approval, source-intake, gap-matrix, implementation-readiness, and
+evidence-detail summaries. It records `blocked_not_run`,
+`not_approved`, and `not_started` states only, with
+`sourceIntakeAllowed`, `sourceIntakeAttempted`, and
+`resultMaterialized` set to false. The fixture does not request,
+record, or grant approval, attempt source intake, complete source
+intake, or materialize result payloads.
+
+The result boundary is metadata only. It does not read C++ sources,
+read SystemVerilog sources, read custom-script sources, read grammar
+input, read source paths, read source content, read source hashes, read
+source metadata, read source manifests, read parser output, read
+compiler output, read runtime plans, read script execution results, run
+approval executors, dispatch source intake, run parsers, run compilers,
+generate runtimes, execute scripts, run simulators, run verification,
+read or write reports, read or write artifacts, execute commands, read
+repositories, mutate repositories, publish public text, call providers,
+use the network, touch hardware, access KV260, access FPGA repos, load
+models, upload telemetry, push publicly, or control releases/tags.
+
+The result boundary is approved for descriptor metadata only. Future
+implementation work still requires separate reviewed boundaries before
+any approval request, approval decision, source-intake dispatch, source
+path, source content, source hash, source metadata, manifest, grammar
+input, parser/compiler behavior, runtime behavior, script execution,
+simulator execution, verification, hardware control, result payload,
+report output, artifact handling, evidence publication, release flow,
+or marketplace-facing flow can exist. No runtime, hardware,
+marketplace, release, or API/ABI stability claim is made.
+
 ## analyze command
 
 ```
