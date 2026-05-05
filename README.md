@@ -116,6 +116,15 @@ boundary. There is no private back channel into lab internals. See
   model generator, model execution path, refinement check, proof path,
   verification run, report/artifact reader or writer, command runner,
   repository reader, release flow, marketplace flow, or hardware path.
+- `docs/examples/sail-source-intake-boundary.example.json` records a
+  descriptor-only source-intake boundary for future Sail and RTL source
+  handoff planning over approved Sail boundary summaries; it is not a
+  Sail source reader, RTL source reader, source path reader, source
+  content reader, source hash reader, source metadata reader, manifest
+  reader, AST reader, generated-model reader, parser, compiler, model
+  generator, model execution path, refinement check, proof path,
+  verification run, report/artifact reader or writer, command runner,
+  repository reader, release flow, marketplace flow, or hardware path.
 - `docs/examples/hybrid-strategy-plan.example.json` records a
   descriptor-only hybrid strategy plan for future C++/SystemVerilog and
   custom-script control tracks; it is not a source reader, grammar

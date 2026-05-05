@@ -148,6 +148,7 @@ run_case \
     "[sail-evidence-detail] inventory ok" \
     "[sail-model-readiness] inventory ok" \
     "[sail-implementation-gap-matrix] inventory ok" \
+    "[sail-source-intake-boundary] inventory ok" \
     "[hybrid-strategy-plan] inventory ok" \
     "[hybrid-interface-boundary] inventory ok" \
     "[hybrid-review-packet] inventory ok" \

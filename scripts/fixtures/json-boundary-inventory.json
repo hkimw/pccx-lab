@@ -240,6 +240,23 @@
       "docsAnchor": "docs/CLI_CORE_BOUNDARY.md#sail-implementation-gap-matrix-boundary"
     },
     {
+      "boundaryKind": "sail-source-intake-boundary",
+      "examplePath": "docs/examples/sail-source-intake-boundary.example.json",
+      "producingCommand": null,
+      "coreGeneratorOrReader": "docs/CLI_CORE_BOUNDARY.md#sail-source-intake-boundary",
+      "readerOnly": true,
+      "shapeValidation": {
+        "kind": "sail-source-intake-boundary",
+        "validator": "scripts/json_boundary_shape_validator.py",
+        "fixtureTest": "scripts/test-json-boundary-shapes.sh"
+      },
+      "rustValidation": {
+        "testPath": "crates/core/tests/json_boundary_examples.rs",
+        "testName": "sail_source_intake_boundary_example_keeps_descriptor_only_boundary"
+      },
+      "docsAnchor": "docs/CLI_CORE_BOUNDARY.md#sail-source-intake-boundary"
+    },
+    {
       "boundaryKind": "hybrid-strategy-plan",
       "examplePath": "docs/examples/hybrid-strategy-plan.example.json",
       "producingCommand": null,
