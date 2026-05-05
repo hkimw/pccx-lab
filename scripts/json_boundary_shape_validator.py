@@ -17507,6 +17507,521 @@ def validate_hybrid_source_intake_result(value: Any) -> None:
     require_string_array(require_field(root, "$", "issueRefs"), "$.issueRefs", min_items=1)
 
 
+def validate_hybrid_source_intake_handoff(value: Any) -> None:
+    root = expect_object(value, "$")
+    require_schema(root, "$", "pccx.lab.hybrid-source-intake-handoff.v0")
+    require_string_fields(
+        root,
+        "$",
+        [
+            "tool",
+            "handoffBoundaryId",
+            "handoffState",
+            "resultState",
+            "approvalState",
+            "intakeState",
+            "adapterState",
+            "defaultMode",
+            "hostMode",
+            "boundaryKind",
+        ],
+    )
+    expected_states = {
+        "handoffState": "blocked_summary_only",
+        "resultState": "blocked_not_run",
+        "approvalState": "not_approved",
+        "intakeState": "not_started",
+        "adapterState": "not_implemented",
+        "defaultMode": "read_only",
+        "hostMode": "cli_core_first_gui_second",
+        "boundaryKind": "future_hybrid_source_intake_handoff_summary",
+    }
+    for field, expected in expected_states.items():
+        if root[field] != expected:
+            raise ShapeError(f"unexpected value at $.{field}: expected {expected}")
+
+    refs = require_object_array(
+        require_field(root, "$", "sourceBoundaryRefs"),
+        "$.sourceBoundaryRefs",
+        min_items=5,
+    )
+    ref_ids = set()
+    ref_true_flags = ["summaryOnly", "handoffInput", "approvedSummaryRef"]
+    ref_false_flags = [
+        "sourceIntakeAllowed",
+        "sourceIntakeAttempted",
+        "resultMaterialized",
+        "sourceReadAllowed",
+        "grammarReadAllowed",
+        "pathReadAllowed",
+        "repositoryReadAllowed",
+        "reportReadAllowed",
+        "artifactReadAllowed",
+        "commandExecutionAllowed",
+        "runtimeExecutionAllowed",
+        "hardwareControlAllowed",
+    ]
+    for ref in refs:
+        path = "$.sourceBoundaryRefs[]"
+        require_string_fields(ref, path, ["refId", "schemaVersion", "examplePath", "state"])
+        ref_ids.add(ref["refId"])
+        require_bool_fields(ref, path, ref_true_flags + ref_false_flags)
+        for flag in ref_true_flags:
+            if ref[flag] is not True:
+                raise ShapeError(f"unexpected value at $.sourceBoundaryRefs[].{flag}: expected true")
+        for flag in ref_false_flags:
+            if ref[flag] is not False:
+                raise ShapeError(f"unexpected value at $.sourceBoundaryRefs[].{flag}: expected false")
+    for ref_id in [
+        "hybrid_source_intake_result",
+        "hybrid_source_intake_approval",
+        "hybrid_source_intake_boundary",
+        "hybrid_implementation_gap_matrix",
+        "hybrid_evidence_detail",
+    ]:
+        if ref_id not in ref_ids:
+            raise ShapeError(f"missing source boundary ref: {ref_id}")
+    if not any(ref["refId"] == "hybrid_source_intake_result" and ref.get("approved") is False for ref in refs):
+        raise ShapeError("missing blocked hybrid source-intake result reference")
+    if not any(
+        ref["refId"] == "hybrid_implementation_gap_matrix" and ref.get("sourceBoundaryGapRecorded") is True
+        for ref in refs
+    ):
+        raise ShapeError("missing hybrid implementation gap-matrix source-boundary gap reference")
+
+    request = expect_object(require_field(root, "$", "handoffRequest"), "$.handoffRequest")
+    require_string_fields(
+        request,
+        "$.handoffRequest",
+        ["requestKind", "commandKind", "sourceReferenceKind", "outputBoundary", "summary"],
+    )
+    expected_request = {
+        "requestKind": "planned_hybrid_source_intake_handoff",
+        "sourceReferenceKind": "approved-hybrid-source-intake-handoff-summaries",
+        "outputBoundary": "pccx.lab.hybrid-source-intake-handoff.v0",
+    }
+    for field, expected in expected_request.items():
+        if request[field] != expected:
+            raise ShapeError(f"unexpected value at $.handoffRequest.{field}: expected {expected}")
+    fixed_args = require_field(request, "$.handoffRequest", "fixedArgsPreview")
+    require_string_array(fixed_args, "$.handoffRequest.fixedArgsPreview", min_items=5)
+    if fixed_args[:5] != ["hybrid", "source-intake", "handoff", "--format", "json"]:
+        raise ShapeError("unexpected value at $.handoffRequest.fixedArgsPreview")
+    request_true_flags = ["summaryOnly", "inputRefOnly", "approvalRequired"]
+    request_false_flags = [
+        "approvalRequested",
+        "approved",
+        "sourceIntakeAllowed",
+        "sourceIntakeAttempted",
+        "sourceIntakeCompleted",
+        "resultMaterialized",
+        "handoffPayloadIncluded",
+        "handoffPublished",
+        "publicTextGenerated",
+        "pathEchoAllowed",
+        "privatePathEchoAllowed",
+        "localFileReadAllowed",
+        "repositoryReadAllowed",
+        "cppSourceReadAllowed",
+        "systemVerilogSourceReadAllowed",
+        "scriptSourceReadAllowed",
+        "grammarReadAllowed",
+        "sourceContentReadAllowed",
+        "sourcePathReadAllowed",
+        "sourceHashReadAllowed",
+        "sourceMetadataReadAllowed",
+        "sourceManifestReadAllowed",
+        "parserOutputReadAllowed",
+        "compilerOutputReadAllowed",
+        "runtimePlanReadAllowed",
+        "scriptExecutionResultReadAllowed",
+        "simulatorOutputReadAllowed",
+        "verificationResultReadAllowed",
+        "hardwareControlReadAllowed",
+        "parserExecutionAllowed",
+        "compilerExecutionAllowed",
+        "runtimeExecutionAllowed",
+        "scriptExecutionAllowed",
+        "simulatorExecutionAllowed",
+        "verificationRunAllowed",
+        "hardwareControlAllowed",
+        "rawReportReadAllowed",
+        "rawLogReadAllowed",
+        "artifactReadAllowed",
+        "artifactWriteAllowed",
+        "reportReadAllowed",
+        "reportWriteAllowed",
+        "commandExecutionAllowed",
+        "shellExecutionAllowed",
+        "providerCallAllowed",
+        "networkCallAllowed",
+        "launcherExecutionAllowed",
+        "editorExecutionAllowed",
+        "hardwareAccessAllowed",
+        "kv260AccessAllowed",
+        "fpgaRepoAccessAllowed",
+        "modelLoadAllowed",
+        "stableApiAbiClaim",
+        "marketplaceClaim",
+        "runtimeClaim",
+        "hardwareClaim",
+    ]
+    require_bool_fields(request, "$.handoffRequest", request_true_flags + request_false_flags)
+    for flag in request_true_flags:
+        if request[flag] is not True:
+            raise ShapeError(f"unexpected value at $.handoffRequest.{flag}: expected true")
+    for flag in request_false_flags:
+        if request[flag] is not False:
+            raise ShapeError(f"unexpected value at $.handoffRequest.{flag}: expected false")
+
+    handoff = expect_object(require_field(root, "$", "blockedHandoff"), "$.blockedHandoff")
+    require_string_fields(
+        handoff,
+        "$.blockedHandoff",
+        ["handoffKind", "handoffState", "resultState", "approvalState", "intakeState", "disposition", "summary"],
+    )
+    expected_handoff = {
+        "handoffKind": "hybrid_source_intake_handoff",
+        "handoffState": "blocked_summary_only",
+        "resultState": "blocked_not_run",
+        "approvalState": "not_approved",
+        "intakeState": "not_started",
+        "disposition": "blocked_until_source_intake_result_is_approved_and_materialized",
+    }
+    for field, expected in expected_handoff.items():
+        if handoff[field] != expected:
+            raise ShapeError(f"unexpected value at $.blockedHandoff.{field}: expected {expected}")
+    handoff_true_flags = ["summaryOnly", "descriptorOnly", "approvalRequired"]
+    handoff_false_flags = [
+        "approved",
+        "sourceIntakeAllowed",
+        "sourceIntakeAttempted",
+        "sourceIntakeCompleted",
+        "resultMaterialized",
+        "handoffPayloadIncluded",
+        "handoffPublished",
+        "publicTextGenerated",
+        "sourceManifestReadAllowed",
+        "cppSourceReadAllowed",
+        "systemVerilogSourceReadAllowed",
+        "scriptSourceReadAllowed",
+        "grammarReadAllowed",
+        "sourceContentReadAllowed",
+        "sourcePathReadAllowed",
+        "sourceHashReadAllowed",
+        "sourceMetadataReadAllowed",
+        "parserOutputReadAllowed",
+        "compilerOutputReadAllowed",
+        "runtimePlanReadAllowed",
+        "scriptExecutionResultReadAllowed",
+        "simulatorOutputReadAllowed",
+        "verificationResultReadAllowed",
+        "parserExecutionAllowed",
+        "compilerExecutionAllowed",
+        "runtimeExecutionAllowed",
+        "scriptExecutionAllowed",
+        "simulatorExecutionAllowed",
+        "verificationRunAllowed",
+        "hardwareControlAllowed",
+        "repositoryReadAllowed",
+        "artifactReadAllowed",
+        "reportReadAllowed",
+        "commandExecutionAllowed",
+        "providerCallAllowed",
+        "networkCallAllowed",
+        "publicPushAllowed",
+        "releaseOrTagAllowed",
+    ]
+    require_bool_fields(handoff, "$.blockedHandoff", handoff_true_flags + handoff_false_flags)
+    for flag in handoff_true_flags:
+        if handoff[flag] is not True:
+            raise ShapeError(f"unexpected value at $.blockedHandoff.{flag}: expected true")
+    for flag in handoff_false_flags:
+        if handoff[flag] is not False:
+            raise ShapeError(f"unexpected value at $.blockedHandoff.{flag}: expected false")
+
+    checklist = require_object_array(require_field(root, "$", "handoffChecklist"), "$.handoffChecklist", min_items=3)
+    checklist_true_flags = ["summaryOnly", "approvalRequired", "approvedSummaryRef"]
+    checklist_false_flags = [
+        "sourceIntakeAllowed",
+        "sourceReadAllowed",
+        "grammarReadAllowed",
+        "pathReadAllowed",
+        "repositoryReadAllowed",
+        "reportReadAllowed",
+        "artifactReadAllowed",
+        "commandExecutionAllowed",
+        "hardwareControlAllowed",
+    ]
+    for item in checklist:
+        path = "$.handoffChecklist[]"
+        require_string_fields(item, path, ["checkId", "state", "sourceRef", "summary"])
+        require_bool_fields(item, path, checklist_true_flags + checklist_false_flags)
+        for flag in checklist_true_flags:
+            if item[flag] is not True:
+                raise ShapeError(f"unexpected value at $.handoffChecklist[].{flag}: expected true")
+        for flag in checklist_false_flags:
+            if item[flag] is not False:
+                raise ShapeError(f"unexpected value at $.handoffChecklist[].{flag}: expected false")
+    expected_checks = {
+        "source_intake_result_blocked": "blocked_not_run",
+        "source_intake_approval_not_granted": "not_approved",
+        "no_public_handoff_payload": "blocked",
+    }
+    for check_id, state in expected_checks.items():
+        if not any(item["checkId"] == check_id and item["state"] == state for item in checklist):
+            raise ShapeError(f"missing handoff checklist item: {check_id}")
+
+    policy = expect_object(require_field(root, "$", "handoffPolicy"), "$.handoffPolicy")
+    require_string_fields(
+        policy,
+        "$.handoffPolicy",
+        ["policyState", "handoffState", "resultState", "approvalState", "summary"],
+    )
+    expected_policy = {
+        "policyState": "blocked",
+        "handoffState": "blocked_summary_only",
+        "resultState": "blocked_not_run",
+        "approvalState": "not_approved",
+    }
+    for field, expected in expected_policy.items():
+        if policy[field] != expected:
+            raise ShapeError(f"unexpected value at $.handoffPolicy.{field}: expected {expected}")
+    policy_true_flags = ["summaryOnly", "descriptorOnly", "approvalRequired", "auditRequired"]
+    policy_false_flags = [
+        "approved",
+        "sourceIntakeAllowed",
+        "sourceIntakeAttempted",
+        "sourceIntakeCompleted",
+        "resultMaterialized",
+        "handoffPayloadIncluded",
+        "handoffPublished",
+        "publicTextGenerated",
+        "readyForSourceIntake",
+        "readyForCppSourceIntake",
+        "readyForSystemVerilogIntake",
+        "readyForScriptIntake",
+        "readyForGrammarIntake",
+        "readyForManifestRead",
+        "readyForParser",
+        "readyForCompiler",
+        "readyForRuntime",
+        "readyForScriptExecution",
+        "readyForSimulator",
+        "readyForVerificationRun",
+        "readyForHardwareControl",
+        "readyForReportRead",
+        "readyForArtifactRead",
+        "readyForRepositoryRead",
+        "readyForRelease",
+        "readyForMarketplace",
+        "runtimeClaim",
+        "hardwareClaim",
+        "stableApiAbiClaim",
+        "marketplaceClaim",
+    ]
+    require_bool_fields(policy, "$.handoffPolicy", policy_true_flags + policy_false_flags)
+    for flag in policy_true_flags:
+        if policy[flag] is not True:
+            raise ShapeError(f"unexpected value at $.handoffPolicy.{flag}: expected true")
+    for flag in policy_false_flags:
+        if policy[flag] is not False:
+            raise ShapeError(f"unexpected value at $.handoffPolicy.{flag}: expected false")
+
+    display = expect_object(require_field(root, "$", "displayPolicy"), "$.displayPolicy")
+    require_string_fields(display, "$.displayPolicy", ["surface", "guiPolicy"])
+    require_string_array(require_field(display, "$.displayPolicy", "allowedFields"), "$.displayPolicy.allowedFields", min_items=1)
+    require_string_array(require_field(display, "$.displayPolicy", "blockedFields"), "$.displayPolicy.blockedFields", min_items=1)
+    display_false_flags = [
+        "pathEchoAllowed",
+        "privatePathsIncluded",
+        "payloadIncluded",
+        "stdoutIncluded",
+        "stderrIncluded",
+        "rawLogsIncluded",
+        "rawReportIncluded",
+        "artifactPathsIncluded",
+        "reportContentIncluded",
+        "sourceContentIncluded",
+        "sourcePathIncluded",
+        "sourceHashIncluded",
+        "sourceMetadataIncluded",
+        "sourceManifestIncluded",
+        "cppSourceIncluded",
+        "systemVerilogSourceIncluded",
+        "scriptSourceIncluded",
+        "grammarContentIncluded",
+        "parserOutputIncluded",
+        "compilerOutputIncluded",
+        "runtimePlanIncluded",
+        "scriptExecutionOutputIncluded",
+        "simulatorOutputIncluded",
+        "verificationOutputIncluded",
+        "resultPayloadIncluded",
+        "handoffPayloadIncluded",
+        "publicTextIncluded",
+        "approvalTokenIncluded",
+        "approvalActorIncluded",
+        "hardwareDumpIncluded",
+        "boardDumpIncluded",
+        "modelPathsIncluded",
+    ]
+    require_bool_fields(display, "$.displayPolicy", ["summaryOnly"] + display_false_flags)
+    if display["summaryOnly"] is not True:
+        raise ShapeError("unexpected value at $.displayPolicy.summaryOnly: expected true")
+    for flag in display_false_flags:
+        if display[flag] is not False:
+            raise ShapeError(f"unexpected value at $.displayPolicy.{flag}: expected false")
+
+    mutation = expect_object(require_field(root, "$", "noMutationEvidence"), "$.noMutationEvidence")
+    require_string_fields(mutation, "$.noMutationEvidence", ["state", "evidenceRule"])
+    mutation_false_flags = [
+        "trackedFileMutationAllowed",
+        "trackedFileDiffCaptured",
+        "approvalExecutorAllowed",
+        "sourceIntakeDispatchAllowed",
+        "sourceIntakeAttempted",
+        "localFileReadAllowed",
+        "repositoryReadAllowed",
+        "cppSourceReadAllowed",
+        "systemVerilogSourceReadAllowed",
+        "scriptSourceReadAllowed",
+        "grammarReadAllowed",
+        "sourceContentReadAllowed",
+        "sourcePathReadAllowed",
+        "sourceHashReadAllowed",
+        "sourceMetadataReadAllowed",
+        "sourceManifestReadAllowed",
+        "parserOutputReadAllowed",
+        "compilerOutputReadAllowed",
+        "runtimePlanReadAllowed",
+        "rawReportReadAllowed",
+        "rawLogReadAllowed",
+        "artifactReadAllowed",
+        "artifactWriteAllowed",
+        "reportReadAllowed",
+        "reportWriteAllowed",
+        "publicTextPublicationAllowed",
+        "commandExecutionAllowed",
+        "repositoryMutationAllowed",
+        "publicPushAllowed",
+        "releaseOrTagAllowed",
+    ]
+    require_bool_fields(mutation, "$.noMutationEvidence", mutation_false_flags)
+    for flag in mutation_false_flags:
+        if mutation[flag] is not False:
+            raise ShapeError(f"unexpected value at $.noMutationEvidence.{flag}: expected false")
+
+    blocked_actions = require_field(root, "$", "blockedActions")
+    require_string_array(blocked_actions, "$.blockedActions", min_items=1)
+    for required in [
+        "source-intake-handoff-materialization",
+        "source-intake-result-materialization",
+        "source-intake-approval-request",
+        "source-intake-dispatch",
+        "cpp-source-read",
+        "systemverilog-source-read",
+        "grammar-read",
+        "public-text-publication",
+        "repository-read",
+        "artifact-read",
+        "report-read",
+        "marketplace-flow",
+        "kv260-access",
+        "fpga-repo-access",
+        "model-load",
+        "release-or-tag",
+    ]:
+        if required not in blocked_actions:
+            raise ShapeError(f"missing blocked action at $.blockedActions: {required}")
+
+    safety = expect_object(require_field(root, "$", "safetyFlags"), "$.safetyFlags")
+    safety_true_flags = [
+        "dataOnly",
+        "descriptorOnly",
+        "readOnly",
+        "summaryOnly",
+        "hybridSourceIntakeHandoffFixtureOnly",
+    ]
+    safety_false_flags = [
+        "approvalExecutorImplemented",
+        "sourceIntakeApprovalImplemented",
+        "sourceIntakeRequestImplemented",
+        "sourceIntakeDispatchImplemented",
+        "sourceIntakeResultImplemented",
+        "sourceIntakeHandoffImplemented",
+        "cppSourceReaderImplemented",
+        "systemVerilogSourceReaderImplemented",
+        "scriptSourceReaderImplemented",
+        "grammarReaderImplemented",
+        "sourceManifestReaderImplemented",
+        "sourcePathReaderImplemented",
+        "sourceContentReaderImplemented",
+        "sourceHashReaderImplemented",
+        "sourceMetadataReaderImplemented",
+        "parserImplemented",
+        "compilerImplemented",
+        "runtimeImplemented",
+        "scriptExecution",
+        "simulatorExecution",
+        "verificationExecution",
+        "hardwareControl",
+        "commandExecution",
+        "shellExecution",
+        "runtimeExecution",
+        "localFileRead",
+        "repositoryRead",
+        "rawReportRead",
+        "rawLogRead",
+        "readsArtifacts",
+        "writesArtifacts",
+        "reportReaderImplemented",
+        "reportWriterImplemented",
+        "publicTextWriterImplemented",
+        "networkCalls",
+        "providerCalls",
+        "launcherExecution",
+        "editorExecution",
+        "hardwareAccess",
+        "kv260Access",
+        "fpgaRepoAccess",
+        "modelExecution",
+        "modelWeightsIncluded",
+        "privatePathsIncluded",
+        "secretsIncluded",
+        "tokensIncluded",
+        "stdoutIncluded",
+        "stderrIncluded",
+        "rawLogsIncluded",
+        "rawReportIncluded",
+        "artifactPathsIncluded",
+        "approvalTokenIncluded",
+        "approvalActorIncluded",
+        "hardwareDumpIncluded",
+        "boardDumpIncluded",
+        "publicTextIncluded",
+        "telemetry",
+        "writeBack",
+        "repositoryMutation",
+        "publicPush",
+        "releaseOrTag",
+        "stableApiAbiClaim",
+        "marketplaceClaim",
+        "runtimeClaim",
+        "hardwareClaim",
+    ]
+    require_bool_fields(safety, "$.safetyFlags", safety_true_flags + safety_false_flags)
+    for flag in safety_true_flags:
+        if safety[flag] is not True:
+            raise ShapeError(f"unexpected value at $.safetyFlags.{flag}: expected true")
+    for flag in safety_false_flags:
+        if safety[flag] is not False:
+            raise ShapeError(f"unexpected value at $.safetyFlags.{flag}: expected false")
+
+    require_string_array(require_field(root, "$", "limitations"), "$.limitations", min_items=1)
+    require_string_array(require_field(root, "$", "issueRefs"), "$.issueRefs", min_items=1)
+
+
 def validate_hybrid_strategy_plan(value: Any) -> None:
     root = expect_object(value, "$")
     require_schema(root, "$", "pccx.lab.hybrid-strategy-plan.v0")
@@ -20221,6 +20736,7 @@ SPECS = [
     BoundarySpec("hybrid-source-intake-boundary", "docs/examples/hybrid-source-intake-boundary.example.json", validate_hybrid_source_intake_boundary),
     BoundarySpec("hybrid-source-intake-approval", "docs/examples/hybrid-source-intake-approval.example.json", validate_hybrid_source_intake_approval),
     BoundarySpec("hybrid-source-intake-result", "docs/examples/hybrid-source-intake-result.example.json", validate_hybrid_source_intake_result),
+    BoundarySpec("hybrid-source-intake-handoff", "docs/examples/hybrid-source-intake-handoff.example.json", validate_hybrid_source_intake_handoff),
     BoundarySpec("launcher-diagnostics-handoff", "docs/examples/launcher-diagnostics-handoff.example.json", validate_launcher_handoff),
     BoundarySpec("launcher-device-session-status", "docs/examples/launcher-device-session-status.example.json", validate_launcher_device_session_status),
     BoundarySpec("mcp-read-only-tool-plan", "docs/examples/mcp-read-only-tool-plan.example.json", validate_mcp_read_only_tool_plan),

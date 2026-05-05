@@ -10858,6 +10858,317 @@ fn hybrid_source_intake_result_example_keeps_descriptor_only_boundary() {
 }
 
 #[test]
+fn hybrid_source_intake_handoff_example_keeps_descriptor_only_boundary() {
+    let value: serde_json::Value = parse_example("hybrid-source-intake-handoff.example.json");
+    let root = value
+        .as_object()
+        .expect("hybrid source-intake handoff boundary must be an object");
+
+    assert_eq!(
+        root["schemaVersion"],
+        "pccx.lab.hybrid-source-intake-handoff.v0"
+    );
+    assert_eq!(root["handoffState"], "blocked_summary_only");
+    assert_eq!(root["resultState"], "blocked_not_run");
+    assert_eq!(root["approvalState"], "not_approved");
+    assert_eq!(root["intakeState"], "not_started");
+    assert_eq!(root["adapterState"], "not_implemented");
+    assert_eq!(root["defaultMode"], "read_only");
+    assert_eq!(root["hostMode"], "cli_core_first_gui_second");
+    assert_eq!(
+        root["boundaryKind"],
+        "future_hybrid_source_intake_handoff_summary"
+    );
+
+    let refs = root["sourceBoundaryRefs"]
+        .as_array()
+        .expect("source boundary refs must be an array");
+    for ref_id in [
+        "hybrid_source_intake_result",
+        "hybrid_source_intake_approval",
+        "hybrid_source_intake_boundary",
+        "hybrid_implementation_gap_matrix",
+        "hybrid_evidence_detail",
+    ] {
+        assert!(
+            refs.iter().any(|source| {
+                source["refId"] == ref_id
+                    && source["summaryOnly"] == true
+                    && source["handoffInput"] == true
+                    && source["approvedSummaryRef"] == true
+                    && source["sourceIntakeAllowed"] == false
+                    && source["sourceReadAllowed"] == false
+                    && source["grammarReadAllowed"] == false
+                    && source["repositoryReadAllowed"] == false
+                    && source["reportReadAllowed"] == false
+                    && source["artifactReadAllowed"] == false
+                    && source["commandExecutionAllowed"] == false
+                    && source["runtimeExecutionAllowed"] == false
+            }),
+            "sourceBoundaryRefs must include {ref_id}"
+        );
+    }
+
+    let request = root["handoffRequest"]
+        .as_object()
+        .expect("handoff request must be an object");
+    assert_eq!(
+        request["requestKind"],
+        "planned_hybrid_source_intake_handoff"
+    );
+    assert_eq!(
+        request["sourceReferenceKind"],
+        "approved-hybrid-source-intake-handoff-summaries"
+    );
+    assert_eq!(
+        request["outputBoundary"],
+        "pccx.lab.hybrid-source-intake-handoff.v0"
+    );
+    let fixed_args = request["fixedArgsPreview"]
+        .as_array()
+        .expect("fixed args preview must be an array");
+    assert_eq!(fixed_args[0], "hybrid");
+    assert_eq!(fixed_args[1], "source-intake");
+    assert_eq!(fixed_args[2], "handoff");
+    assert_eq!(fixed_args[3], "--format");
+    assert_eq!(fixed_args[4], "json");
+    assert_eq!(request["summaryOnly"], true);
+    assert_eq!(request["inputRefOnly"], true);
+    assert_eq!(request["approvalRequired"], true);
+    assert_eq!(request["approvalRequested"], false);
+    assert_eq!(request["approved"], false);
+    assert_eq!(request["sourceIntakeAllowed"], false);
+    assert_eq!(request["sourceIntakeAttempted"], false);
+    assert_eq!(request["sourceIntakeCompleted"], false);
+    assert_eq!(request["resultMaterialized"], false);
+    assert_eq!(request["handoffPayloadIncluded"], false);
+    assert_eq!(request["handoffPublished"], false);
+    assert_eq!(request["publicTextGenerated"], false);
+    assert_eq!(request["cppSourceReadAllowed"], false);
+    assert_eq!(request["systemVerilogSourceReadAllowed"], false);
+    assert_eq!(request["scriptSourceReadAllowed"], false);
+    assert_eq!(request["grammarReadAllowed"], false);
+    assert_eq!(request["sourceContentReadAllowed"], false);
+    assert_eq!(request["sourcePathReadAllowed"], false);
+    assert_eq!(request["sourceHashReadAllowed"], false);
+    assert_eq!(request["sourceMetadataReadAllowed"], false);
+    assert_eq!(request["sourceManifestReadAllowed"], false);
+    assert_eq!(request["parserExecutionAllowed"], false);
+    assert_eq!(request["compilerExecutionAllowed"], false);
+    assert_eq!(request["runtimeExecutionAllowed"], false);
+    assert_eq!(request["scriptExecutionAllowed"], false);
+    assert_eq!(request["verificationRunAllowed"], false);
+    assert_eq!(request["hardwareControlAllowed"], false);
+    assert_eq!(request["repositoryReadAllowed"], false);
+    assert_eq!(request["reportReadAllowed"], false);
+    assert_eq!(request["artifactReadAllowed"], false);
+    assert_eq!(request["providerCallAllowed"], false);
+    assert_eq!(request["networkCallAllowed"], false);
+    assert_eq!(request["kv260AccessAllowed"], false);
+    assert_eq!(request["fpgaRepoAccessAllowed"], false);
+    assert_eq!(request["stableApiAbiClaim"], false);
+    assert_eq!(request["marketplaceClaim"], false);
+    assert_eq!(request["runtimeClaim"], false);
+    assert_eq!(request["hardwareClaim"], false);
+
+    let handoff = root["blockedHandoff"]
+        .as_object()
+        .expect("blocked handoff must be an object");
+    assert_eq!(handoff["handoffKind"], "hybrid_source_intake_handoff");
+    assert_eq!(handoff["handoffState"], "blocked_summary_only");
+    assert_eq!(handoff["resultState"], "blocked_not_run");
+    assert_eq!(handoff["approvalState"], "not_approved");
+    assert_eq!(handoff["intakeState"], "not_started");
+    assert_eq!(handoff["summaryOnly"], true);
+    assert_eq!(handoff["descriptorOnly"], true);
+    assert_eq!(handoff["approvalRequired"], true);
+    assert_eq!(handoff["approved"], false);
+    assert_eq!(handoff["sourceIntakeAllowed"], false);
+    assert_eq!(handoff["sourceIntakeAttempted"], false);
+    assert_eq!(handoff["sourceIntakeCompleted"], false);
+    assert_eq!(handoff["resultMaterialized"], false);
+    assert_eq!(handoff["handoffPayloadIncluded"], false);
+    assert_eq!(handoff["handoffPublished"], false);
+    assert_eq!(handoff["publicTextGenerated"], false);
+    assert_eq!(handoff["cppSourceReadAllowed"], false);
+    assert_eq!(handoff["systemVerilogSourceReadAllowed"], false);
+    assert_eq!(handoff["scriptSourceReadAllowed"], false);
+    assert_eq!(handoff["grammarReadAllowed"], false);
+    assert_eq!(handoff["sourceManifestReadAllowed"], false);
+    assert_eq!(handoff["parserExecutionAllowed"], false);
+    assert_eq!(handoff["compilerExecutionAllowed"], false);
+    assert_eq!(handoff["runtimeExecutionAllowed"], false);
+    assert_eq!(handoff["scriptExecutionAllowed"], false);
+    assert_eq!(handoff["verificationRunAllowed"], false);
+    assert_eq!(handoff["hardwareControlAllowed"], false);
+    assert_eq!(handoff["repositoryReadAllowed"], false);
+    assert_eq!(handoff["reportReadAllowed"], false);
+    assert_eq!(handoff["artifactReadAllowed"], false);
+    assert_eq!(handoff["providerCallAllowed"], false);
+    assert_eq!(handoff["networkCallAllowed"], false);
+
+    let checklist = root["handoffChecklist"]
+        .as_array()
+        .expect("handoff checklist must be an array");
+    assert!(checklist.iter().any(|item| {
+        item["checkId"] == "source_intake_result_blocked"
+            && item["state"] == "blocked_not_run"
+            && item["approvalRequired"] == true
+            && item["sourceIntakeAllowed"] == false
+    }));
+    assert!(checklist.iter().any(|item| {
+        item["checkId"] == "source_intake_approval_not_granted"
+            && item["state"] == "not_approved"
+            && item["sourceIntakeAllowed"] == false
+    }));
+    assert!(checklist.iter().any(|item| {
+        item["checkId"] == "no_public_handoff_payload" && item["state"] == "blocked"
+    }));
+
+    let policy = root["handoffPolicy"]
+        .as_object()
+        .expect("handoff policy must be an object");
+    assert_eq!(policy["policyState"], "blocked");
+    assert_eq!(policy["handoffState"], "blocked_summary_only");
+    assert_eq!(policy["resultState"], "blocked_not_run");
+    assert_eq!(policy["approvalState"], "not_approved");
+    assert_eq!(policy["summaryOnly"], true);
+    assert_eq!(policy["descriptorOnly"], true);
+    assert_eq!(policy["approvalRequired"], true);
+    assert_eq!(policy["auditRequired"], true);
+    assert_eq!(policy["approved"], false);
+    assert_eq!(policy["sourceIntakeAllowed"], false);
+    assert_eq!(policy["sourceIntakeAttempted"], false);
+    assert_eq!(policy["sourceIntakeCompleted"], false);
+    assert_eq!(policy["resultMaterialized"], false);
+    assert_eq!(policy["handoffPayloadIncluded"], false);
+    assert_eq!(policy["handoffPublished"], false);
+    assert_eq!(policy["publicTextGenerated"], false);
+    assert_eq!(policy["readyForSourceIntake"], false);
+    assert_eq!(policy["readyForCppSourceIntake"], false);
+    assert_eq!(policy["readyForSystemVerilogIntake"], false);
+    assert_eq!(policy["readyForScriptIntake"], false);
+    assert_eq!(policy["readyForGrammarIntake"], false);
+    assert_eq!(policy["readyForParser"], false);
+    assert_eq!(policy["readyForCompiler"], false);
+    assert_eq!(policy["readyForRuntime"], false);
+    assert_eq!(policy["readyForScriptExecution"], false);
+    assert_eq!(policy["readyForVerificationRun"], false);
+    assert_eq!(policy["readyForHardwareControl"], false);
+    assert_eq!(policy["readyForRepositoryRead"], false);
+    assert_eq!(policy["runtimeClaim"], false);
+    assert_eq!(policy["hardwareClaim"], false);
+    assert_eq!(policy["stableApiAbiClaim"], false);
+    assert_eq!(policy["marketplaceClaim"], false);
+
+    let display = root["displayPolicy"]
+        .as_object()
+        .expect("display policy must be an object");
+    assert_eq!(display["summaryOnly"], true);
+    assert_eq!(display["sourceContentIncluded"], false);
+    assert_eq!(display["sourcePathIncluded"], false);
+    assert_eq!(display["sourceHashIncluded"], false);
+    assert_eq!(display["sourceManifestIncluded"], false);
+    assert_eq!(display["resultPayloadIncluded"], false);
+    assert_eq!(display["handoffPayloadIncluded"], false);
+    assert_eq!(display["publicTextIncluded"], false);
+    assert_eq!(display["artifactPathsIncluded"], false);
+    assert_eq!(display["approvalTokenIncluded"], false);
+    assert_eq!(display["approvalActorIncluded"], false);
+    assert_eq!(display["hardwareDumpIncluded"], false);
+    assert_eq!(display["boardDumpIncluded"], false);
+
+    let blocked = root["blockedActions"]
+        .as_array()
+        .expect("blocked actions must be an array");
+    for action in [
+        "source-intake-handoff-materialization",
+        "source-intake-result-materialization",
+        "source-intake-approval-request",
+        "source-intake-dispatch",
+        "cpp-source-read",
+        "systemverilog-source-read",
+        "script-source-read",
+        "grammar-read",
+        "public-text-publication",
+        "local-file-read",
+        "repository-read",
+        "artifact-read",
+        "report-read",
+        "provider-call",
+        "network-call",
+        "hardware-probe",
+        "kv260-access",
+        "fpga-repo-access",
+        "model-load",
+        "release-or-tag",
+    ] {
+        assert!(
+            blocked.iter().any(|item| item == action),
+            "blockedActions must include {action}"
+        );
+    }
+
+    let safety = root["safetyFlags"]
+        .as_object()
+        .expect("safety flags must be an object");
+    assert_eq!(safety["dataOnly"], true);
+    assert_eq!(safety["descriptorOnly"], true);
+    assert_eq!(safety["readOnly"], true);
+    assert_eq!(safety["summaryOnly"], true);
+    assert_eq!(safety["hybridSourceIntakeHandoffFixtureOnly"], true);
+    assert_eq!(safety["approvalExecutorImplemented"], false);
+    assert_eq!(safety["sourceIntakeApprovalImplemented"], false);
+    assert_eq!(safety["sourceIntakeRequestImplemented"], false);
+    assert_eq!(safety["sourceIntakeDispatchImplemented"], false);
+    assert_eq!(safety["sourceIntakeResultImplemented"], false);
+    assert_eq!(safety["sourceIntakeHandoffImplemented"], false);
+    assert_eq!(safety["cppSourceReaderImplemented"], false);
+    assert_eq!(safety["systemVerilogSourceReaderImplemented"], false);
+    assert_eq!(safety["scriptSourceReaderImplemented"], false);
+    assert_eq!(safety["grammarReaderImplemented"], false);
+    assert_eq!(safety["sourceManifestReaderImplemented"], false);
+    assert_eq!(safety["sourcePathReaderImplemented"], false);
+    assert_eq!(safety["sourceContentReaderImplemented"], false);
+    assert_eq!(safety["sourceHashReaderImplemented"], false);
+    assert_eq!(safety["sourceMetadataReaderImplemented"], false);
+    assert_eq!(safety["parserImplemented"], false);
+    assert_eq!(safety["compilerImplemented"], false);
+    assert_eq!(safety["runtimeImplemented"], false);
+    assert_eq!(safety["scriptExecution"], false);
+    assert_eq!(safety["verificationExecution"], false);
+    assert_eq!(safety["hardwareControl"], false);
+    assert_eq!(safety["commandExecution"], false);
+    assert_eq!(safety["runtimeExecution"], false);
+    assert_eq!(safety["localFileRead"], false);
+    assert_eq!(safety["repositoryRead"], false);
+    assert_eq!(safety["networkCalls"], false);
+    assert_eq!(safety["providerCalls"], false);
+    assert_eq!(safety["hardwareAccess"], false);
+    assert_eq!(safety["kv260Access"], false);
+    assert_eq!(safety["fpgaRepoAccess"], false);
+    assert_eq!(safety["modelExecution"], false);
+    assert_eq!(safety["privatePathsIncluded"], false);
+    assert_eq!(safety["secretsIncluded"], false);
+    assert_eq!(safety["tokensIncluded"], false);
+    assert_eq!(safety["artifactPathsIncluded"], false);
+    assert_eq!(safety["approvalTokenIncluded"], false);
+    assert_eq!(safety["approvalActorIncluded"], false);
+    assert_eq!(safety["hardwareDumpIncluded"], false);
+    assert_eq!(safety["boardDumpIncluded"], false);
+    assert_eq!(safety["publicTextIncluded"], false);
+    assert_eq!(safety["telemetry"], false);
+    assert_eq!(safety["writeBack"], false);
+    assert_eq!(safety["repositoryMutation"], false);
+    assert_eq!(safety["publicPush"], false);
+    assert_eq!(safety["releaseOrTag"], false);
+    assert_eq!(safety["stableApiAbiClaim"], false);
+    assert_eq!(safety["marketplaceClaim"], false);
+    assert_eq!(safety["runtimeClaim"], false);
+    assert_eq!(safety["hardwareClaim"], false);
+}
+
+#[test]
 fn plugin_host_session_state_example_keeps_host_session_blocked_boundary() {
     let value: serde_json::Value = parse_example("plugin-host-session-state.example.json");
     let root = value

@@ -946,6 +946,43 @@ report output, artifact handling, evidence publication, release flow,
 or marketplace-facing flow can exist. No runtime, hardware,
 marketplace, release, or API/ABI stability claim is made.
 
+## Hybrid source-intake handoff boundary
+
+[`docs/examples/hybrid-source-intake-handoff.example.json`](examples/hybrid-source-intake-handoff.example.json)
+defines the checked descriptor-only blocked handoff summary for future
+hybrid source-intake result review over approved hybrid source-intake
+result, approval, source-intake, gap-matrix, and evidence-detail
+summaries. It records `blocked_summary_only`, `blocked_not_run`,
+`not_approved`, and `not_started` states only, with
+`sourceIntakeAllowed`, `sourceIntakeAttempted`, `resultMaterialized`,
+`handoffPayloadIncluded`, `handoffPublished`, and `publicTextGenerated`
+set to false. The fixture does not request, record, or grant approval,
+attempt source intake, complete source intake, materialize result
+payloads, generate public text, or publish a handoff.
+
+The handoff boundary is metadata only. It does not read C++ sources,
+read SystemVerilog sources, read custom-script sources, read grammar
+input, read source paths, read source content, read source hashes, read
+source metadata, read source manifests, read parser output, read
+compiler output, read runtime plans, read script execution results, run
+approval executors, dispatch source intake, run parsers, run compilers,
+generate runtimes, execute scripts, run simulators, run verification,
+read or write reports, read or write artifacts, execute commands, read
+repositories, mutate repositories, publish public text, call providers,
+use the network, touch hardware, access KV260, access FPGA repos, load
+models, upload telemetry, push publicly, or control releases/tags.
+
+The handoff boundary is approved for descriptor metadata only. Future
+implementation work still requires separate reviewed boundaries before
+any approval request, approval decision, source-intake dispatch, source
+path, source content, source hash, source metadata, manifest, grammar
+input, parser/compiler behavior, runtime behavior, script execution,
+simulator execution, verification, hardware control, result payload,
+handoff payload, public handoff text, report output, artifact handling,
+evidence publication, release flow, or marketplace-facing flow can
+exist. No runtime, hardware, marketplace, release, or API/ABI stability
+claim is made.
+
 ## analyze command
 
 ```

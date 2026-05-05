@@ -444,6 +444,23 @@
       "docsAnchor": "docs/CLI_CORE_BOUNDARY.md#hybrid-source-intake-result-boundary"
     },
     {
+      "boundaryKind": "hybrid-source-intake-handoff",
+      "examplePath": "docs/examples/hybrid-source-intake-handoff.example.json",
+      "producingCommand": null,
+      "coreGeneratorOrReader": "docs/CLI_CORE_BOUNDARY.md#hybrid-source-intake-handoff-boundary",
+      "readerOnly": true,
+      "shapeValidation": {
+        "kind": "hybrid-source-intake-handoff",
+        "validator": "scripts/json_boundary_shape_validator.py",
+        "fixtureTest": "scripts/test-json-boundary-shapes.sh"
+      },
+      "rustValidation": {
+        "testPath": "crates/core/tests/json_boundary_examples.rs",
+        "testName": "hybrid_source_intake_handoff_example_keeps_descriptor_only_boundary"
+      },
+      "docsAnchor": "docs/CLI_CORE_BOUNDARY.md#hybrid-source-intake-handoff-boundary"
+    },
+    {
       "boundaryKind": "launcher-diagnostics-handoff",
       "examplePath": "docs/examples/launcher-diagnostics-handoff.example.json",
       "producingCommand": null,

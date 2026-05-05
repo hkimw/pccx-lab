@@ -160,6 +160,7 @@ run_case \
     "[hybrid-source-intake-boundary] inventory ok" \
     "[hybrid-source-intake-approval] inventory ok" \
     "[hybrid-source-intake-result] inventory ok" \
+    "[hybrid-source-intake-handoff] inventory ok" \
     "[plugin-boundary-plan] inventory ok" \
     "[plugin-manifest-validation-result] inventory ok" \
     "[plugin-sample-catalog] inventory ok" \
